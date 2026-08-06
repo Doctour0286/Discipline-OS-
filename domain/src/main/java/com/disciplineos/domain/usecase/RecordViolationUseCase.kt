@@ -84,10 +84,11 @@ class RecordViolationUseCase(
             )
         }
 
-        val debtBlocked = violation.rootCauseClusterId != null &&
-            clusterAlreadyHasActiveEntry(violation.rootCauseClusterId, violation.id, LedgerMetric.DEBT)
-        val reputationBlocked = violation.rootCauseClusterId != null &&
-            clusterAlreadyHasActiveEntry(violation.rootCauseClusterId, violation.id, LedgerMetric.REPUTATION)
+        val clusterId = violation.rootCauseClusterId
+        val debtBlocked = clusterId != null &&
+            clusterAlreadyHasActiveEntry(clusterId, violation.id, LedgerMetric.DEBT)
+        val reputationBlocked = clusterId != null &&
+            clusterAlreadyHasActiveEntry(clusterId, violation.id, LedgerMetric.REPUTATION)
 
         val debtEntry = if (debtBlocked) null else {
             val delta = consequencePolicy.debtPenalty(user.currentTier, violation.type)
