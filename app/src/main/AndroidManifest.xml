@@ -2,13 +2,73 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-        Skeleton manifest only. No Activity, no Accessibility Service declaration yet —
-        those are ROADMAP.md Phase 2/3 work (the Accessibility Service declaration text
-        itself needs to be drafted per Architecture doc §1.2 before it's added here, not
-        invented as part of getting a build to pass).
+        ROADMAP.md Phase 2: MissionAccessibilityService + MissionInterceptionActivity
+        declarations added. BIND_ACCESSIBILITY_SERVICE is a signature|system-protected
+        permission Android requires any accessibility service to declare on itself — this is
+        what stops a random app from binding to and impersonating this service, not something
+        DisciplineOS is requesting of the user.
+
+        Deliberately NOT here: PACKAGE_USAGE_STATS (UsageStatsManager is Unsupervised
+        Reliability's passive-measurement path, §13 — explicitly out of this class's scope
+        per MissionAccessibilityService's own kdoc, "What this class deliberately excludes";
+        add that permission when that feature is actually built, not preemptively). Also not
+        here: any Play Console / store-review-facing declaration content (Architecture §1.2)
+        — out of scope for this sideload-only distribution pass, see ROADMAP.md Phase 2
+        entry and mission_accessibility_service_config.xml's top comment. SYSTEM_ALERT_WINDOW
+        is likewise deliberately absent — the interception screen is a full-screen Activity
+        specifically to avoid needing it (ROADMAP.md §5.14).
     -->
+
     <application
         android:label="DisciplineOS"
-        android:allowBackup="false" />
+        android:allowBackup="false">
+
+        <!--
+            MissionAccessibilityService — Architecture §1.1/§1.2, PRD §9/§14. exported=true is
+            required by the platform for BIND_ACCESSIBILITY_SERVICE-permission services (the
+            permission itself is what gates who can bind, not exported=false); this is the
+            standard, documented pattern for declaring an AccessibilityService, not a
+            case-by-case relaxation of an otherwise-closed component.
+        -->
+        <service
+            android:name=".enforcement.MissionAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true"
+            android:label="@string/accessibility_service_summary">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/mission_accessibility_service_config" />
+        </service>
+
+        <!--
+            MissionInterceptionActivity — the interception/countdown screen
+            (MissionAccessibilityService.launchInterception starts it). Launched with
+            FLAG_ACTIVITY_NEW_TASK from a non-Activity context (the Service), so it needs its
+            own task (taskAffinity left default/unset is fine here since this Activity never
+            needs to share a task with anything else in the app — it's always launched fresh,
+            never navigated to from within an existing task). excludeFromRecents keeps a live
+            interception screen from lingering in the Recents list after the user leaves it
+            via Return to Mission / Break Commitment / Crisis Exit, all of which call finish()
+            or finishAndReturnHome() — nothing about this screen should be worth returning to
+            from Recents once it's closed. showWhenLocked/turnScreenOn duplicate what
+            MissionInterceptionActivity.onCreate() already sets via WindowManager flags at
+            runtime (older API levels need the runtime flags; API 27+ additionally supports
+            declaring this directly on the Activity, so both are present for broad coverage
+            down to this project's minSdk 26 — the runtime flags in Kotlin are what actually
+            cover 26/27, these two manifest attributes are belt-and-suspenders for 27+).
+        -->
+        <activity
+            android:name=".enforcement.MissionInterceptionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@android:style/Theme.NoTitleBar.Fullscreen" />
+
+    </application>
 
 </manifest>

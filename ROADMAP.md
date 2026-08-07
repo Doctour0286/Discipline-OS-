@@ -142,9 +142,11 @@ Debt/Reputation, same handling as an overturned dispute).
       `ironCalibrationSatisfied()` (Metrics.kt); a `check()` failure hard-blocks activation
       with no exception path, matching PRD §12.6. Tests in `TierTransitionUseCaseTest`
       cover both the pass and fail side, plus that a failed attempt leaves tier unmoved
-      (transactional rollback, not partial application). **Written, manually cross-checked
-      against real DAO/entity signatures the same way Phase 1's first session verified
-      `RecordViolationUseCase` before CI existed — not yet run on real CI, see item 2 below.**
+      (transactional rollback, not partial application). **Executed for real on CI,
+      2026-08-07 (Phase 0.5) — passes.** This test file is also where the flaky
+      `Instant`-precision assertion in the crisis-downgrade test was caught and fixed
+      (§5.12); `activateIron`'s own tests were unaffected by that bug and passed on the
+      first run.
 - [x] Crisis exit (`ABORTED_CRISIS_EXIT`) provably does not write to Ledger — the asterisked
       gap from the previous session ("it doesn't yet prove nothing *else* in the app could
       route one there instead") is now closed: `TierTransitionUseCase.ironCrisisExit()` is
@@ -191,26 +193,108 @@ compiler — flagged repeatedly (§4 item 2) as the single highest-priority unve
 the project. This phase closes that gap for real, on GitHub's infrastructure, not a sandbox
 that lacks Android SDK/Gradle network access.
 
-**What running it for real actually found:** one genuine compile error, not zero — see §5.8.
-This is the expected outcome of finally running a compiler on code that had only ever been
-read, and is exactly why "looks correct on careful reading" and "compiles" were kept as
-distinct claims throughout Phase 0/1 rather than conflated.
+**What running it for real actually found: two genuine bugs, not zero, across two separate
+runs.** This is the expected outcome of finally running a compiler and a real test runner on
+code that had only ever been read, and is exactly why "looks correct on careful reading" and
+"passes on a real toolchain" were kept as distinct claims throughout Phase 0/1 rather than
+conflated. Neither bug was visible to manual cross-checking; both are exactly the category of
+thing §4 item 2 predicted this sandbox's lack of a real compiler/test runner would eventually
+miss.
+
+- **Run 1 — real compile error** (see §5.8): a cross-module Kotlin smart-cast failure in
+  `RecordViolationUseCase.kt`. `Violation.rootCauseClusterId` is declared in `:data`;
+  `RecordViolationUseCase` lives in `:domain`, a separate compiled module. Kotlin does not
+  extend smart-cast guarantees for a nullable property across a module boundary (it can't
+  verify the other module's getter is stable), so `violation.rootCauseClusterId != null &&
+  clusterAlreadyHasActiveEntry(violation.rootCauseClusterId, ...)` failed to compile even
+  though the logic is correct. Fixed by binding to a local `val clusterId` first. Common,
+  well-known multi-module Kotlin gotcha — not a design flaw.
+- **Run 2 — real (flaky) test failure** (see §5.12): `TierTransitionUseCaseTest`'s crisis
+  downgrade test asserted exact `Instant` equality between an in-memory `Instant.now()`
+  (JVM nanosecond precision) and the same value read back from Room, which persists
+  `Instant` as epoch **milliseconds** (`Converters.fromInstant`/`toInstant`) and silently
+  drops any sub-millisecond component on write. The two values were therefore only equal
+  when `now()` happened to land on an exact millisecond boundary — a flaky assertion, not
+  a bug in the code under test. Fixed by truncating `now` to millisecond precision in the
+  test, at the point of capture, so both sides of the comparison agree deterministically.
+  Every other `Instant.now()` + DB-read comparison in both new test files was scanned for
+  the same risk and confirmed clear (they compare enums/doubles/nulls, none of which lose
+  precision on the millis round-trip).
+
+**Both fixes verified on a third CI run: full green — `:data`, `:domain`, and
+`:app:assembleDebug` all passed in one job**, not just the previously-failing piece in
+isolation. This is the first fully-green build this project has had.
 
 **Exit criteria:**
 - [x] `./gradlew :data:testDebugUnitTest` passes on a real Android SDK + JDK 17 environment
 - [x] `./gradlew :domain:testDebugUnitTest` passes — `RecordViolationUseCaseTest`,
-      `ResolveDisputeUseCaseTest`, `DomainArchitectureBoundaryTest` all ran and passed, not
-      just parsed
+      `ResolveDisputeUseCaseTest`, `DomainArchitectureBoundaryTest`, `TierTransitionUseCaseTest`,
+      `ApplyReputationDecayUseCaseTest` all ran and passed, not just parsed (29/29 domain tests
+      green as of the third run)
 - [x] `./gradlew :app:assembleDebug` passes — confirms manifest merge, resource linking, and
       the `:data`/`:domain` dependency wiring all resolve, not just each module in isolation
 - [x] CI re-runs automatically on every push to `main` (`build-and-test.yml`, `on: push`)
+- [x] Two real bugs found by the real toolchain were fixed and re-verified green, not just
+      found and left open
 
 **Location:** `settings.gradle.kts`, `build.gradle.kts`, `gradle.properties`, `app/`,
 `gradle/wrapper/`, `.github/workflows/build-and-test.yml`.
 
+**Known non-blocking noise:** CI currently emits two deprecation warnings (Node.js 20 in
+`actions/*`, `setup-java@v4`) from GitHub's own Actions runner, unrelated to this project's
+code. Worth a five-minute bump to the actions' newer major versions at some point; does not
+affect build correctness and isn't blocking anything.
+
+**Push workflow actually used to get code from the authoring environment onto the real
+repo** (worth recording since this project is authored in a sandbox with no git credentials
+and no direct device access — the round trip is manual by necessity, not a preference):
+
+1. Code is written/edited in an AI sandbox with no GitHub write access and no persistent
+   storage between sessions. Every session's changes are packaged as a zip of the **entire**
+   repo (not a diff) and handed off as a downloadable file.
+2. That zip lands in the phone's `Downloads` folder via the browser/chat app.
+3. On the phone, **Termux** holds the actual working git clone (`~/projects/disciplineos`,
+   with the real `.git` history/remote). Termux's home directory is sandboxed from normal
+   Android storage, so `termux-setup-storage` is run once to expose `~/storage/downloads/`
+   into Termux's filesystem.
+4. Replace the working copy with the new zip's contents while preserving git history:
+   ```bash
+   cd ~/projects
+   mv disciplineos disciplineos-old-backup        # don't skip — cheap insurance
+   unzip ~/storage/downloads/<new-zip-name>.zip -d .
+   mv <unzipped-folder-name> disciplineos          # match the original folder name
+   cp -r disciplineos-old-backup/.git disciplineos/  # the zip has no .git — reattach it
+   cd disciplineos
+   git status                                       # inspect the real diff before committing
+   ```
+5. `git status` at this point is the actual verification step — it should show only the
+   files a given session claims to have touched. Anything unexpected (a file the session
+   didn't mention, or an expected change missing) is a signal to stop and check before
+   committing, not to commit through.
+6. Commit and push as normal:
+   ```bash
+   git add -A
+   git commit -m "<describes what actually changed, e.g. 'Fix flaky Instant precision assertion'>"
+   git push
+   ```
+7. Once confirmed working (`git status` clean, push succeeded, CI later confirms green),
+   delete the backup: `rm -rf ~/projects/disciplineos-old-backup`.
+8. Check the Actions tab a few minutes later for the real result — a green check is the
+   only claim in this whole loop that isn't provisional.
+
+**Auth note, logged because it already caused two dead-ends:** a classic PAT embedded
+directly in the git remote URL (`https://<user>:<token>@github.com/...`) stops working the
+moment that token is revoked/regenerated, and the remote URL keeps the dead token cached
+until explicitly reset with `git remote set-url`. Regenerating a token requires re-running
+`git remote set-url origin https://<user>:<NEW_TOKEN>@github.com/...`. `git config --global
+credential.helper 'cache --timeout=31536000'` avoids re-embedding a token in the URL on
+future rotations, at the cost of caching a credential in plaintext-adjacent form for up to a
+year — a reasonable trade for a personal project, worth reconsidering if this repo ever
+stops being solo/private.
+
 ---
 
-### Phase 2 — Core Enforcement Loop (Android-specific)  ⬜ **NOT STARTED**
+### Phase 2 — Core Enforcement Loop (Android-specific)  🟡 **IN PROGRESS** (2026-08-07)
 
 **Delivers:** the actual Accessibility Service, foreground-app detection, Mission
 interception overlay, and the countdown/crisis-exit screen's underlying logic (not yet
@@ -229,17 +313,108 @@ early rather than assuming it's moot — cheap to check now, expensive to discov
 distribution scope ever changes.
 
 **Exit criteria:**
-- [ ] Accessibility Service detects foreground app changes and can intercept a blocklisted
-      app during an active Mission
-- [ ] Interception screen shows Warden Voice (Warden/Iron tiers) or informational content
-      (Recruit/Operator), per tier-dependent content in Onboarding doc §3.1
-- [ ] Iron-tier crisis exit reachable *from the interception screen itself*, not buried in
-      settings (Onboarding doc §3.1, hard requirement)
-- [ ] AI Voice call has a hard local fallback bank if generation times out (~2s starting
-      ceiling, Onboarding doc §3.1) — screen must never show blank/error at this moment
-- [ ] Fallback bank content passes the same behavior-vs-identity review as generated content
-      (Architecture §2.1) — this is a content review task, not just an engineering one; don't
-      let it slip through as "just placeholder text for now"
+- [x] Accessibility Service detects foreground app changes and can intercept a blocklisted
+      app during an active Mission — `MissionAccessibilityService` written; foreground
+      detection + blocklist matching against `MissionDao.activeMissionFor()` implemented.
+      Now has a manifest `<service>` declaration and `res/xml/` config too (this session's
+      continuation) — see below for what's still unverified.
+- [x] Interception screen shows Warden Voice (Warden/Iron tiers) or informational content
+      (Recruit/Operator), per tier-dependent content in Onboarding doc §3.1 —
+      `MissionInterceptionActivity` + `InterceptionPolicy` implement the tier branching, now
+      with a real `res/layout/activity_mission_interception.xml` and `res/values/strings.xml`
+      (this session's continuation) — the screen has an actual layout and copy to render.
+- [x] Iron-tier crisis exit reachable *from the interception screen itself*, not buried in
+      settings (Onboarding doc §3.1, hard requirement) — wired into
+      `MissionInterceptionActivity` via `TierTransitionUseCase.ironCrisisExit()`, available
+      for the full countdown per §12.4.4.
+- [x] AI Voice call has a hard local fallback bank if generation times out (~2s starting
+      ceiling, Onboarding doc §3.1) — `WardenVoiceProvider` orchestrates timeout → gate →
+      fallback, never throws/blanks; unit-tested for every failure mode (cloud timeout,
+      cloud error, null, gate-rejection). Real cloud generator is intentionally a
+      `NoOpWardenVoiceGenerator` placeholder (see §5.13) — always defers to fallback bank
+      until a real backend exists.
+- [x] Fallback bank content passes the same behavior-vs-identity review as generated content
+      (Architecture §2.1) — `VoiceLineGate` is the structural pre-display filter mandated by
+      §2.2; `FallbackVoiceBankTest` exhaustively runs every bank line through it. This
+      session's continuation extended the same review discipline to the interception
+      screen's *static* UI copy too (`strings.xml`'s top comment) — Onboarding doc §4 asks
+      for that review on every user-facing string, not just Warden Voice content.
+
+**Resource/manifest layer — completed this session's continuation:**
+- [x] `res/layout/activity_mission_interception.xml` — full layout matching every view ID
+      `MissionInterceptionActivity` references (`voiceLineText`, `countdownText`,
+      `returnToMissionButton`, `breakCommitmentButton`, `stabilityControlButton`,
+      `breakReasonInput`). Structural only, per Onboarding doc §5's deferral of visual
+      design/theming to a follow-on doc.
+- [x] `res/values/strings.xml` — every user-facing string the Activity and the Accessibility
+      Service's on-device description need, hand-checked against the behavior-vs-identity
+      shape (Onboarding §4 / PRD §22.1) before being written, not just copied in.
+- [x] `res/xml/mission_accessibility_service_config.xml` — the Android-framework-required
+      static Accessibility Service declaration (distinct from the Play Console declaration,
+      which stays out of scope — see below). Description string verified against the actual
+      service code (`onAccessibilityEvent` reads only `event.packageName`, never window
+      content) before being written, so the "does not read screen content" claim in the
+      string is checked, not asserted on faith.
+- [x] `AndroidManifest.xml` — `<service>` for `MissionAccessibilityService`
+      (`BIND_ACCESSIBILITY_SERVICE` + config XML meta-data pointer) and `<activity>` for
+      `MissionInterceptionActivity` (`showWhenLocked`/`turnScreenOn`/`excludeFromRecents`/
+      `singleTask`) both added. A first draft mistakenly added a `PACKAGE_USAGE_STATS`
+      permission for UsageStatsManager — caught before finishing, since that's explicitly
+      out of `MissionAccessibilityService`'s own stated scope (its kdoc's "what this class
+      deliberately excludes" list) and adding the permission preemptively would be exactly
+      the kind of scope creep ROADMAP.md's conventions ask to avoid. Removed.
+- [x] `InterceptionControllerTest` — written this session's continuation
+      (`app/src/test/java/.../InterceptionControllerTest.kt`), same in-memory-Room-under-
+      Robolectric pattern as `:domain`'s use-case tests. Covers `resolveVoiceLine` (Recruit
+      null vs. Operator+ generated-then-fallback), `countdownSpec`/`stabilityControl`
+      delegation, `returnToMission` (asserted as a genuine no-op via the Violation table),
+      `breakCommitment` (Iron's mandatory-reason requirement, both the throwing and
+      succeeding paths), and `ironCrisisExit` (Recruit landing + Mission
+      `ABORTED_CRISIS_EXIT` + the resulting `RecordViolationUseCase` closed-loop guard).
+      `app/build.gradle.kts` updated to add the matching Robolectric/Room test dependencies
+      (mirrors `:domain`'s set exactly) plus `testOptions.unitTests.isIncludeAndroidResources`.
+
+**Two real compile bugs found and fixed this session's continuation (not yet CI-confirmed):**
+Both are the same root cause: the prior session's `MissionAccessibilityService` and
+`MissionInterceptionActivity` both called `lifecycleScope`, but neither class had a base
+type that actually provides it.
+- `MissionAccessibilityService extends AccessibilityService` — plain framework class, not a
+  `LifecycleOwner`, and AndroidX has no `LifecycleAccessibilityService` equivalent of
+  `LifecycleService` to opt into. **Fix:** replaced with a manually-managed
+  `CoroutineScope(SupervisorJob())`, created as a field and cancelled in a new
+  `onDestroy()` override — the standard pattern for a `Service`/`AccessibilityService` that
+  needs coroutines without being a `LifecycleService`.
+- `MissionInterceptionActivity extends Activity` (plain `android.app.Activity`) — same
+  problem. **Fix:** switched the base class to `androidx.activity.ComponentActivity`, the
+  minimal AndroidX class that provides real `lifecycleScope` support; added
+  `androidx.activity:activity-ktx` and `androidx.lifecycle:lifecycle-runtime-ktx` to
+  `app/build.gradle.kts` (neither was a direct dependency before — `:app` had no real code
+  using them until this phase). Verified every other `Activity` API this class calls
+  (`window`, `setContentView`, `findViewById`, `finish()`, `startActivity`, `getString`) is
+  inherited from `android.app.Activity`, which `ComponentActivity` extends, so nothing else
+  needed to change.
+
+Neither bug was caught during the session that introduced it — both are exactly the kind of
+thing invisible to line-by-line reading and only reliably caught by an actual compiler,
+which this sandbox doesn't have for Android/Kotlin (see §4's standing caution on this).
+Caught this pass only because writing `InterceptionControllerTest` required tracing through
+`InterceptionController`'s actual call sites carefully enough to notice the pattern repeat
+across both files.
+
+**Still open before this phase can be marked DONE:**
+- [ ] None of this phase's code — including this session's continuation — has been through
+      real Gradle/CI yet. Phase 0.5's green run predates all of it. Standing discipline from
+      §4 applies: push and let CI confirm before trusting any of the above as actually
+      compiling, not just reading correctly. This matters more than usual this time, given
+      two compile bugs already turned up in code that looked correct on a prior read.
+- [ ] Hard blocker research (Play Console declaration + comparable-apps check, Architecture
+      §1.2) remains explicitly skipped, since distribution is sideload-only for now.
+      **Revisit if distribution scope ever changes** — don't let this stay silently skipped
+      if the app is ever submitted to Play.
+- [ ] No on-device or emulator install/run has happened — everything above is "should work"
+      based on careful reading and the two bugs already found, not "has been seen running."
+      Once CI is green, an actual install-and-trigger-an-interception pass is still owed
+      before this phase's exit criteria are honestly checkable end-to-end.
 
 ---
 
@@ -283,42 +458,74 @@ after N more days" note — never a silently-picked number.
 
 ## 3. Current state snapshot
 
-**Last updated:** 2026-08-07 (this session)
-**Current phase:** Phase 0 and Phase 0.5 complete and CI-verified. Phase 1 is now
-functionally complete — all four exit-criterion use-cases exist
-(`RecordViolationUseCase`, `ResolveDisputeUseCase` from the prior session;
-`TierTransitionUseCase` and `ApplyReputationDecayUseCase` written this session). Schema
-bumped to v3 (`TierEvent` table; `User.debtAccrualPausedUntil` /
-`User.tribunalDeferredUntil`) with an explicit migration-policy decision made (destructive
-fallback, pre-launch only — see §5.7's update below) rather than left open a second time.
+**Last updated:** 2026-08-07 (this session, second continuation)
+**Current phase:** Phase 0 and Phase 0.5 remain complete and confirmed on real CI, fully
+green (unchanged since last entry). Phase 1 remains functionally complete (§5.9's spec gap
+aside). **Phase 2 is now substantially further along** — the resource/manifest layer that
+was missing after the first Phase 2 pass now exists (layout, strings, accessibility service
+config, manifest entries), `InterceptionController` has real test coverage, and two genuine
+compile bugs from the first Phase 2 pass were found and fixed. **Still none of it has been
+through real Gradle/CI** — treat Phase 2 as "should compile and install, carefully checked
+by hand, not yet proven" rather than "done."
 
-**Not yet done, flagging clearly rather than overclaiming:** this session's code has been
-manually cross-checked field-by-field and call-by-call against the real entity/DAO
-signatures already in the tree (same method the first Phase 1 session used before CI
-existed — see §4 item 2's original text) and the two new SQL queries
-(`missedDaysSince`/`completedMissionsSince`) were hand-simulated against real SQLite outside
-Room to check their semantics, not just their syntax. **None of this has been run through
-`./gradlew :domain:testDebugUnitTest` on a real environment yet** — that requires the same
-GitHub Actions run Phase 0.5 used, which this sandbox still cannot do (no Gradle/Android SDK
-network access here — see §4 item 2, unchanged). Push and let CI confirm before treating any
-of this session's checkboxes as fully closed, not just carefully reasoned-through.
+**What got built in the first Phase 2 pass (prior entry, unchanged):**
+- `:domain/voice/` — `VoiceLineGate`, `FallbackVoiceBank`, `WardenVoiceProvider`, all
+  unit-tested.
+- `:domain/policy/InterceptionPolicy.kt` — PRD §14 countdown durations, unit-tested.
+- `:data` — `MissionDao.activeMissionFor(userId)`, `UserDao.getSingleLocalUser()`.
+- `:app` — `MissionAccessibilityService`, `MissionInterceptionActivity`,
+  `InterceptionController`, `AppContainer`, `DbPassphraseProvider`,
+  `NoOpWardenVoiceGenerator`.
+
+**What got built/fixed in this continuation:**
+- `res/layout/activity_mission_interception.xml`, `res/values/strings.xml`,
+  `res/xml/mission_accessibility_service_config.xml`, and `AndroidManifest.xml`'s `<service>`
+  + `<activity>` entries — the full resource/manifest layer Phase 2's first pass was missing.
+  One self-caught mistake along the way: a first manifest draft added
+  `PACKAGE_USAGE_STATS` for a feature (`UsageStatsManager`) explicitly out of this phase's
+  scope per the service's own kdoc — caught and removed before finishing, not left in as
+  "might need it later."
+- `InterceptionControllerTest` — real Robolectric+Room test coverage for the one Phase 2
+  class that had none, plus the matching `app/build.gradle.kts` test-dependency additions.
+- **Two real compile bugs found and fixed:** `MissionAccessibilityService` and
+  `MissionInterceptionActivity` both called `lifecycleScope` from base classes
+  (`AccessibilityService`, plain `Activity`) that don't provide it — see Phase 2's own
+  section above for the full account and fixes (manual `CoroutineScope` for the Service,
+  `ComponentActivity` base class for the Activity). Neither was caught in the session that
+  wrote them; both surfaced while tracing through real call sites to write the controller
+  test, not from a compiler (none is available in this sandbox for Android/Kotlin).
+
+**What "confirmed on real CI" actually took, for everything predating Phase 2:** not a
+single clean push. Two real, distinct bugs were found by the real toolchain across two
+separate CI runs — a cross-module Kotlin smart-cast compile error (§5.8) and a flaky
+`Instant`-precision test assertion (§5.12) — both invisible to manual line-by-line review,
+both fixed narrowly, and both re-verified green on a subsequent run before being logged here
+as resolved. Phase 2's own two `lifecycleScope` bugs are the same story playing out again,
+now twice over, before this phase has even reached CI once — worth taking as further
+confirmation that "read carefully" and "compiles" are genuinely different bars, not just a
+one-time lesson from Phase 0.5.
 
 ```
-Phase 0 — Data Layer            ████████████████████░  ~95% (code done, verified on real CI)
-Phase 1 — Domain/Use-Cases      ████████████████████░  ~90% (4 of 4 use-cases written; TierEvent
-                                                        schema + TierDao added; not yet run on
-                                                        real CI — see §4 item 2 below)
-Phase 2 — Enforcement Loop      ░░░░░░░░░░░░░░░░░░░░░  0%
+Phase 0 — Data Layer            █████████████████████  100% (code done, real CI green)
+Phase 1 — Domain/Use-Cases      ████████████████████░  ~95% (4 of 4 use-cases written and
+                                                        passing on real CI; demotion_triggered
+                                                        rank-band gap still open, §5.9)
+Phase 2 — Enforcement Loop      ███████████████░░░░░░  ~70% (all logic, resources, manifest,
+                                                        and tests written and self-consistent;
+                                                        zero of it confirmed on real CI or run
+                                                        on a device yet — see "still open")
 Phase 3 — Onboarding & UI       ░░░░░░░░░░░░░░░░░░░░░  0%
 Phase 4 — Fingerprint Rules     ░░░░░░░░░░░░░░░░░░░░░  0%
 Phase 5 — Pilot                 ░░░░░░░░░░░░░░░░░░░░░  0%
 ```
 
-**No `app` module exists yet** — only `data` and (new this session) `domain`, both Android
-library modules. There is nothing installable yet, even for a smoke test, and no
-`settings.gradle.kts` tying them together into one buildable project. That's expected at this
-stage (Phase 1–2 need to exist first) but flagging it so nobody's surprised there's no APK to
-try.
+**`app` module should now be a real, installable app — untested.** Every file Phase 2 needs
+to compile, link resources, and install now exists: Kotlin classes, layout, strings,
+accessibility config, and manifest entries. This is a materially different state from the
+last snapshot ("still not installable, resource layer missing entirely"), but "should
+install" and "confirmed installing" are not the same claim — nothing in Phase 2 has been
+through Gradle, CI, or an actual device/emulator yet. The two bugs found this pass are
+concrete evidence that claim needs verifying, not assuming.
 
 ---
 
@@ -327,44 +534,45 @@ try.
 **If you are the next agent picking this up: do this first, in order.**
 
 1. Read §0–§1 of this file (you're doing that now).
-2. **Push this session's work and let real CI run.** The Gradle project shell, GitHub
-   Actions workflow, and `:app` skeleton this item used to ask for are now done (Phase 0.5,
-   prior session) — what's still true is that **this sandbox itself** has no Gradle/Android
-   SDK/network access, so `TierTransitionUseCase`, `ApplyReputationDecayUseCase`, their
-   tests, the `TierEvent`/`TierDao` additions, and the `DisciplineOsDatabase` v3 schema bump
-   have never been through a real compiler — same unresolved risk category as before, now
-   scoped to less code. What *was* done in lieu of that this session, matching the standing
-   convention: every new method/field reference was manually cross-checked against the real
-   signatures already in the tree (see the field-by-field greps logged informally during
-   this session — not reproduced here, but every DAO call in `TierTransitionUseCase.kt` and
-   `ApplyReputationDecayUseCase.kt` was checked this way before being treated as correct),
-   and the two new hand-written `@Query` SQL strings (`missedDaysSince`,
-   `completedMissionsSince`) were additionally simulated against real SQLite (Python's
-   `sqlite3`, outside Room/Robolectric entirely) with constructed missed/completed-day
-   scenarios to check *semantics*, not just that they parse — Room's own compile-time query
-   validation still hasn't touched them for real. Treat this as reduced risk relative to
-   pure manual review, not eliminated risk.
-3. Two items from the previous round are now resolved this session rather than carried
-   forward again: **§5.5** is still open (unchanged, still needs a real rolling-window
-   decision once pilot data exists) but **§5.7's migration-policy question is now decided**
-   — `fallbackToDestructiveMigration()` wired into `DisciplineOsDatabase.build()`, with the
-   reasoning inline in that file's kdoc and restated in §5.11 below. Two *new* judgment
-   calls from this session need your sign-off: §5.9 (decay vs. per-violation Reputation
-   write are two distinct formula terms, not one mechanic re-implemented) and §5.10 (the
-   crisis-stabilization pause reuses `debtAccrualPausedUntil` to also gate Reputation decay,
-   which the PRD doesn't say explicitly either way).
-4. All four Phase 1 use-cases now exist. **Phase 1's only remaining open item is the
-   `demotion_triggered` gap** (§5.9 below) — `tier_floor` values per rank and the
-   consecutive-day count `N` aren't specified anywhere in the PRD or Data Model doc, not
-   even as `[HYPOTHESIS]`. This blocks implementing actual rank-band demotion (as opposed to
-   just the running Reputation *value*, which `ApplyReputationDecayUseCase` already
-   computes) — flag it back to whoever owns the spec docs rather than guessing tier floors
-   for the seven §35 ranks.
-5. Once CI confirms this session's code (item 2), Phase 1's checklist in §2 above should be
-   fully checkable except the `demotion_triggered` gap — at that point Phase 2 (Core
-   Enforcement Loop) is unblocked per the phase-ordering rule in §2's intro, and its own
-   hard blocker (Accessibility Service Play Console declaration research, Architecture doc
-   §1.2) should be picked up first within that phase.
+2. **CI is green — this is no longer a "push and wait" item.** Phase 0.5 is fully done:
+   Gradle project shell, GitHub Actions workflow, `:app` skeleton, and now two real bugs
+   found and fixed with a confirmed green re-run (§5.8, §5.12). Don't re-flag "hasn't been
+   through a real compiler" for any code that predates this entry — it has. Anything *new*
+   written after this entry is, as always, unverified until it's pushed and CI confirms it;
+   the standing discipline (manual cross-check against real signatures, hand-simulate any
+   new hand-written SQL against real SQLite, then push and let CI have the final word) still
+   applies to new work, just not to what's already green.
+3. **§5.5 is still open** — the shared-cause guard's rolling-window cutoff still needs either
+   a real value (once Phase 5 pilot data exists) or an explicit decision that cluster IDs are
+   always short-lived enough not to matter. **§5.9 is still open** — `demotion_triggered`'s
+   `tier_floor`/`N` values are absent from the spec, not just unvalidated; this needs a
+   spec-doc revision from whoever owns the PRD/Data Model doc, not an engineering guess.
+   **§5.10 is still open** — the crisis-stabilization pause reusing `debtAccrualPausedUntil`
+   to also gate Reputation decay is a judgment call the PRD doesn't make explicitly; flagged
+   for sign-off, not silently assumed correct. **§5.15 is now also open** — Explicit
+   Downgrade's target tier (one-tier-down) is a Phase 2 judgment call with the same
+   "flagged, not assumed" status as §5.5/§5.9/§5.10.
+4. **Phase 1 is functionally complete and CI-verified** except the `demotion_triggered` gap
+   (§5.9) — that's a spec gap, not an engineering task, and shouldn't block Phase 2.
+5. **Phase 2 is in progress, not "next" — pick up exactly where it left off.** The Play
+   Console research blocker in Architecture §1.2 was explicitly and correctly skipped for
+   this pass (sideload-only distribution, your call) — don't redo that research unless
+   distribution scope changes. The Voice layer, `InterceptionPolicy`, `InterceptionController`,
+   `MissionAccessibilityService`, and `MissionInterceptionActivity` are written and (except
+   the Controller) unit-tested. **In order, what's left to close out Phase 2:**
+   a. `res/layout/activity_mission_interception.xml` + `res/values/strings.xml` — extract
+      the Activity's literal strings per Onboarding doc §3.1's exact required copy.
+   b. Accessibility Service config XML (`res/xml/`) — event types + the plain-language
+      on-device description drafted (but not yet filed) last session.
+   c. `AndroidManifest.xml` — add the `<service>` (with `BIND_ACCESSIBILITY_SERVICE` +
+      config XML meta-data pointer) and `<activity>` declarations. Currently has neither.
+   d. Unit tests for `InterceptionController` — everything else this phase has tests;
+      this doesn't yet (`app/src/test` is empty).
+   e. **Push and confirm on real CI.** Every prior phase's "done" only became real after a
+      confirmed green re-run (§5.8, §5.12) — this phase's new code hasn't had that yet, and
+      per §4.2's standing discipline should not be treated as trustworthy until it has.
+   f. Only once (a)–(e) are done does Phase 2's exit criteria checklist above become
+      honestly checkable end-to-end — installing and manually triggering an interception.
 
 ---
 
@@ -451,6 +659,59 @@ it should never receive.
 **Revisit when:** the actual crisis-exit handling path is built (Phase 1, not yet started) —
 confirm it never calls `RecordViolationUseCase` in the first place, at which point this
 `require` becomes a pure defensive check rather than a load-bearing one.
+
+**Update, Phase 0.5:** this path is now exercised directly, not just reasoned about —
+`TierTransitionUseCaseTest`'s `` `a mission marked aborted crisis exit by this use-case cannot
+be double-charged by RecordViolationUseCase` `` test constructs exactly this scenario
+(`TierTransitionUseCase.ironCrisisExit()` marks a Mission `ABORTED_CRISIS_EXIT`, then a
+`RecordViolationUseCase.execute()` call against that same Mission is asserted to throw) and
+passed on real CI. The `require` above is no longer just a defensive check nobody's called —
+it's now proven to actually fire for the one caller (`TierTransitionUseCase`) that could
+plausibly race it.
+
+### 5.8 — RESOLVED (Phase 0.5, real CI) — Cross-module smart-cast failure in `RecordViolationUseCase`
+
+**Where:** `domain/.../usecase/RecordViolationUseCase.execute()`, the `debtBlocked` /
+`reputationBlocked` computation (originally around line 87–90).
+
+**What CI actually found, first real compile error this project has had:**
+```
+val debtBlocked = violation.rootCauseClusterId != null &&
+    clusterAlreadyHasActiveEntry(violation.rootCauseClusterId, violation.id, LedgerMetric.DEBT)
+```
+failed to compile with a smart-cast error on the second `violation.rootCauseClusterId` use.
+
+**Why manual review didn't catch it:** the logic reads as obviously correct — a `!= null`
+guard immediately followed by a use of the same property inside the `&&`. This is a standard,
+safe Kotlin idiom *within a single module*. The failure is specific to `:data` and `:domain`
+being separate compiled Gradle modules: `Violation.rootCauseClusterId` (`val
+rootCauseClusterId: UUID? = null`) is declared in `:data`; the use site is in `:domain`.
+Kotlin's smart-cast requires the compiler to prove nothing else could change the property's
+value between the null-check and the use — and it does not extend that proof across a module
+boundary, since it can't verify another module's getter is stable/non-overridable from where
+it's compiling. This is a well-documented, common multi-module Kotlin gotcha, not a sign of a
+deeper design problem, and not something a `:data`/`:domain`-unaware read of the file would
+surface.
+
+**Fix:** bind the nullable value to a local `val` first, so the compiler is reasoning about a
+local variable's stability (never in question) rather than a cross-module property's:
+```
+val clusterId = violation.rootCauseClusterId
+val debtBlocked = clusterId != null &&
+    clusterAlreadyHasActiveEntry(clusterId, violation.id, LedgerMetric.DEBT)
+val reputationBlocked = clusterId != null &&
+    clusterAlreadyHasActiveEntry(clusterId, violation.id, LedgerMetric.REPUTATION)
+```
+
+**Scope check performed:** `ResolveDisputeUseCase.kt` (the only other file touching
+`Violation`) was checked and does not read `rootCauseClusterId` at all — not affected. The
+rest of `:domain` was scanned for the same nullable-property-then-immediate-use pattern
+against any `:data`-declared property; no other instance found.
+
+**Confirms:** the standing caution in §4/§0 about "looks correct on careful reading" and
+"compiles" being distinct claims — this is a concrete instance of that gap, found by the
+real toolchain within the first CI run that included new code, not by inspection however
+careful.
 
 ### 5.11 — RESOLVED (this session) — Migration policy decided: destructive fallback, pre-launch only
 
@@ -605,6 +866,74 @@ otherwise avoid.
 **Revisit when:** Architecture doc §3.2 says to revisit this section first if distribution
 ever moves toward public/store — same trigger applies here.
 
+### 5.13 — RESOLVED, needs eventual sign-off — Single-local-user assumption for Phase 2 enforcement
+
+**Where:** `data/.../dao/CoreDaos.kt` (`UserDao.getSingleLocalUser()`),
+`app/.../MissionAccessibilityService.kt`, `app/.../di/AppContainer.kt`.
+
+**Call made:** `MissionAccessibilityService` needs "the current user" on every foreground-app
+change event, but nothing in the PRD, Data Model doc, or Onboarding spec addresses
+multi-profile/login — checked directly, confirmed absent, not just unnoticed. Treated this as
+a single local device-user app: one person, one install, one `User` row. `getSingleLocalUser()`
+is `SELECT * FROM users LIMIT 1`, returning null before onboarding creates the row at all
+(callers must treat null as "nothing to enforce yet," not an error).
+
+**Why this reading and not shared-device-multi-account:** "personal use, then friends" (doc 05's
+scoping) reads as friends running their own separate installs, not multiple people sharing one
+device's Mission/Ledger state — sharing enforcement state across people on one phone would be a
+much stranger product than the specs otherwise describe.
+
+**Revisit when:** if a real multi-profile need ever surfaces (e.g., one person, multiple
+devices needing synced state — a different problem than multi-account), this DAO method and
+every call site built on top of the "there is exactly one user" assumption needs a real audit,
+not a quick patch. Flagging now specifically so that audit isn't a surprise later.
+
+### 5.14 — RESOLVED — Full-screen Activity chosen over `SYSTEM_ALERT_WINDOW` overlay for interception
+
+**Where:** `app/.../MissionAccessibilityService.kt` (launches `MissionInterceptionActivity`),
+`app/.../MissionInterceptionActivity.kt`.
+
+**Call made:** the interception screen is a full-screen `Activity` launched by the
+Accessibility Service on blocklist match, not a `TYPE_APPLICATION_OVERLAY` window drawn over
+the foreground app.
+
+**Why:** a `SYSTEM_ALERT_WINDOW`-style overlay needs its own separate runtime permission grant
+(`Settings.canDrawOverlays()`), which means a second permission dialog during setup — real
+friction for a family/friend install where the whole point is a quick, low-effort setup.
+Launching an `Activity` from the Accessibility Service achieves the same practical effect
+(interrupts the blocked app, shows the interception screen) without that extra permission.
+Architecture doc §6 explicitly defers interception screen *layout* to Phase 3 but doesn't
+mandate the overlay *mechanism* specifically — §1.1's "interception overlay" language is used
+functionally elsewhere in this codebase's own comments, not as a literal `TYPE_APPLICATION_
+OVERLAY` requirement.
+
+**Revisit when:** if a future requirement needs the interception screen to draw over a locked
+device or in some other context an `Activity` launch can't reach (overlay windows and
+activities have different capabilities here), this choice needs re-examining — it was made for
+setup-friction reasons, not because overlays are impossible.
+
+### 5.15 — OPEN, needs your sign-off — Explicit Downgrade's target tier: one-tier-down, not spec-stated
+
+**Where:** `app/.../MissionInterceptionActivity.kt` (`oneTierDown()`),
+`domain/.../TierTransitionUseCase.kt` (`explicitDowngrade`).
+
+**Call made:** PRD §12.4.2 describes Explicit Downgrade as "a persistent, always-visible 'this
+is too much right now' control," but — unlike §12.4.3's Crisis Downgrade, which explicitly
+names Recruit as the fixed landing tier — §12.4.1/§12.4.2 never states what tier an Explicit
+Downgrade actually lands on. Implemented as one tier down from the user's current tier
+(Iron→Warden→Operator→Recruit), with Recruit itself having no further-down target (button is a
+no-op at Recruit, since there's nowhere lower to go).
+
+**Why this reading:** an always-available "too much right now" control reads as calibration,
+not crisis — jumping straight to Recruit the way Crisis Downgrade does would conflate a
+user's own "dial it back" self-report with the Tampering/Critical-violation trigger §12.4.3
+is reserved for. One-tier-down is the smallest change that still respects the button's
+stated purpose.
+
+**Needs sign-off because:** this is a genuine spec gap, not a case where the "right" answer is
+obvious from other stated rules — worth confirming against product intent before treating it as
+settled, the same way §5.9 and §5.10 are logged as open rather than silently decided.
+
 ### 5.3 — RESOLVED — Two databases split into two files, not one
 
 **Where:** `data/.../db/DisciplineOsDatabase.kt`, `db/UnsupervisedDatabase.kt`
@@ -637,6 +966,54 @@ because they don't specify a language/API level at all.
 **Revisit when:** if you need to support pre-8.0 devices (unlikely for a personal/friends
 build in 2026, but flagging since it's an unstated assumption), switch to desugaring or a
 different timestamp representation — don't just lower minSdk and let Instant silently break.
+
+### 5.12 — RESOLVED (Phase 0.5, real CI, second run) — Flaky `Instant` precision assertion in `TierTransitionUseCaseTest`
+
+**Where:** `domain/src/test/.../usecase/TierTransitionUseCaseTest.kt`, `` `crisis downgrade
+always moves to Recruit and pauses debt accrual and Tribunal for 24 hours` ``
+
+**What CI actually found, second real failure this project has had (a test failure, not a
+compile error — the fix in §5.8 was already pushed and compiled cleanly; 28 of 29 domain
+tests passed this run):**
+```
+com.disciplineos.domain.usecase.TierTransitionUseCaseTest > crisis downgrade always moves to
+Recruit and pauses debt accrual and Tribunal for 24 hours FAILED
+    java.lang.AssertionError at TierTransitionUseCaseTest.kt:111
+```
+
+**Why manual review didn't catch it:** the test looks correct — it captures `val now =
+Instant.now()`, passes it into `crisisDowngrade(..., now = now)`, then asserts
+`now.plus(24, HOURS)` equals `user.debtAccrualPausedUntil` after re-reading the user from the
+DB. Same `now`, same arithmetic, should be bit-for-bit equal. The actual failure is a
+precision mismatch introduced entirely by the persistence round-trip: `Instant.now()`
+frequently carries **nanosecond** precision on the JVM, but `Converters.fromInstant` stores
+`Instant` via `.toEpochMilli()` — **millisecond** precision — and `Converters.toInstant`
+reconstructs via `Instant.ofEpochMilli(...)`, which always has a zeroed sub-millisecond
+component. The assertion therefore compares a nanosecond-precision in-memory value against a
+millisecond-truncated, DB-round-tripped one — equal only when `now()` happened to land on an
+exact millisecond boundary. This is flakiness, not incorrect production logic: the actual
+`TierTransitionUseCase.crisisDowngrade()` code being tested was never in question.
+
+**Fix:** truncate `now` to millisecond precision at the point of capture in the test, so the
+in-memory value used for the assertion and the DB-round-tripped value being compared against
+agree deterministically:
+```kotlin
+val now = Instant.ofEpochMilli(Instant.now().toEpochMilli())
+```
+
+**Scope check performed:** every other `Instant.now()` + DB-read comparison across both
+`TierTransitionUseCaseTest.kt` and `ApplyReputationDecayUseCaseTest.kt` was enumerated and
+checked. No other instance is at risk — every other DB-backed assertion in both files
+compares enums (`Tier`, `MissionStatus`, `TierEventKind`), `Double` values (via
+`LedgerDao.currentValue`, which uses a delta epsilon already), or null-checks
+(`assertNotNull`), none of which lose precision through the millis round-trip. This was an
+isolated instance, not a systemic pattern needing a broader fix.
+
+**Confirms, alongside §5.8:** this project's now-standing pattern of "real toolchain finds
+something manual review didn't, fix is narrow and well-understood, re-verify on CI rather
+than assume the fix is correct" — both of Phase 0.5's real failures were found, fixed, and
+then actually re-confirmed green on a subsequent CI run before being logged here as
+resolved, not logged as resolved on the strength of the fix looking correct.
 
 ---
 

@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    PRD §14 (Distraction Interception System) / Onboarding doc §3.1 (Mission Interception /
+    Countdown Screen). Paired with MissionInterceptionActivity.kt — every view ID below is
+    resolved by that Activity via findViewById(); do not rename an ID here without updating
+    the matching R.id.* reference there.
+
+    Layout, not visual design: Onboarding doc §5 explicitly defers "visual design system,
+    color, typography" to a follow-on doc, "not blocking for engineering to start on the
+    underlying enforcement logic in parallel." This file implements §3.1's STRUCTURAL
+    requirements only — what's on screen and in what order, not final theming:
+      - tier-dependent content area (Warden Voice line / informational copy) always visible
+      - a countdown indicator
+      - Return to Mission / Break Commitment, gated by the Activity's early-dismissal logic
+      - a reason-entry field, shown only when the tier requires it (Iron Break Commitment)
+      - a stability control (Iron Crisis Exit / Explicit Downgrade) rendered separately from
+        the two decision buttons above, since §12.4.4 requires it available for the FULL
+        countdown, not gated behind countdown completion the way Return/Break are at
+        Warden/Iron (see isEarlyDismissalAllowedNow's kdoc in the Activity).
+
+    Uses only platform widgets (TextView/Button/EditText in a ScrollView+LinearLayout) — no
+    third-party layout library, matching this project's "no framework not already justified"
+    stance (ROADMAP.md §5.3's convention note) and the Activity's own choice of a hand-rolled
+    CountDownTimer over a Compose-based screen, since no Compose dependency exists yet.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="@android:color/black">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:padding="24dp">
+
+        <!-- Countdown indicator. Onboarding §3.1: Recruit/Operator = "lower-pressure",
+             Warden/Iron = "countdown to consequence" — the Activity drives the actual
+             pacing/duration difference (InterceptionPolicy), this view just displays
+             whatever text the Activity sets each tick. -->
+        <TextView
+            android:id="@+id/countdownText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="48dp"
+            android:textColor="@android:color/white"
+            android:textSize="40sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            tools:text="5"
+            tools:ignore="HardcodedText" />
+
+        <!-- Warden Voice line (Warden/Iron) or informational copy (Recruit/Operator) —
+             InterceptionPolicy.usesWardenVoice decides which; this view doesn't need to know
+             which case it's in, it just renders whatever renderVoiceLine() sets. -->
+        <TextView
+            android:id="@+id/voiceLineText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="32dp"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:gravity="center"
+            android:lineSpacingMultiplier="1.2" />
+
+        <!-- Reason entry — Onboarding §3.1 / PRD §12.4.4: only required for Iron's Break
+             Commitment path (InterceptionPolicy.requiresBreakCommitmentReason). GONE by
+             default; the Activity flips this to VISIBLE only when the current tier needs it. -->
+        <EditText
+            android:id="@+id/breakReasonInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:visibility="gone"
+            android:inputType="textMultiLine|textCapSentences"
+            android:minLines="2"
+            android:gravity="top|start"
+            android:background="@android:color/darker_gray"
+            android:textColor="@android:color/white"
+            android:textColorHint="@android:color/darker_gray"
+            android:hint="@string/break_reason_hint"
+            android:padding="12dp" />
+
+        <!-- Return to Mission / Break Commitment — the two decision buttons. Disabled
+             (isEnabled=false) by the Activity at Warden/Iron until the countdown completes;
+             enabled immediately at Recruit/Operator per §3.1's "casual exit available". -->
+        <Button
+            android:id="@+id/returnToMissionButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:text="@string/return_to_mission_label" />
+
+        <Button
+            android:id="@+id/breakCommitmentButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="32dp"
+            android:text="@string/break_commitment_label" />
+
+        <!-- Stability control — Iron Crisis Exit or Explicit Downgrade, per
+             InterceptionPolicy.StabilityControl. PRD §12.4.4 (hard requirement): reachable
+             from this exact screen, for the full countdown duration, never gated behind the
+             two buttons above. Visually separated (top margin + divider-style spacing) so it
+             doesn't read as a third equally-weighted decision button — it's a different kind
+             of action, and the spacing plus label wording (set by the Activity) are this
+             layout's only levers until Phase 3's visual design pass. -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginBottom="24dp"
+            android:background="@android:color/darker_gray" />
+
+        <Button
+            android:id="@+id/stabilityControlButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp" />
+
+    </LinearLayout>
+
+</ScrollView>

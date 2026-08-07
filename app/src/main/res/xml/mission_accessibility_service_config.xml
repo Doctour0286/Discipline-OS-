@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Config for MissionAccessibilityService, referenced from AndroidManifest.xml via
+    <meta-data android:name="android.accessibilityservice" android:resource="@xml/mission_accessibility_service_config" />.
+
+    This is the ANDROID FRAMEWORK'S required static declaration (shown in device Settings >
+    Accessibility when the user enables the service) — a separate thing from the Play Console
+    declaration/use-case-justification text Architecture doc §1.2 requires before a *store*
+    submission. That store-declaration work remains explicitly out of scope for this pass per
+    ROADMAP.md's Phase 2 entry (sideload-only distribution today) and is NOT drafted here —
+    this file's android:description below is deliberately plain, on-device Settings copy only,
+    not an attempt at Play Console review copy.
+
+    android:accessibilityEventTypes/feedbackType/notificationTimeout here mirror what
+    MissionAccessibilityService.onServiceConnected() already sets programmatically on
+    `serviceInfo` at runtime — Android requires SOME static declaration in this file
+    regardless (the framework reads it before onServiceConnected() ever runs, e.g. to render
+    the service in Settings), so the two are kept in sync rather than one being authoritative
+    and the other stale. If the runtime AccessibilityServiceInfo config in the Kotlin file
+    ever changes, this file needs the matching update — noting that explicitly since it's an
+    easy thing to let drift.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="100"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/accessibility_service_description"
+    android:summary="@string/accessibility_service_summary" />

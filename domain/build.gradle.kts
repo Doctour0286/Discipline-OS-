@@ -39,6 +39,11 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1") // withTransaction
+    // Phase 2 (WardenVoiceProvider, ROADMAP.md): withTimeoutOrNull for the Architecture §2.1
+    // "(c)" fallback strategy — hard timeout on the cloud-generation call. Not previously a
+    // direct main-sourceset dependency; only pulled in transitively via
+    // kotlinx-coroutines-test's test-only classpath before this.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("androidx.room:room-testing:2.6.1")

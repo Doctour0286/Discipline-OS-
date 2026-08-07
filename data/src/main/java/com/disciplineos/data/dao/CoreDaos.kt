@@ -25,6 +25,20 @@ interface UserDao {
 
     @Query("SELECT * FROM users WHERE id = :id")
     suspend fun get(id: UUID): User?
+
+    /**
+     * Phase 2 (`MissionAccessibilityService`, ROADMAP.md): the accessibility-event handler
+     * needs "the current user" on every foreground-app-change event, but this app has no
+     * multi-profile/login concept anywhere in the spec — checked, and logged as a judgment
+     * call in ROADMAP.md §5 rather than assumed silently. `LIMIT 1` here encodes that same
+     * single-local-user assumption at the DAO layer instead of via ad hoc SQL at the call
+     * site, matching this module's stated preference (every other DAO in this file) for
+     * auditable named queries over raw `openHelper` access. Returns null before onboarding
+     * has created a `User` row at all — callers must treat that as "nothing to enforce yet,"
+     * not an error.
+     */
+    @Query("SELECT * FROM users LIMIT 1")
+    suspend fun getSingleLocalUser(): User?
 }
 
 /**
@@ -70,6 +84,26 @@ interface MissionDao {
 
     @Query("SELECT * FROM missions WHERE id = :id")
     suspend fun get(id: UUID): Mission?
+
+    /**
+     * Phase 2 (Accessibility Service, ROADMAP.md) needs this to answer "is there an active
+     * Mission for this user right now, and if so what's its allow/blocklist" on every
+     * foreground-app-change event — the highest-frequency read path in the whole app, so this
+     * is a direct indexed-equality query rather than something derived from [resolvedMissionsSince]
+     * (which deliberately excludes ACTIVE missions and scans a time window, both wrong for this
+     * use). Returns null if the user has no Mission currently ACTIVE, which the interception
+     * logic treats as "nothing to enforce right now" — not an error.
+     *
+     * Assumes at most one ACTIVE Mission per user at a time. Nothing in the PRD or Data Model
+     * doc states this explicitly, but §7 (Mission Launch Protocol) and §14 (Distraction
+     * Interception) both describe Mission state in the singular ("the device enters a Mission
+     * Environment"), and `Mission.status` has no schema-level uniqueness constraint enforcing
+     * it — so this is a real, currently-unenforced assumption, not a spec-derived guarantee.
+     * `LIMIT 1` is defensive (never crash the enforcement loop on this query), not a claim that
+     * a second concurrent ACTIVE row is an expected or handled case. Logged in ROADMAP.md §5.
+     */
+    @Query("SELECT * FROM missions WHERE userId = :userId AND status = 'ACTIVE' LIMIT 1")
+    suspend fun activeMissionFor(userId: UUID): Mission?
 
     /**
      * Rolling window query backing Reliability Index (Data Model §3.2) and Debt Ceiling's

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Onboarding doc §4 (Cross-Cutting Copy Review Requirement): "Every user-facing string in
+    this document ... should pass the same behavior-vs-identity test from PRD §22.1 before
+    ship, not just Warden Voice's AI-generated output." The strings below are static UI copy
+    (button labels, countdown text, the Recruit/Operator informational fallback), not
+    AI-generated Warden Voice content — VoiceLineGate.kt doesn't run against these at runtime
+    since they never pass through WardenVoiceProvider — but they were hand-checked against
+    the same §22.1 shape (no "you are/you're a ___" identity framing) before being written
+    here, per §4's instruction that this review is systematic, not spot-checked once.
+
+    None of this is final visual copy — Onboarding doc §5 defers visual design/tone polish to
+    a follow-on doc. This is a first pass sufficient to make the screen functional and
+    spec-compliant in substance, flagged for the same copy-review pass §4 asks for before
+    ship, same as everything else in this doc.
+-->
+<resources>
+
+    <!--
+        Onboarding §3.1: "Recruit/Operator: informational, lower-pressure countdown, casual
+        exit available." This is the fallback shown when InterceptionPolicy.usesWardenVoice
+        is false (voiceLineView.text falls back to this — see renderVoiceLine's kdoc).
+        Behavior-focused: describes the Mission and the choice in front of the user, not a
+        judgment about who they are for opening a blocked app.
+    -->
+    <string name="interception_informational_copy">This app is outside your current Mission. You can return to the Mission, or end it early if something\'s changed.</string>
+
+    <!--
+        PRD §12.4.4: Iron-tier crisis exit, "reachable from this exact screen ... honored
+        immediately: no delay, no additional confirmation screen, no reason entry." Label
+        names the mechanism plainly rather than dramatizing it — a crisis exit is a safety
+        control, and copy that makes it sound like a bigger deal than "leave now, no
+        penalty" would work against the control's own purpose.
+    -->
+    <string name="iron_crisis_exit_label">Exit Now — No Penalty</string>
+
+    <!--
+        PRD §12.4.2: the general "this is too much right now" stability control, shown at
+        every tier below Iron on this screen. Kept distinct in wording from the Iron Crisis
+        Exit label above (a genuinely different, less acute control — see InterceptionPolicy
+        and ROADMAP.md §5.15 for why they're not the same button).
+    -->
+    <string name="explicit_downgrade_label">This Is Too Much Right Now</string>
+
+    <string name="return_to_mission_label">Return to Mission</string>
+    <string name="break_commitment_label">Break Commitment</string>
+
+    <!--
+        Iron-only Break Commitment reason field (InterceptionPolicy.requiresBreakCommitmentReason).
+        Asks what happened, not what that says about the user — matches the
+        behavior-vs-identity framing this doc's §4 requires and mirrors the same "what
+        happened" framing §3.2 recommends for the Tribunal's structured review.
+    -->
+    <string name="break_reason_hint">What happened? (required to break this commitment)</string>
+
+    <!--
+        %d = whole seconds remaining, ticked every COUNTDOWN_TICK_MILLIS by
+        MissionInterceptionActivity.startCountdown(). Plain numeral display, not a
+        countdown-as-threat framing — matches interception_informational_copy's tone.
+    -->
+    <string name="countdown_seconds_remaining">%d</string>
+
+    <!--
+        Shown once CountDownTimer.onFinish() fires and (at Warden/Iron) the decision buttons
+        become enabled. Neutral, not celebratory or shaming either direction — the countdown
+        completing isn't itself a win or a loss, just the point where a choice becomes
+        available.
+    -->
+    <string name="countdown_complete">You can choose now.</string>
+
+    <!--
+        Accessibility Service on-device description strings, shown to the user in Android
+        Settings > Accessibility when they enable MissionAccessibilityService — NOT the Play
+        Console declaration text (that's out of scope for this sideload-only pass, see
+        mission_accessibility_service_config.xml's top comment). Plain and specific about
+        what the service does and does not do, matching Architecture §1.2's "narrow, clearly
+        justified use case" framing even though there's no store review to satisfy here —
+        the same honesty standard applies to what a family member reads before enabling it.
+    -->
+    <string name="accessibility_service_summary">Lets DisciplineOS detect when you open an app outside your current Mission.</string>
+    <string name="accessibility_service_description">DisciplineOS uses this permission only to see which app is in the foreground while a Mission is active, so it can show the interception screen if you open something outside that Mission\'s allowed apps. It does not read screen content, does not log what you type, and does not run when no Mission is active.</string>
+
+</resources>
