@@ -60,6 +60,8 @@ dependencies {
     // LifecycleOwner, which plain Activity does not implement. Not needed for
     // MissionAccessibilityService (fixed with a manual CoroutineScope instead — plain
     // AccessibilityService has no ComponentActivity-equivalent AndroidX subclass to switch to).
+    implementation("androidx.security:security-crypto:1.1.0-alpha06") // MasterKey /
+    // EncryptedSharedPreferences, used by DbPassphraseProvider to store the SQLCipher passphrase.
 
     testImplementation("junit:junit:4.13.2")
     // Mirrors :domain/build.gradle.kts's test dependency set exactly (see that file's
