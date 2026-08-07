@@ -110,7 +110,13 @@ class TierTransitionUseCaseTest {
     @Test
     fun `crisis downgrade always moves to Recruit and pauses debt accrual and Tribunal for 24 hours`() = runTest {
         seedUser(tier = Tier.IRON)
-        val now = Instant.now()
+        // Truncated to millisecond precision: Room persists Instant via Converters.fromInstant
+        // (toEpochMilli), which silently drops any sub-millisecond component. Instant.now()
+        // often carries nanosecond precision on the JVM, so comparing an untruncated `now`
+        // against a value re-read from the DB is flaky — equal only when `now` happens to
+        // land on an exact millisecond boundary. Truncating here makes the in-memory value
+        // and the DB round-trip agree deterministically.
+        val now = Instant.ofEpochMilli(Instant.now().toEpochMilli())
 
         val event = useCase.crisisDowngrade(userId, triggerReason = "Tampering detected", now = now)
 
