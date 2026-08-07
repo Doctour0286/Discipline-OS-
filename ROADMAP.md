@@ -238,7 +238,10 @@ isolation. This is the first fully-green build this project has had.
       found and left open
 
 **Location:** `settings.gradle.kts`, `build.gradle.kts`, `gradle.properties`, `app/`,
-`gradle/wrapper/`, `.github/workflows/build-and-test.yml`.
+`gradle/wrapper/`, `.github/workflows/build-and-test.yml`, `scripts/deploy_update.sh` (the
+zip-to-repo deploy script — see "Deploy script" below; also expected to live at
+`~/scripts/deploy_update.sh` on-device, outside the repo, since it needs to run *before* the
+repo's working tree is in a known state).
 
 **Known non-blocking noise:** CI currently emits two deprecation warnings (Node.js 20 in
 `actions/*`, `setup-java@v4`) from GitHub's own Actions runner, unrelated to this project's
@@ -257,30 +260,88 @@ and no direct device access — the round trip is manual by necessity, not a pre
    with the real `.git` history/remote). Termux's home directory is sandboxed from normal
    Android storage, so `termux-setup-storage` is run once to expose `~/storage/downloads/`
    into Termux's filesystem.
-4. Replace the working copy with the new zip's contents while preserving git history:
-   ```bash
-   cd ~/projects
-   mv disciplineos disciplineos-old-backup        # don't skip — cheap insurance
-   unzip ~/storage/downloads/<new-zip-name>.zip -d .
-   mv <unzipped-folder-name> disciplineos          # match the original folder name
-   cp -r disciplineos-old-backup/.git disciplineos/  # the zip has no .git — reattach it
-   cd disciplineos
-   git status                                       # inspect the real diff before committing
-   ```
-5. `git status` at this point is the actual verification step — it should show only the
-   files a given session claims to have touched. Anything unexpected (a file the session
-   didn't mention, or an expected change missing) is a signal to stop and check before
-   committing, not to commit through.
+4. **Run `~/scripts/deploy_update.sh <path-to-zip>` instead of the manual mv/cp sequence
+   previously documented here** — see "Deploy script" subsection immediately below for why
+   this replaced the manual version and what it actually does.
+5. The script stops after staging the new tree and prints `git status` for review — it does
+   not commit or push on its own. Treat that printed diff as the real verification step: it
+   should show only the files a given session claims to have touched. Anything unexpected (a
+   file the session didn't mention, or an expected change missing) is a signal to stop and
+   check before committing, not to commit through.
 6. Commit and push as normal:
    ```bash
    git add -A
    git commit -m "<describes what actually changed, e.g. 'Fix flaky Instant precision assertion'>"
    git push
    ```
-7. Once confirmed working (`git status` clean, push succeeded, CI later confirms green),
-   delete the backup: `rm -rf ~/projects/disciplineos-old-backup`.
+7. Once confirmed working (diff reviewed, push succeeded, CI later confirms green), delete
+   the backup the script made: `rm -rf ~/projects/disciplineos-old-backup`.
 8. Check the Actions tab a few minutes later for the real result — a green check is the
    only claim in this whole loop that isn't provisional.
+
+**Deploy script (`~/scripts/deploy_update.sh`) — why the manual steps above got replaced:**
+
+The original version of this section (steps 4 above, prior to this entry) documented a
+manual `mv`/`cp` sequence: rename the current repo to a backup folder, unzip, `mv` the
+unzipped folder to `disciplineos`, `cp -r` the backup's `.git` into it. In practice this
+failed **three separate times in one real session** before the Phase 2 CI-artifact push
+landed successfully, all from the same underlying problem: the sequence has no built-in
+verification, so a small mistake compounds silently instead of stopping the person running
+it. Concretely, across that session:
+
+- The zip's internal folder is named `updated`, not the zip's own filename
+  (`disciplineos-validated-phase2-updated.zip`) — the manual `mv <unzipped-folder-name>
+  disciplineos` step assumes those match. They don't, and nothing about the zip format makes
+  that obvious ahead of time.
+- `mv`/`cp -r` behave differently depending on whether the destination already exists (a
+  clean rename vs. "move source *inside* the existing destination") — a first failed attempt
+  left debris that changed what the *next* command silently did, compounding rather than
+  failing loudly.
+- One of those silent failures resulted in `.git`'s contents landing bare in the project root
+  (instead of inside a `.git` subfolder), which made `git status` report every real file as
+  "deleted" — genuinely alarming output, but not actual data loss, since the append-only
+  `disciplineos-old-backup/.git` was never touched by any of it.
+- Recovering required manually re-verifying, at every step, exactly the kind of thing a
+  script should check automatically: does the zip actually contain what I think it does, does
+  the destination already exist, does the result look structurally complete before I delete
+  anything irreversible.
+
+The script fixes this by making each step check its own precondition and refuse to proceed
+silently:
+- Finds the real project root inside the extracted zip by locating the directory that
+  actually contains `build.gradle.kts` + `settings.gradle.kts` together, rather than assuming
+  a folder name.
+- Extracts into an isolated, disposable temp folder (`~/projects/.deploy-tmp-extract`) —
+  never directly into `~/projects` — so a bad extraction can't collide with anything live.
+- Refuses to proceed if the new tree is missing `app/`, `data/`, `domain/`, or `ROADMAP.md`,
+  instead of silently swapping in a half-broken copy.
+- Restores the `gradlew` executable bit automatically — the zip round-trip through a browser
+  download and Termux's storage bridge was separately observed, in the same session, to
+  silently drop it (`old mode 100755, new mode 100644` in the resulting diff). Undetected,
+  this would have made `./gradlew` fail with a permissions error despite identical file
+  content.
+- Only deletes the live `disciplineos/` directory after the new tree has passed all of the
+  above checks, and never touches `disciplineos-old-backup/` if one already exists from an
+  earlier run.
+- Ends by printing `git status` for review — it deliberately does not run `git add`/`commit`/
+  `push` itself, keeping that as a manual, reviewed step per point 5 above.
+
+`set -euo pipefail` at the top means any unexpected error anywhere in the script stops it
+immediately rather than continuing past a failure — the exact opposite of what the manual
+sequence did when `mv`/`rmdir` failed quietly in the middle of a chain of commands.
+
+**Setup, one-time:**
+```bash
+mkdir -p ~/scripts
+# save deploy_update.sh into ~/scripts/ (paste via `micro ~/scripts/deploy_update.sh`, or
+# download it like any other session artifact and `mv` it into place)
+chmod +x ~/scripts/deploy_update.sh
+```
+
+**Usage, every session after that:**
+```bash
+bash ~/scripts/deploy_update.sh ~/storage/downloads/<zip-name>.zip
+```
 
 **Auth note, logged because it already caused two dead-ends:** a classic PAT embedded
 directly in the git remote URL (`https://<user>:<token>@github.com/...`) stops working the
@@ -594,9 +655,10 @@ verification either.
   then discarded when the runner tore down. This closes that gap — the ready-to-install debug
   APK can now be pulled directly from a run's Actions page instead of requiring a full
   on-device Termux Android SDK build every time (see `docs/PHASE2_DEVICE_VERIFICATION.md`,
-  "Option B"). **Not yet confirmed on a real run** — next push should verify the artifact
-  actually appears and downloads correctly, same "one green run isn't confirmed until
-  re-checked" standard as §5.12.
+  "Option B"). **Confirmed on a real run** — run #9 (`Add debug APK CI upload, fix stale app
+  module comment, add device verification runbook`), Success, 3m56s, both `app-debug-apk`
+  (9.03 MB) and `test-reports` (33.1 KB) present and downloadable from the Actions page.
+  Screenshot-verified directly, not inferred from job-level green alone.
 - `app/build.gradle.kts` — fixed a stale top comment that still described this module as
   containing "no app code beyond a launcher-less Application class." Phase 2 already added
   the real Accessibility Service, interception Activity, and their resources/tests; the
@@ -612,6 +674,21 @@ verification either.
   no-Ledger-write, verify survival through process death mid-countdown, and pull the CI
   `test-reports` artifact to directly confirm all 9 `InterceptionControllerTest` cases passed
   individually (§4 item 5(b)'s "inferred, not directly checked" gap).
+- New file: `scripts/deploy_update.sh` — replaces the manual `mv`/`cp` zip-to-repo sequence
+  previously documented in this section, after that manual sequence failed three separate
+  times in the same real session (folder-name mismatch between the zip's internal directory
+  and its filename, `mv`/`cp` behaving differently depending on pre-existing destination
+  state, and a bare `.git` ending up in the project root instead of a subfolder — see the
+  "Deploy script" writeup above this entry for the full account). The script verifies each
+  step's precondition before acting (finds the project root by content rather than assumed
+  name, extracts into a disposable temp folder, refuses to proceed on a structurally
+  incomplete tree, restores `gradlew`'s executable bit which the zip round-trip was separately
+  observed to silently drop) and stops on first error (`set -euo pipefail`) instead of
+  continuing past a failure the way the manual chained commands did. Confirmed working this
+  session — the run #9 push above went through this script's staged tree without incident.
+  Deliberately does not run `git add`/`commit`/`push` itself; ends by printing `git status`
+  for manual review, keeping that human-checked step exactly where it was in the original
+  workflow.
 
 ---
 
@@ -669,6 +746,103 @@ verification either.
       version pinned because it matched existing code, not independently vetted. Worth a
       deliberate look at whether a stable release now covers `DbPassphraseProvider`'s needs,
       lower priority than (a)–(c) given sideload-only scope.
+
+**(c) is now in progress — plan below.** Real device install (Termux → SAI → sideload,
+`docs/PHASE2_DEVICE_VERIFICATION.md` steps 1–4) is done: app installs, launches, has no
+launcher icon (correct — no `MAIN`/`LAUNCHER` intent-filter exists, by design, until Phase 3),
+Accessibility Service registers and enables (initially blocked by Android's Restricted
+Settings anti-malware gate on sideloaded apps — resolved via SAI as installer, not a bug in
+the app; full account logged as §5.18). What's left for (c): trigger an actual interception,
+which needs a `Mission` row to exist. There is currently no way to create one — no UI (Phase
+3), no seed mechanism. Chosen approach and why, in order of what was considered:
+
+- **Raw SQL against the Room DB file directly** — rejected. The DB is SQLCipher-encrypted
+  (`DbPassphraseProvider`), so plain `sqlite3` from a shell can't open it without replicating
+  the passphrase logic outside the app; and even with that solved, hand-written INSERTs bypass
+  Room's type converters and FK constraints entirely, risking a malformed row that fails
+  silently at the SQL level and only surfaces later as a confusing crash deep in app code —
+  the wrong place to be debugging when the actual open question is "does interception work,"
+  not "did I write correct SQL by hand."
+- **Instrumented test invoking the real DAOs via `adb shell am instrument`** — this is
+  actually the most rigorous option (reuses already-CI-verified `MissionDao`/`UserDao` code
+  paths, touching the same encrypted-DB machinery production code already exercises,
+  correctness inherited rather than re-risked) but requires `adb` targeting a separate
+  device, which doesn't apply here — Termux and the target device are the same phone, and
+  `adb` has no concept of "device talking to itself" (confirmed this session:
+  `adb: no devices/emulators found` even with the daemon running).
+- **Chosen: a small, dedicated debug-buildType seed class, tested like real code, not
+  improvised inline.** Concretely:
+  1. New file `app/src/debug/java/com/disciplineos/app/debug/DebugSeeder.kt`, living under
+     Gradle's `debug` source set (not `main`) so it is compiled into debug builds only and
+     structurally cannot ship in a release build regardless of anyone forgetting to remove
+     it later — enforced by the build system, not by memory or a code comment.
+  2. It calls the real `UserDao`/`MissionDao` insert methods already used by
+     `RecordViolationUseCase` and friends — no new persistence logic, no hand-rolled SQL,
+     just constructing one valid `User` row and one valid `Mission` row (tier, blocklist,
+     `status = ACTIVE`, sane timestamps via the existing `Converters.kt` path) and calling
+     `.insert()`.
+  3. Invoked once, deliberately (a one-line call from `AppContainer.onCreate` gated behind
+     `if (BuildConfig.DEBUG && <no existing Mission>)`), not on every launch — avoids
+     silently re-seeding or duplicating rows on subsequent opens.
+  4. **Gets its own unit test** (`DebugSeederTest`, same rigor as any other class in this
+     codebase) asserting: seeding is a no-op if a Mission already exists (idempotency), and
+     the round-tripped row reads back with the exact tier/blocklist/status values written —
+     catching the exact class of "subtly wrong foreign key or enum value" bug that raw SQL or
+     an untested inline hook would only surface at runtime, on-device, mid-verification.
+  5. Ships through the same review discipline as everything else in this file: written,
+     manually cross-checked against real DAO signatures (no compiler in the authoring
+     sandbox — same standing caveat as all other new code per item 2 above), pushed, CI
+     green required before treating it as real, only then relied on for the actual
+     interception test.
+  6. **Explicitly test infrastructure, logged as such, not silent scaffolding to forget
+     about** — matching this file's own standard for the dispute flow and crisis boundary:
+     once (c) is fully verified across all three tiers, decide explicitly whether
+     `DebugSeeder` stays (useful for future manual QA passes) or gets deleted, and record
+     that decision here rather than leaving it to linger unexamined.
+  7. Once seeded, walk `docs/PHASE2_DEVICE_VERIFICATION.md` §5 exactly as written: trigger
+     interception at Recruit, then Warden, then Iron (separate passes — the branching logic
+     differs materially), confirming Iron's crisis exit specifically writes no Ledger entry
+     and exits with no delay.
+
+**`DebugSeeder` — written this session, not yet run through real CI.** All six items in the
+plan above are implemented:
+- `app/src/debug/java/com/disciplineos/app/debug/DebugSeeder.kt` — debug-source-set-only,
+  calls real `UserDao`/`MissionDao` insert methods (no hand-rolled SQL), idempotent
+  (`seedIfNeeded` returns `null` and writes nothing if an ACTIVE Mission already exists for
+  the single local user), seeds at a caller-supplied `Tier` (defaults to Warden) so
+  Recruit/Iron passes are reachable later by re-seeding, not a second class.
+- `app/src/main/java/com/disciplineos/app/DisciplineOsApplication.kt` — **new**, this
+  codebase's first `Application` subclass (nothing needed one before this). Calls
+  `DebugSeeder.seedIfNeeded` from `onCreate()`, gated behind `BuildConfig.DEBUG` as a second,
+  independent guard alongside the debug source set itself. Registered in
+  `AndroidManifest.xml` via `android:name=".DisciplineOsApplication"`.
+- `app/build.gradle.kts` — added `buildFeatures { buildConfig = true }`, required for the
+  `BuildConfig.DEBUG` reference above; nothing in this module referenced `BuildConfig` before
+  now so it was never turned on.
+- `app/src/test/java/com/disciplineos/app/debug/DebugSeederTest.kt` — same in-memory
+  Room-under-Robolectric pattern as `InterceptionControllerTest`. Covers: a fresh seed creates
+  exactly one User + one ACTIVE Mission with the right blocklist; the written `Tier` round-trips
+  correctly; a second `seedIfNeeded` call is a no-op (`null` return, no duplicate Mission row);
+  a repeat call does not create a second User row either (checked directly, not just inferred
+  from the Mission-level idempotency check passing).
+
+**Standing caveat, same as every other new file in this project until it's been through real
+CI:** manually cross-checked against real DAO/entity signatures (`UserDao.insert`,
+`MissionDao.insert`, `MissionDao.activeMissionFor`, `User`/`Mission` constructors all matched
+field-for-field against `data/.../entity/` and `data/.../dao/CoreDaos.kt` as they exist in
+this tree, not from memory), but not yet compiled — no Android/Kotlin compiler in this
+authoring sandbox, per §4 item 2's standing note. Push, let CI confirm
+`:app:testDebugUnitTest` picks up and passes `DebugSeederTest`, then this note graduates the
+same way §5.8/§5.12/§5.16/§5.17 did. Once CI is green, proceed to plan step 7 above: build or
+pull the CI debug APK, reinstall on-device (the new `Application` class and `BuildConfig`
+build-feature flag both mean the APK has changed since the last install), confirm the app
+still launches (an `Application.onCreate()` crash would be silent/fatal at every launch, not
+just during seeding — the `try/catch` around the seeding coroutine specifically guards
+against a seeding *failure* taking down startup, but a crash in `AppContainer.database()`
+itself, e.g. a passphrase-provider issue, is not caught by that same block and is worth
+watching for on first relaunch), then check logcat for the `DisciplineOsApp` tag to confirm
+seeding ran, then walk the three-tier interception verification in
+`docs/PHASE2_DEVICE_VERIFICATION.md` §5.
 
 ---
 
@@ -1244,6 +1418,45 @@ failed test would fail the job — but per this project's own §4/§5.12 standar
 "looks correct" as equivalent to "checked," that artifact is worth a direct look before this
 entry's confirmation is treated as airtight rather than "green build page + the same
 inference every prior CI-confirmed entry in this doc relies on."
+
+---
+
+### 5.18 — RESOLVED, device-verification finding (not a code bug) — Android Restricted
+Settings blocks Accessibility Service toggle on sideloaded builds
+
+**What happened:** first real on-device install (Phase 2's remaining verification step,
+§4(c)) succeeded — app installed, no crash, correctly has no launcher icon (no
+`MAIN`/`LAUNCHER` intent-filter exists by design, pending Phase 3). But enabling the
+Accessibility Service in Settings → Accessibility was blocked: no toggle, no
+"Allow restricted settings" option in the app-info three-dot menu either — confirmed absent
+on this device (Infinix Hot 40i, XOS).
+
+**Root cause, not app-side:** Android 13+ ships a security feature ("Restricted Settings")
+that blocks enabling sensitive permissions — Accessibility Service access chief among them —
+for apps installed via direct APK sideload (tapped open from a file manager/downloads
+folder), specifically to stop malware from sideloading itself and immediately grabbing
+accessibility access. This has nothing to do with `mission_accessibility_service_config.xml`,
+the manifest `<service>` entry, or any code in this repo — all of that is correct and was
+already confirmed structurally sound by static review before this device test (§ device
+verification doc, "pre-flight" section). Some OEM skins (this device's XOS among them, per
+this session) additionally strip the standard override UI that stock Android and some
+skins expose, making the usual fix ("tap the app info, allow restricted settings") not just
+inconvenient but genuinely absent from the UI.
+
+**Fix:** reinstall via a third-party package-installer app (this session used SAI — Split
+APKs Installer) rather than tapping the APK directly in a file manager. An app installed
+*through* another installer app isn't flagged the same way a direct sideload is, so the
+Restricted Settings gate doesn't trigger, and the Accessibility toggle became available
+normally afterward. Confirmed working this session.
+
+**Why this is logged here rather than left as a one-off Termux transcript:** anyone else
+sideloading this app for manual testing (future contributors, or this same author on a
+different device) will hit the identical wall on any Android 13+ device, and the fix is
+non-obvious and OEM-dependent enough to be worth a permanent note rather than rediscovering
+it. **Not an app-code decision, not something to "fix" in the manifest or service config —
+it's a distribution-mechanism fact of the platform**, filed here as decision-log precedent
+rather than under Phase 2's engineering exit criteria, since no code change is needed or
+possible on this end.
 
 ---
 

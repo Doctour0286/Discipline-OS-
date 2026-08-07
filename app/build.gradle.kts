@@ -27,6 +27,13 @@ android {
         }
     }
 
+    buildFeatures {
+        buildConfig = true // AGP 8+ generates BuildConfig only when opted in. Needed by
+        // DisciplineOsApplication.onCreate()'s BuildConfig.DEBUG gate around DebugSeeder
+        // (ROADMAP.md §4(c)) — nothing in this module referenced BuildConfig before this,
+        // so it was never previously turned on.
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
