@@ -1,47 +1,41 @@
 name: Build and Test
-
 # ROADMAP.md's #1 flagged risk: "Nothing in either module has been through a real compiler
 # yet." This workflow is that real compiler — runs on GitHub's own Ubuntu runner, with a real
 # JDK, Gradle, and Android SDK, none of which exist in the sandbox this project was drafted
 # in. Runs the :data and :domain unit tests (MetricsTest, ArchitectureBoundaryTest,
 # RecordViolationUseCaseTest, ResolveDisputeUseCaseTest, DomainArchitectureBoundaryTest) plus
 # a full :app assemble to catch manifest/resource/dex-level problems the library modules
-# alone wouldn't surface.
-
+# alone wouldn't surface, and — as of ROADMAP.md §5.16/§4 item 5(b) — the :app module's own
+# unit tests (InterceptionControllerTest), which this workflow previously never ran despite
+# :app:assembleDebug going green; assembling only proves compilation, not that the
+# Robolectric+Room test suite actually passes.
 on:
   push:
   pull_request:
   workflow_dispatch: # lets you trigger a run manually from the Actions tab, no push needed
-
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-
       - name: Run :data unit tests
         run: ./gradlew :data:testDebugUnitTest --stacktrace
-
       - name: Run :domain unit tests
         run: ./gradlew :domain:testDebugUnitTest --stacktrace
-
+      - name: Run :app unit tests (InterceptionControllerTest — Robolectric + in-memory Room)
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
       - name: Assemble :app debug (full variant graph — manifest, resources, dex)
         run: ./gradlew :app:assembleDebug --stacktrace
-
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -50,4 +44,5 @@ jobs:
           path: |
             data/build/reports/tests
             domain/build/reports/tests
+            app/build/reports/tests
           retention-days: 14
