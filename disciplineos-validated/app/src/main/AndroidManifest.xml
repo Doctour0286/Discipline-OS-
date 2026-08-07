@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        Skeleton manifest only. No Activity, no Accessibility Service declaration yet —
+        those are ROADMAP.md Phase 2/3 work (the Accessibility Service declaration text
+        itself needs to be drafted per Architecture doc §1.2 before it's added here, not
+        invented as part of getting a build to pass).
+    -->
+    <application
+        android:label="DisciplineOS"
+        android:allowBackup="false" />
+
+</manifest>
