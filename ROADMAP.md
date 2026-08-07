@@ -374,10 +374,11 @@ distribution scope ever changes.
       `app/build.gradle.kts` updated to add the matching Robolectric/Room test dependencies
       (mirrors `:domain`'s set exactly) plus `testOptions.unitTests.isIncludeAndroidResources`.
 
-**Two real compile bugs found and fixed this session's continuation (not yet CI-confirmed):**
-Both are the same root cause: the prior session's `MissionAccessibilityService` and
-`MissionInterceptionActivity` both called `lifecycleScope`, but neither class had a base
-type that actually provides it.
+**Three real compile bugs found and fixed across this phase, all now CI-confirmed:**
+
+Two are the same root cause, found during the writing pass, before ever reaching CI: the
+prior session's `MissionAccessibilityService` and `MissionInterceptionActivity` both called
+`lifecycleScope`, but neither class had a base type that actually provides it.
 - `MissionAccessibilityService extends AccessibilityService` — plain framework class, not a
   `LifecycleOwner`, and AndroidX has no `LifecycleAccessibilityService` equivalent of
   `LifecycleService` to opt into. **Fix:** replaced with a manually-managed
@@ -394,27 +395,65 @@ type that actually provides it.
   inherited from `android.app.Activity`, which `ComponentActivity` extends, so nothing else
   needed to change.
 
-Neither bug was caught during the session that introduced it — both are exactly the kind of
-thing invisible to line-by-line reading and only reliably caught by an actual compiler,
-which this sandbox doesn't have for Android/Kotlin (see §4's standing caution on this).
-Caught this pass only because writing `InterceptionControllerTest` required tracing through
-`InterceptionController`'s actual call sites carefully enough to notice the pattern repeat
-across both files.
+Neither of those two was caught during the session that introduced it — both are exactly the
+kind of thing invisible to line-by-line reading and only reliably caught by an actual
+compiler, which the authoring sandbox doesn't have for Android/Kotlin (see §4's standing
+caution on this). Caught before CI only because writing `InterceptionControllerTest` required
+tracing through `InterceptionController`'s actual call sites carefully enough to notice the
+pattern repeat across both files.
+
+A third, genuinely only findable by CI: **`:app:compileDebugKotlin` failed on its first real
+run** — `DisciplineOsDatabase`'s `RoomDatabase` supertype and `DbPassphraseProvider`'s
+`androidx.security.crypto` types (`MasterKey`, `EncryptedSharedPreferences`) both unresolved.
+Root cause and fix logged in full at §5.16 — in short: `:data`'s Room dependencies were
+`implementation`-scoped (not visible transitively to `:app`, which now touches
+`DisciplineOsDatabase` directly for the first time this phase) and `security-crypto` was
+never declared anywhere despite `DbPassphraseProvider.kt` needing it since that file was
+written. Fixed by changing `:data`'s Room dependencies to `api(...)` and adding
+`security-crypto` to `:app`. **Confirmed green on real CI** (`build-and-test` run #6,
+`:app:assembleDebug`, 3m3s) — this is the first time any `:app`-module code, including both
+`lifecycleScope` fixes above, has actually compiled on a real toolchain rather than just
+read correctly.
+
+A fourth, found only once the third's own fix (wiring `:app:testDebugUnitTest` into CI)
+actually ran: `kotlin-test` was never declared, so `InterceptionControllerTest` couldn't
+compile (`assertFailsWith` unresolved). Root cause and fix logged in full at §5.17. Fixed by
+adding `testImplementation("org.jetbrains.kotlin:kotlin-test:1.9.24")` to
+`app/build.gradle.kts`. **Confirmed green on real CI** (`build-and-test` run #8,
+`:app:testDebugUnitTest`, 3m8s) — the first time `InterceptionControllerTest` has actually
+executed, not just compiled. This run also incidentally re-exercised §5.16's `RoomDatabase`/
+`security-crypto` classpath fix under a second, independent CI run — functioning as the
+"second confirming run" §5.12's standard asks for, even though re-confirming §5.16 wasn't
+run #8's primary purpose.
 
 **Still open before this phase can be marked DONE:**
-- [ ] None of this phase's code — including this session's continuation — has been through
-      real Gradle/CI yet. Phase 0.5's green run predates all of it. Standing discipline from
-      §4 applies: push and let CI confirm before trusting any of the above as actually
-      compiling, not just reading correctly. This matters more than usual this time, given
-      two compile bugs already turned up in code that looked correct on a prior read.
+- [x] ~~None of this phase's code has been through real Gradle/CI yet~~ — **DONE.**
+      `:app:assembleDebug` (run #6) and `:app:testDebugUnitTest` (run #8) both green. All
+      four compile/dependency bugs above are now confirmed fixed, not just plausibly fixed.
+- [x] ~~Per §5.12's own standard, one green run isn't automatically "permanently
+      resolved"~~ — **effectively satisfied.** Run #8 independently re-exercised §5.16's
+      `RoomDatabase`/`security-crypto` fix under a second CI run without incident, alongside
+      confirming §5.17. Not a dedicated, deliberate re-run of §5.16 specifically, but the
+      practical bar (does this classpath configuration hold up across more than one real CI
+      run) has been met.
+- [ ] **Not yet independently verified:** run #8's job-level "Success" was confirmed directly
+      (screenshot); the `test-reports` artifact's per-test breakdown — that all 9
+      `InterceptionControllerTest` cases specifically passed, not some subset skipped — was
+      not separately pulled and checked. Low-risk given a failed test would fail the job, but
+      flagged per this doc's own "don't call something checked when it was only inferred"
+      standard (see §5.17's own note on this).
+- [ ] `androidx.security:security-crypto:1.1.0-alpha06` is an alpha version, used because it
+      matched `DbPassphraseProvider.kt`'s existing API usage — not independently re-checked
+      against whatever stable `androidx.security` release exists now. Lower priority given
+      sideload-only distribution, but worth confirming before any non-sideload distribution.
 - [ ] Hard blocker research (Play Console declaration + comparable-apps check, Architecture
       §1.2) remains explicitly skipped, since distribution is sideload-only for now.
       **Revisit if distribution scope ever changes** — don't let this stay silently skipped
       if the app is ever submitted to Play.
-- [ ] No on-device or emulator install/run has happened — everything above is "should work"
-      based on careful reading and the two bugs already found, not "has been seen running."
-      Once CI is green, an actual install-and-trigger-an-interception pass is still owed
-      before this phase's exit criteria are honestly checkable end-to-end.
+- [ ] **The single clearest remaining gap:** no on-device or emulator install/run has
+      happened — CI confirms the code compiles, packages, and its own tests pass, not that it
+      behaves correctly on a real device. An actual install-and-trigger-an-interception pass
+      is still owed before this phase's exit criteria are honestly checkable end-to-end.
 
 ---
 
@@ -458,15 +497,24 @@ after N more days" note — never a silently-picked number.
 
 ## 3. Current state snapshot
 
-**Last updated:** 2026-08-07 (this session, second continuation)
+**Last updated:** 2026-08-07 (this session, fourth continuation — `:app:testDebugUnitTest`
+wired into CI and confirmed green for the first time)
 **Current phase:** Phase 0 and Phase 0.5 remain complete and confirmed on real CI, fully
 green (unchanged since last entry). Phase 1 remains functionally complete (§5.9's spec gap
-aside). **Phase 2 is now substantially further along** — the resource/manifest layer that
-was missing after the first Phase 2 pass now exists (layout, strings, accessibility service
-config, manifest entries), `InterceptionController` has real test coverage, and two genuine
-compile bugs from the first Phase 2 pass were found and fixed. **Still none of it has been
-through real Gradle/CI** — treat Phase 2 as "should compile and install, carefully checked
-by hand, not yet proven" rather than "done."
+aside). **Phase 2 is now CI-confirmed to compile, package, AND pass its own test suite** —
+the resource/manifest layer (layout, strings, accessibility service config, manifest
+entries) exists, `InterceptionController` has real test coverage, and all four genuine
+compile/dependency bugs found across this phase (the two `lifecycleScope` base-class bugs,
+§5.16's `RoomDatabase`/`security-crypto` classpath gap, §5.17's missing `kotlin-test`
+dependency) are fixed and confirmed on green CI runs (`:app:assembleDebug` on run #6,
+`:app:testDebugUnitTest` on run #8 — the latter only possible because run #6's own follow-up
+found the workflow had never actually run that task before). Treat Phase 2 as "compiles,
+packages, and its tests pass, all confirmed on CI" rather than "done" — no on-device
+install/run has happened yet, which is now the one clearly-remaining gap before this phase's
+exit criteria (§2) are honestly checkable end-to-end. Per §5.12's own standard, §5.16's
+`RoomDatabase`/`security-crypto` fix has one green run behind it (not yet a *second*
+confirming run) — worth keeping in mind, though the practical risk is low since §5.17's
+independent CI run (#8) exercised the same dependency graph without incident.
 
 **What got built in the first Phase 2 pass (prior entry, unchanged):**
 - `:domain/voice/` — `VoiceLineGate`, `FallbackVoiceBank`, `WardenVoiceProvider`, all
@@ -510,22 +558,60 @@ Phase 0 — Data Layer            ███████████████�
 Phase 1 — Domain/Use-Cases      ████████████████████░  ~95% (4 of 4 use-cases written and
                                                         passing on real CI; demotion_triggered
                                                         rank-band gap still open, §5.9)
-Phase 2 — Enforcement Loop      ███████████████░░░░░░  ~70% (all logic, resources, manifest,
-                                                        and tests written and self-consistent;
-                                                        zero of it confirmed on real CI or run
-                                                        on a device yet — see "still open")
+Phase 2 — Enforcement Loop      ██████████████████░░░  ~85% (all logic, resources, manifest,
+                                                        and tests written, self-consistent,
+                                                        AND now confirmed compiling,
+                                                        packaging, AND passing its own test
+                                                        suite on real CI; not yet run on a
+                                                        device — see "still open")
 Phase 3 — Onboarding & UI       ░░░░░░░░░░░░░░░░░░░░░  0%
 Phase 4 — Fingerprint Rules     ░░░░░░░░░░░░░░░░░░░░░  0%
 Phase 5 — Pilot                 ░░░░░░░░░░░░░░░░░░░░░  0%
 ```
 
-**`app` module should now be a real, installable app — untested.** Every file Phase 2 needs
-to compile, link resources, and install now exists: Kotlin classes, layout, strings,
-accessibility config, and manifest entries. This is a materially different state from the
-last snapshot ("still not installable, resource layer missing entirely"), but "should
-install" and "confirmed installing" are not the same claim — nothing in Phase 2 has been
-through Gradle, CI, or an actual device/emulator yet. The two bugs found this pass are
-concrete evidence that claim needs verifying, not assuming.
+**`app` module compiles, packages, AND its own tests pass — still not run on a device.**
+Every file Phase 2 needs to compile, link resources, and install exists: Kotlin classes,
+layout, strings, accessibility config, and manifest entries. `:app:assembleDebug` is
+confirmed green (build-and-test run #6, §5.16), and — new this entry — `:app:testDebugUnitTest`
+is also confirmed green (run #8, §5.17), meaning `InterceptionControllerTest` has actually
+executed on a real Robolectric+Room toolchain, not just compiled. This is a materially
+different state from the prior snapshot ("compiles and packages, tests not yet run") — the
+test suite has now actually been exercised, not just written and read carefully. "Tests pass
+in CI" and "confirmed installing/running on a device" are still not the same claim, though —
+that step remains genuinely undone, and is now the single clearest remaining gap before this
+phase's exit criteria (§2) are honestly checkable end-to-end. Four real bugs were found
+across this phase before reaching this state (two `lifecycleScope` base-class errors, the
+`RoomDatabase`/`security-crypto` classpath gap, the missing `kotlin-test` dependency) — each
+one only surfaced by actually running the real toolchain, not by re-reading the code more
+carefully, which is itself the concrete argument for not skipping the remaining device-install
+verification either.
+
+**This session's additions (no code logic touched, tooling/docs only):**
+- `.github/workflows/build-and-test.yml` — added an "Upload debug APK" step
+  (`app-debug-apk`, from `app/build/outputs/apk/debug/app-debug.apk`, 14-day retention,
+  no `if: always()` since a failed-build APK isn't worth keeping). Previously the workflow
+  only uploaded test reports; the actual built app was produced by `:app:assembleDebug` and
+  then discarded when the runner tore down. This closes that gap — the ready-to-install debug
+  APK can now be pulled directly from a run's Actions page instead of requiring a full
+  on-device Termux Android SDK build every time (see `docs/PHASE2_DEVICE_VERIFICATION.md`,
+  "Option B"). **Not yet confirmed on a real run** — next push should verify the artifact
+  actually appears and downloads correctly, same "one green run isn't confirmed until
+  re-checked" standard as §5.12.
+- `app/build.gradle.kts` — fixed a stale top comment that still described this module as
+  containing "no app code beyond a launcher-less Application class." Phase 2 already added
+  the real Accessibility Service, interception Activity, and their resources/tests; the
+  comment predated that and was never updated. Comment-only, no logic change.
+- New file: `docs/PHASE2_DEVICE_VERIFICATION.md` — a step-by-step on-device verification
+  runbook for Phase 2's one remaining gap (real device/emulator install-and-trigger, §2/§4
+  above). Written because verifying this requires an actual Android device/emulator/adb, none
+  of which exist in the sandbox this project is authored in — same limitation this file's own
+  Phase 0.5 push workflow already works around. Covers: pre-flight static checks (view-ID
+  cross-reference, manifest/config consistency — done and clean, no bugs found),
+  get-code-onto-phone, build-or-pull-APK, install, enable Accessibility Service, seed a test
+  Mission and trigger interception at each tier, verify Iron crisis-exit timing and
+  no-Ledger-write, verify survival through process death mid-countdown, and pull the CI
+  `test-reports` artifact to directly confirm all 9 `InterceptionControllerTest` cases passed
+  individually (§4 item 5(b)'s "inferred, not directly checked" gap).
 
 ---
 
@@ -554,25 +640,35 @@ concrete evidence that claim needs verifying, not assuming.
    "flagged, not assumed" status as §5.5/§5.9/§5.10.
 4. **Phase 1 is functionally complete and CI-verified** except the `demotion_triggered` gap
    (§5.9) — that's a spec gap, not an engineering task, and shouldn't block Phase 2.
-5. **Phase 2 is in progress, not "next" — pick up exactly where it left off.** The Play
-   Console research blocker in Architecture §1.2 was explicitly and correctly skipped for
-   this pass (sideload-only distribution, your call) — don't redo that research unless
-   distribution scope changes. The Voice layer, `InterceptionPolicy`, `InterceptionController`,
-   `MissionAccessibilityService`, and `MissionInterceptionActivity` are written and (except
-   the Controller) unit-tested. **In order, what's left to close out Phase 2:**
-   a. `res/layout/activity_mission_interception.xml` + `res/values/strings.xml` — extract
-      the Activity's literal strings per Onboarding doc §3.1's exact required copy.
-   b. Accessibility Service config XML (`res/xml/`) — event types + the plain-language
-      on-device description drafted (but not yet filed) last session.
-   c. `AndroidManifest.xml` — add the `<service>` (with `BIND_ACCESSIBILITY_SERVICE` +
-      config XML meta-data pointer) and `<activity>` declarations. Currently has neither.
-   d. Unit tests for `InterceptionController` — everything else this phase has tests;
-      this doesn't yet (`app/src/test` is empty).
-   e. **Push and confirm on real CI.** Every prior phase's "done" only became real after a
-      confirmed green re-run (§5.8, §5.12) — this phase's new code hasn't had that yet, and
-      per §4.2's standing discipline should not be treated as trustworthy until it has.
-   f. Only once (a)–(e) are done does Phase 2's exit criteria checklist above become
-      honestly checkable end-to-end — installing and manually triggering an interception.
+5. **Phase 2's code/resource/manifest/test work is done and CI-confirmed — what's left is
+   verification, not authoring.** The Play Console research blocker in Architecture §1.2 was
+   explicitly and correctly skipped for this pass (sideload-only distribution, your call) —
+   don't redo that research unless distribution scope changes. Everything below is now true,
+   not aspirational: the Voice layer, `InterceptionPolicy`, `InterceptionController`,
+   `MissionAccessibilityService`, `MissionInterceptionActivity`, the layout/strings/
+   accessibility-config resources, the manifest `<service>`/`<activity>` entries, and
+   `InterceptionControllerTest` all exist, are self-consistent, and — as of this entry —
+   `:app:assembleDebug` is confirmed green on real CI (§5.16). **What's actually left:**
+   a. **A second confirming CI run.** Per §5.12's own standard, one green run isn't
+      automatically "permanently resolved" — the next push should re-confirm §5.16's fix
+      before it's treated as fully settled, not assumed stable on the strength of one run.
+   b. **`:app:testDebugUnitTest` — now actually run, found a real bug, fixed, and
+      confirmed green.** Wiring the task into CI this session (§5.16's addendum)
+      immediately surfaced a second genuine gap: `kotlin-test` was never declared, so
+      `InterceptionControllerTest` couldn't compile (`assertFailsWith` unresolved — §5.17).
+      Fixed and confirmed on run #8. **What's still worth a direct look, not assumed:** §5.17
+      confirms the job as a whole went green; it does not independently confirm the
+      `test-reports` artifact shows all 9 `InterceptionControllerTest` cases specifically
+      passing rather than some subset skipped. Worth 30 seconds pulling that artifact open
+      before treating this as fully airtight.
+   c. **An actual on-device or emulator install-and-run.** CI confirms compiling and
+      packaging, nothing about runtime behavior — no interception has ever actually been
+      triggered and observed. This is the real remaining gap before Phase 2's exit criteria
+      checklist (§2) is honestly checkable end-to-end, not a formality.
+   d. **`androidx.security:security-crypto:1.1.0-alpha06`** — flagged in §5.16 as an alpha
+      version pinned because it matched existing code, not independently vetted. Worth a
+      deliberate look at whether a stable release now covers `DbPassphraseProvider`'s needs,
+      lower priority than (a)–(c) given sideload-only scope.
 
 ---
 
@@ -1014,6 +1110,140 @@ something manual review didn't, fix is narrow and well-understood, re-verify on 
 than assume the fix is correct" — both of Phase 0.5's real failures were found, fixed, and
 then actually re-confirmed green on a subsequent CI run before being logged here as
 resolved, not logged as resolved on the strength of the fix looking correct.
+
+---
+
+### 5.16 — RESOLVED (Phase 2, real CI, first run against the full interception-screen tree) — `:app:compileDebugKotlin` couldn't resolve `RoomDatabase` or `androidx.security.crypto`
+
+**Where:** `app/build.gradle.kts`, `data/build.gradle.kts` — not any of the Kotlin source
+files themselves; every file the Phase 2 continuation actually wrote or edited
+(`MissionInterceptionActivity.kt`, `MissionAccessibilityService.kt`, `AppContainer.kt`,
+`DbPassphraseProvider.kt`, the new layout/strings/xml resources, `InterceptionControllerTest.kt`)
+was correct as written — this was a classpath/dependency-declaration gap, not a logic bug.
+
+**What CI actually found, third real failure this project has had (a compile error, `:app`
+module's first real compile against a full source tree — everything before this either
+compiled cleanly or was `:data`/`:domain` only):**
+```
+e: Supertypes of the following classes cannot be resolved. Please make sure you have the
+required dependencies in the classpath:
+    class com.disciplineos.data.db.DisciplineOsDatabase, unresolved supertypes:
+    androidx.room.RoomDatabase
+...
+e: .../DbPassphraseProvider.kt:4:17 Unresolved reference: security
+e: .../DbPassphraseProvider.kt:52:25 Unresolved reference: MasterKey
+e: .../DbPassphraseProvider.kt:55:9 Unresolved reference: EncryptedSharedPreferences
+```
+Every `RoomDatabase`-supertype error traced to `AppContainer.kt`, `MissionAccessibilityService.kt`,
+and `MissionInterceptionActivity.kt` — i.e. every `:app`-module file that touches
+`DisciplineOsDatabase` directly, which Phase 2 is the first phase to actually do (Phase 0/0.5
+only exercised `:data`/`:domain` in isolation).
+
+**Why manual review didn't catch it, twice over:**
+1. `DisciplineOsDatabase : RoomDatabase()` lives in `:data`, and `:data`'s own
+   `build.gradle.kts` declares `implementation("androidx.room:room-runtime:...")` /
+   `room-ktx` — correct for `:data` compiling itself, but `implementation`-scoped
+   dependencies are deliberately **not** exposed transitively to modules that depend on
+   `:data`. `:app` depends on `:data` and references `DisciplineOsDatabase` directly, but
+   never declared its own Room dependency (nothing in Phase 0/0.5/2 had needed `:app` to see
+   Room's types before — this module was "deliberately minimal" per its own build file's
+   header comment right up until Phase 2 gave it real code). A partial fix was floated first
+   (add Room directly to `:app`'s own dependency block) but rejected in favor of the more
+   correct fix below.
+2. `androidx.security:security-crypto` was never declared anywhere, in either module.
+   `DbPassphraseProvider.kt`'s own kdoc says its job is exactly what `DisciplineOsDatabase`'s
+   kdoc requires ("[passphrase] must come from Android Keystore-backed storage at the call
+   site") — the file was written correctly against that requirement, but the dependency that
+   makes `MasterKey`/`EncryptedSharedPreferences` resolvable was simply never added when the
+   file was.
+
+**Fix — two changes, one per module, not a workaround in either Kotlin file:**
+- `data/build.gradle.kts`: changed `implementation("androidx.room:room-runtime:2.6.1")` and
+  `implementation("androidx.room:room-ktx:2.6.1")` to `api(...)`. This is the more correct
+  fix over duplicating the dependency in `:app` — `DisciplineOsDatabase` extending
+  `RoomDatabase` makes Room part of `:data`'s public surface by construction (any consumer
+  that touches `DisciplineOsDatabase` needs `RoomDatabase` visible), so `api` is the accurate
+  Gradle modeling of that reality, not `implementation` in two places with the version
+  string duplicated.
+- `app/build.gradle.kts`: added `implementation("androidx.security:security-crypto:1.1.0-alpha06")`
+  — this one is a genuine `:app`-only dependency (nothing in `:data`/`:domain` uses it), so
+  `api` in `:data` wouldn't have helped here; it needed adding where it's actually consumed.
+
+**Not yet done, flagged rather than silently assumed:** the `security-crypto` version pinned
+(`1.1.0-alpha06`) is an alpha release — this was the version already implied by
+`DbPassphraseProvider.kt`'s API usage (`MasterKey`, `EncryptedSharedPreferences`) at the time
+of writing, not independently re-checked against whatever `androidx.security` releases exist
+now. Worth confirming a stable release exists before this goes anywhere near a non-sideload
+distribution; sideload-only per current scope (§0) makes this a lower-priority check than it
+would otherwise be, not a reason to skip it indefinitely.
+
+**Confirmed on CI:** `build-and-test` run #6, `:app:assembleDebug` (and therefore
+`:app:compileDebugKotlin`) green, 3m3s. Per this project's own §5.12 standard, this should
+still get a second confirming run before being treated as fully settled — logged here as
+resolved on the strength of one green run plus a clear, narrow root cause, matching how §5.8
+(not §5.12) was initially logged, with the same caveat: watch for this recurring before
+calling it permanently closed.
+
+**A second, distinct gap this entry uncovered — the workflow itself never ran
+`InterceptionControllerTest` at all.** Checking whether run #6 had actually executed
+`:app`'s test suite (not just compiled it) surfaced that `.github/workflows/build-and-test.yml`
+only ran `:data:testDebugUnitTest`, `:domain:testDebugUnitTest`, and `:app:assembleDebug` —
+`assembleDebug` proves compilation and packaging, nothing about whether the Robolectric+Room
+test suite (`InterceptionControllerTest`, the first real `:app`-module test this project has)
+actually passes. This is exactly the gap the §4/item-5(b) "still open" note was flagging, made
+concrete: a green CI run had been silently read as covering more than it actually checked.
+**Fix:** added a `Run :app unit tests` step (`./gradlew :app:testDebugUnitTest --stacktrace`)
+between the `:domain` tests and `:app:assembleDebug` steps, and extended the test-report
+upload path to include `app/build/reports/tests`. This CI run (build-and-test run #7) is
+that confirming run — and it correctly caught something real: see §5.17.
+
+---
+
+### 5.17 — RESOLVED, confirmed on CI run #8 — `kotlin-test` never declared, `InterceptionControllerTest` couldn't compile
+
+**Where:** `app/build.gradle.kts` — again a classpath/dependency-declaration gap, not a
+problem with `InterceptionControllerTest.kt` itself, which was correct as written.
+
+**What CI actually found — the very first run of `:app:compileDebugUnitTestKotlin`, made
+possible only because §5.16's addendum wired `:app:testDebugUnitTest` into the workflow this
+same session (run #6 never exercised this task at all):**
+```
+e: .../InterceptionControllerTest.kt:32:15 Unresolved reference: test
+e: .../InterceptionControllerTest.kt:243:9 Unresolved reference: assertFailsWith
+e: .../InterceptionControllerTest.kt:243:64 Suspension functions can be called only within
+   coroutine body
+```
+(and three more matching pairs, at lines 244, 273/274, 290 — every `assertFailsWith` call
+site in the file, plus the cascading "suspension function" errors that follow once the
+import itself won't resolve.)
+
+**Why manual review didn't catch it:** logged back when this test was first written (this
+project's own prior-session account, not fabricated after the fact): `assertFailsWith`
+from `kotlin.test` was deliberately chosen over JUnit's `assertThrows` specifically because
+nesting `runTest { }` inside `assertThrows`'s synchronous lambda is the wrong pattern for a
+suspend-function assertion — `assertFailsWith` called directly inside the outer `runTest`
+coroutine body is the idiomatic fix, and that reasoning was correct. What wasn't checked at
+the time: whether `kotlin-test` was actually on `:app`'s test classpath to import from in the
+first place. `:domain`'s own tests never surfaced this gap because none of them use
+`assertFailsWith` — this was genuinely specific to `InterceptionControllerTest`, and nothing
+had ever compiled `:app`'s test sourceset against a real toolchain before run #7.
+
+**Fix:** added `testImplementation("org.jetbrains.kotlin:kotlin-test:1.9.24")` to
+`app/build.gradle.kts` — version pinned to match `org.jetbrains.kotlin.android`'s own
+`1.9.24` in the root `build.gradle.kts`, not a separately-guessed number.
+
+**Confirmed on CI:** yes — `build-and-test` run #8, green, 3m8s (`:app:testDebugUnitTest`
+included in the job and did not fail it). This is the confirming run flagged as owed above —
+`InterceptionControllerTest` has now actually executed on a real toolchain for the first
+time, not just compiled. **One honest caveat kept, not silently dropped:** run #8's overall
+job-level success was confirmed directly; the per-test breakdown (that all 9
+`InterceptionControllerTest` cases specifically passed, rather than some subset being skipped
+or the task reporting 0 tests found) was not independently re-verified against the
+`test-reports` artifact GitHub produced for that run. A green job strongly implies this — a
+failed test would fail the job — but per this project's own §4/§5.12 standard of not treating
+"looks correct" as equivalent to "checked," that artifact is worth a direct look before this
+entry's confirmation is treated as airtight rather than "green build page + the same
+inference every prior CI-confirmed entry in this doc relies on."
 
 ---
 

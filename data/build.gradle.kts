@@ -32,10 +32,13 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     api("androidx.room:room-runtime:2.6.1") // api, not implementation — DisciplineOsDatabase
-    // extends RoomDatabase and is part of :data's public surface (AppContainer, the enforcement
-    // classes in :app all reference it directly), so consumers of :data need RoomDatabase's
-    // supertype visible too. implementation would keep Room an internal :data-only dependency,
-    // which is wrong once :app touches DisciplineOsDatabase directly the way Phase 2 does.
+    // extends RoomDatabase and is part of :data's public surface (AppContainer,
+    // MissionAccessibilityService, MissionInterceptionActivity in :app all reference it
+    // directly), so consumers of :data need RoomDatabase's supertype visible too.
+    // implementation would keep Room an internal :data-only dependency, which is wrong once
+    // :app touches DisciplineOsDatabase directly the way Phase 2 does. Found via real CI
+    // failure (ROADMAP.md §5, this entry's own account) — :app:compileDebugKotlin couldn't
+    // resolve RoomDatabase as DisciplineOsDatabase's supertype until this changed.
     api("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 

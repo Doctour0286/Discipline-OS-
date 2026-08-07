@@ -46,3 +46,14 @@ jobs:
             domain/build/reports/tests
             app/build/reports/tests
           retention-days: 14
+      - name: Upload debug APK
+        # Lets the ready-built app be downloaded straight from this run's Actions page for
+        # on-device install (see docs/PHASE2_DEVICE_VERIFICATION.md, "Option B") instead of
+        # requiring a full on-device Termux Android SDK build every time. Only runs if
+        # assembleDebug actually succeeded (no `if: always()` here) — an APK from a failed
+        # build isn't something worth keeping.
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
