@@ -1460,6 +1460,35 @@ possible on this end.
 
 ---
 
+### 5.19 — RESOLVED, temporary test-infra change — `DebugSeeder`'s blocklist swapped from
+placeholder to a real installed package
+
+**What happened:** §4(c) step 7 (trigger real interception on-device) turned out to be
+blocked by an assumption baked into `DebugSeeder`'s original placeholder blocklist entry,
+`com.example.blocked` — copied from `InterceptionControllerTest`'s own seeding helper, where
+it works fine because Robolectric never actually resolves the foreground package to a real
+installed app. On a real device, `MissionAccessibilityService` only ever sees packages that
+are actually resumed to the foreground, so a non-installed placeholder package can never be
+observed as "opened" — there was no way to manually trigger interception at all with the
+original seed data.
+
+**Fix:** `SEEDED_BLOCKED_PACKAGE` changed to `com.dp.logcatapp` (the logcat reader app already
+installed on the test device for this same verification pass, and harmless to block — no
+other part of this codebase or the verification plan depends on it). `DebugSeederTest`'s
+blocklist assertion updated to match. `InterceptionControllerTest` was deliberately left
+untouched — its own seeding helper is fully self-contained and never depended on
+`DebugSeeder`'s constant.
+
+**Status: temporary, per this file's "explicitly test infrastructure, not silent scaffolding"
+standard (see `DebugSeeder.kt`'s class-level kdoc).** Once the three-tier interception walk
+(§4(c) step 7, Recruit/Warden/Iron) is complete, revisit: either make the blocked package
+configurable (e.g. a build-config field or a second debug-only settings toggle) so it isn't
+hardcoded to whatever happened to be installed on one specific test device, or accept the
+current hardcoding as fine for its narrow purpose and say so explicitly here rather than
+leaving it to be rediscovered as "why is the logcat app blocklisted" later.
+
+---
+
 ## 6. Conventions for whoever works on this next
 
 - **Tag every unresolved number `[HYPOTHESIS]`** in code comments, matching the spec docs'

@@ -54,7 +54,7 @@ class DebugSeederTest {
 
         assertNotNull(mission)
         assertEquals(MissionStatus.ACTIVE, mission!!.status)
-        assertEquals(listOf("com.example.blocked"), mission.blocklist)
+        assertEquals(listOf("com.dp.logcatapp"), mission.blocklist)
 
         val user = db.userDao().get(mission.userId)
         assertNotNull(user)

@@ -59,11 +59,19 @@ import java.util.UUID
  */
 object DebugSeeder {
 
-    /** A fixed blocklisted package id — doesn't need to be a real installed app for the
-     * Accessibility Service's foreground-package string comparison to exercise correctly;
-     * matches the same style of placeholder package id already used in
-     * `InterceptionControllerTest`'s own seeding helper (`com.example.blocked`). */
-    private const val SEEDED_BLOCKED_PACKAGE = "com.example.blocked"
+    /** ROADMAP.md §4(c) step 7 — on-device interception verification needs a package the
+     * Accessibility Service will actually see resumed to the foreground, which means a real
+     * installed app, not the placeholder id (`com.example.blocked`) used by
+     * `InterceptionControllerTest`'s unit-level seeding helper. Using the on-device logcat
+     * reader app (`com.dp.logcatapp`) here specifically because it's already installed for
+     * this same verification pass and harmless to block (no functionality lost by having it
+     * intercepted — it isn't something Missions elsewhere in this codebase depend on).
+     *
+     * **Temporary, for manual on-device testing only** — swap back to a real Mission-relevant
+     * blocklist (or make this configurable) once §4(c) step 7's three-tier walk is done; see
+     * this file's class-level kdoc, "Explicitly test infrastructure, not silent scaffolding,"
+     * for the standing rule this falls under. */
+    private const val SEEDED_BLOCKED_PACKAGE = "com.dp.logcatapp"
 
     /**
      * Seeds one [User] and one ACTIVE [Mission] if — and only if — no Mission exists yet for
