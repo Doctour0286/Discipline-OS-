@@ -711,14 +711,19 @@ verification either.
 **If you are the next agent picking this up: do this first, in order.**
 
 1. Read §0–§1 of this file (you're doing that now).
-2. **New, on top of everything below: the Phase 3 nav skeleton (§3's newest entry, §5.20)
-   exists on disk but has not been pushed or run through CI yet.** Deploy it the same way as
-   every prior slice (`bash ~/scripts/deploy_update.sh <zip>`, review the diff, commit, push,
-   watch Actions), then confirm `:app:assembleDebug` still succeeds with the trimmed nav graph
-   and, once on-device, that tapping Next/Back actually walks all 9 placeholder destinations
-   in the right order including the Tier Selection → Iron Calibration Gate → Mission Profile
-   Setup convergence. This is the first genuinely new thing to verify — everything in items
-   3–6 below is unchanged, already-settled context from before this slice existed.
+2. **New, on top of everything below: the Phase 3 nav skeleton's first push failed real CI
+   (run #12, §5.21) — `NavDestination.actions` is private, not the public API it was assumed
+   to be.** Fixed by hardcoding the next-action mapping as a Kotlin `when` on
+   `currentDestination?.id` instead (§5.21 has the full account, including why the "safer"
+   rewrite that caused this wasn't actually safer). **This fix has been pushed but not yet
+   independently reconfirmed on a second CI run** — per §5.12's own standard, watch Actions
+   for this specific push, confirm `:app:compileDebugKotlin`/`:app:assembleDebug` go green,
+   and only then treat §5.21 as settled rather than "fixed on paper." Once that's green,
+   proceed on-device: confirm tapping Next/Back actually walks all 9 placeholder destinations
+   in the right order, including the Tier Selection → Iron Calibration Gate → Mission Profile
+   Setup convergence (the hardcoded mapping always takes the non-Iron path for now — expected,
+   not a bug, per §5.21). This is the first genuinely new thing to verify — everything in
+   items 3–6 below is unchanged, already-settled context from before this slice existed.
 3. **CI is green — this is no longer a "push and wait" item** for everything that predates
    item 2 above. Phase 0.5 is fully done:
    Gradle project shell, GitHub Actions workflow, `:app` skeleton, and now two real bugs
@@ -1568,11 +1573,74 @@ falls back to the platform default — but worth an explicit decision before rea
 screen content goes in rather than staying implicit. Low priority for a skeleton; noted here
 so it isn't silently decided either way.
 
-**Status: fixed, not yet pushed or CI-confirmed.** Per §4 item 2's standing caution, this
-graduates to "verified" the same way §5.8/§5.12/§5.16/§5.17/§5.19 did — once pushed and CI
-confirms `:app:assembleDebug` still succeeds with the trimmed graph (removing unread arguments
-shouldn't change compiled behavior, but "shouldn't" is exactly the word this file's own history
-keeps flagging as insufficient on its own).
+**Status: fixed and pushed; CI ran (`build-and-test` run #12) and did find a real problem —
+but not the one this entry anticipated.** `:app:assembleDebug`/`compileDebugKotlin` failed,
+correctly, on a *different* line in the same file this entry touched. Removing the stale
+`nextActionId` arguments here was not itself the cause — see §5.21 for the actual failure,
+which was already latent in `OnboardingPlaceholderFragment.kt`'s `findNavController()
+.currentDestination?.actions` lookup (introduced in the same session, before this §5.20 fix,
+and not caught by review either). Leaving this status line as originally written ("removing
+unread arguments shouldn't change compiled behavior") would misrepresent what actually
+happened once real CI ran; correcting it here rather than editing it invisibly is required by
+this project's own convention of not quietly resolving mistakes out of the historical record.
+
+---
+
+### 5.21 — RESOLVED, real CI failure (`build-and-test` run #12) — `NavDestination.actions` is
+private; §5.20's own "safer" rewrite was itself unverified and wrong
+
+**What happened:** `:app:compileDebugKotlin` failed on push, in
+`OnboardingPlaceholderFragment.kt`:
+```
+e: .../OnboardingPlaceholderFragment.kt:76:66 Cannot access 'actions': it is private in 'NavDestination'
+e: .../OnboardingPlaceholderFragment.kt:78:69 Cannot access 'actions': it is private in 'NavDestination'
+```
+Both call sites were the exact lookup — `findNavController().currentDestination?.actions` —
+that had earlier replaced the resource-ID-as-`Bundle`-argument approach specifically because
+that approach was judged too uncertain to build a skeleton on without compiler verification
+(see this class's own kdoc, prior revision). `NavDestination.actions` turns out to be a
+`private` backing property in the Navigation Component version this project pins (2.7.7) —
+not part of the public API surface at all, despite reading as ordinary, idiomatic Navigation
+Component usage.
+
+**Why this matters beyond "one more bug":** the original resource-default approach was
+dropped for being unverified; its replacement was reasoned to be safer specifically because it
+used "real Navigation Component API" — but "real API that exists in the library" and "public
+API this code is actually allowed to call" turned out to be different claims, and the
+difference was never checked against anything compiler-verified before being relied on. This
+is the same root failure mode as §5.8, §5.12, §5.16, §5.17 (code that reads as obviously
+correct, wrong in a way only a real compiler surfaces) — but notable here specifically because
+it happened *inside a fix whose own stated purpose was avoiding exactly that failure mode*.
+Worth naming plainly rather than smoothing over: swapping one unverified pattern for another
+unverified pattern, and describing the swap as risk reduction, is not actually risk reduction.
+
+**Fix:** `NavDestination` does expose one small, stably-public lookup —
+`getAction(actionId: Int): NavAction?`, a single-ID accessor, not the private map — which
+means "ask the current destination what its outgoing action is" has no generic public-API
+answer at all; something has to supply which action ID to ask about. Rather than reaching for
+a third clever lookup with no way to compiler-verify it in this authoring sandbox,
+`OnboardingPlaceholderFragment` now hardcodes the eight-destination next-action mapping as a
+plain Kotlin `when` on `currentDestination?.id`, matched against the graph's own generated
+`R.id.action_*` constants — cross-checked by hand against every `<action>` declared in
+`onboarding_nav_graph.xml` (all eight referenced IDs exist in the graph; the graph's ninth
+action, `action_tierSelection_to_ironCalibrationGate`, is deliberately unused by this
+placeholder, matching the graph's own "always takes the non-Iron path for now" note).
+Every API used in the replacement — generated `R.id.*` constants, a `when` expression,
+`NavController.navigate(Int)` — has real, already-compiler-verified precedent elsewhere in
+this codebase (`MissionInterceptionActivity`, this same class's own `R.id.stepTitleText` etc.),
+rather than being trusted on inspection a third time.
+
+**One thing deliberately checked before treating the `if (nextActionId != null)` guard as
+safe:** §5.8's smart-cast failure was specific to smart-casting a *cross-module class property*
+(`violation.rootCauseClusterId`) — `nextActionId` here is a plain local `val: Int?` computed
+once from a `when` expression and immediately null-checked, the standard single-module Kotlin
+idiom §5.8's own writeup explicitly says compiles fine. Checked rather than assumed, given this
+entry's whole point is not re-trusting "this looks like it should work."
+
+**Status: fixed, pushed as part of the same commit that will re-trigger CI. Not yet
+independently confirmed on a second run** — per §5.12's own standard, one green run isn't
+automatically permanent; the next session should confirm this specifically holds before
+treating it as settled, not just this fix's first pass.
 
 ---
 

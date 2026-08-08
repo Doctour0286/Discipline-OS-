@@ -32,17 +32,37 @@ import com.disciplineos.app.R
  * which step it represents, its position in the sequence, and a Next/Back pair wired to the
  * real nav graph — not to preview any real screen's design or copy.
  *
- * **Next-action resolution, and why it isn't a passed-in argument:** an earlier version of
- * this class took the next action's resource ID as a `Bundle` argument (`android:defaultValue
- * ="@id/action_xxx"` in the nav-graph XML). Dropped without being run through real CI — there
- * is no existing precedent anywhere in this codebase for resolving a resource ID via an
- * `<argument>` default value (`MissionInterceptionActivity`'s Intent-extras pattern, the only
- * precedent that does exist, passes primitive values it constructs itself, never a resource
- * ID), and per ROADMAP.md §4 item 2's standing caution about reasoning past what's actually
- * been compiler-verified, an untested resource-resolution trick was the wrong thing to build a
- * skeleton on. Instead, this class asks [findNavController] for its *current destination's*
- * own outgoing actions directly at click-time — an API shape with real, ordinary precedent in
- * Navigation Component's documented usage, not a resource-default trick unique to this file.
+ * **Next-action resolution — second revision, after a real compile failure.** An earlier
+ * version of this class took the next action's resource ID as a `Bundle` argument
+ * (`android:defaultValue="@id/action_xxx"` in the nav-graph XML). That was dropped before
+ * ever reaching CI, in favor of asking `findNavController().currentDestination?.actions` for
+ * the current destination's own outgoing action at click-time — reasoned at the time to be
+ * safer because it used real Navigation Component API surface rather than an untested
+ * XML-resource-as-argument-default trick.
+ *
+ * **That reasoning was wrong, and CI caught it (ROADMAP.md, `build-and-test` run #12):**
+ * `NavDestination.actions` is `private` in the Navigation Component version this project
+ * pins (2.7.7) — `Cannot access 'actions': it is private in 'NavDestination'`, a real
+ * `:app:compileDebugKotlin` failure, not a lint warning. The mistake was treating "this uses
+ * real Navigation Component API" as equivalent to "this is public API" without actually
+ * checking — the same category of error the resource-default rewrite was trying to avoid in
+ * the first place, just relocated rather than eliminated.
+ *
+ * **Fix, third attempt — deliberately the most conservative option, not another guess:**
+ * `NavDestination` does expose one small, stably-public lookup: `getAction(actionId: Int):
+ * NavAction?`, a single-ID accessor rather than the private backing map. That means "ask the
+ * current destination what its outgoing action is" isn't answerable generically through
+ * public API at all — something has to supply *which* action ID to ask about. Rather than
+ * reopening the resource-default-argument question a second time with no way to compiler-
+ * verify it in this authoring environment, the next action for each destination is hardcoded
+ * here as a plain Kotlin `when` on `currentDestination?.id`, matched against the graph's own
+ * `R.id.*` action constants (generated, stable, already relied on correctly elsewhere in this
+ * codebase — e.g. `R.layout.*`/`R.id.*` usage two lines below in this same class). This is
+ * less elegant than a generic lookup, but every piece of it — `View.findViewById`-style
+ * generated `R` references, a `when` expression, `NavController.navigate(Int)` — is API this
+ * codebase has already used successfully and had compiler-verified (`MissionInterceptionActivity`,
+ * this same class's own `R.id.stepTitleText` etc. above). Nothing here is being trusted on
+ * the strength of "should work" a third time.
  */
 class OnboardingPlaceholderFragment : Fragment(R.layout.fragment_onboarding_placeholder) {
 
@@ -68,15 +88,33 @@ class OnboardingPlaceholderFragment : Fragment(R.layout.fragment_onboarding_plac
         // pretend to demonstrate.
         backButton.setOnClickListener { findNavController().popBackStack() }
 
-        // Look up whether this destination has an outgoing action rather than trusting a
-        // passed-in ID — see class kdoc above for why. firstMissionSchedulingFragment (the
-        // last screen, §2.9) correctly declares no <action> at all, so this list is empty
-        // there and the button stays hidden, same end result as the original design without
-        // relying on any untested resource-default resolution to get there.
-        val nextAction = findNavController().currentDestination?.actions?.get(0)
-        if (nextAction != null) {
-            val actionId = findNavController().currentDestination!!.actions.keyAt(0)
-            nextButton.setOnClickListener { findNavController().navigate(actionId) }
+        // Explicit per-destination mapping — see class kdoc above for why this replaced the
+        // generic (but privately-inaccessible) NavDestination.actions lookup. Each branch's
+        // action ID is the exact <action android:id="@+id/action_..."> already declared for
+        // that destination in onboarding_nav_graph.xml — kept in sync manually since Safe Args
+        // isn't in use in this project (no libs.versions.toml / Safe Args plugin anywhere in
+        // settings.gradle.kts or app/build.gradle.kts as of this session). tierSelectionFragment
+        // intentionally has two possible actions in the graph (Iron Calibration Gate branch,
+        // §2.4's real conditional) — this placeholder always takes the non-Iron path, matching
+        // the "graph shape correct now, real conditional logic when Tier Selection gets real
+        // content" note already in onboarding_nav_graph.xml's top-of-file comment.
+        val nextActionId = when (findNavController().currentDestination?.id) {
+            R.id.welcomeFragment -> R.id.action_welcome_to_goalDefinition
+            R.id.goalDefinitionFragment -> R.id.action_goalDefinition_to_tierExplanation
+            R.id.tierExplanationFragment -> R.id.action_tierExplanation_to_tierSelection
+            R.id.tierSelectionFragment -> R.id.action_tierSelection_to_missionProfileSetup
+            R.id.ironCalibrationGateFragment -> R.id.action_ironCalibrationGate_to_missionProfileSetup
+            R.id.missionProfileSetupFragment -> R.id.action_missionProfileSetup_to_coreDataConsent
+            R.id.coreDataConsentFragment -> R.id.action_coreDataConsent_to_unsupervisedReliabilityOptIn
+            R.id.unsupervisedReliabilityOptInFragment -> R.id.action_unsupervisedReliabilityOptIn_to_firstMissionScheduling
+            // firstMissionSchedulingFragment (§2.9, last screen) falls through to null —
+            // it declares no outgoing <action> in the graph, matching the hidden-button
+            // behavior below.
+            else -> null
+        }
+
+        if (nextActionId != null) {
+            nextButton.setOnClickListener { findNavController().navigate(nextActionId) }
         } else {
             nextButton.visibility = View.GONE
         }
