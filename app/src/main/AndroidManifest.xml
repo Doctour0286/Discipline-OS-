@@ -17,12 +17,34 @@
         entry and mission_accessibility_service_config.xml's top comment. SYSTEM_ALERT_WINDOW
         is likewise deliberately absent — the interception screen is a full-screen Activity
         specifically to avoid needing it (ROADMAP.md §5.14).
+
+        ROADMAP.md Phase 3: MainActivity added below with the app's first MAIN/LAUNCHER
+        intent-filter. Earlier phases correctly had none — see Phase 2's device-verification
+        notes (ROADMAP.md §4(c)) confirming "no launcher icon" was expected, by design, before
+        this point, not a bug. MissionInterceptionActivity above stays exported=false and
+        outside this launcher flow; it's never meant to be reached by tapping the app icon.
     -->
 
     <application
         android:name=".DisciplineOsApplication"
         android:label="DisciplineOS"
         android:allowBackup="false">
+
+        <!--
+            ROADMAP.md Phase 3 — app entry point. Onboarding, Consent & Interaction Spec §1's
+            nine-screen sequence runs inside this Activity's NavHostFragment (see
+            MainActivity.kt's kdoc and res/navigation/onboarding_nav_graph.xml). exported=true
+            is required for any Activity carrying a LAUNCHER intent-filter — this is the
+            standard pattern, not a case-by-case relaxation.
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
 
         <!--
             MissionAccessibilityService — Architecture §1.1/§1.2, PRD §9/§14. exported=true is

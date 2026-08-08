@@ -558,8 +558,22 @@ after N more days" note — never a silently-picked number.
 
 ## 3. Current state snapshot
 
-**Last updated:** 2026-08-07 (this session, fourth continuation — `:app:testDebugUnitTest`
-wired into CI and confirmed green for the first time)
+**Last updated:** 2026-08-07 (this session, fifth continuation — Phase 3 nav skeleton
+authored: `MainActivity`, `OnboardingPlaceholderFragment`, `activity_main.xml`,
+`fragment_onboarding_placeholder.xml`, `onboarding_nav_graph.xml` (9 destinations,
+Recruit-through-Iron sequence per Onboarding doc §1), manifest launcher entry, matching
+strings, and `OnboardingPlaceholderFragmentTest`. One bug caught and fixed before push —
+§5.20 — stale `nextActionId` XML arguments left over from an abandoned resource-ID-default
+approach; `OnboardingPlaceholderFragment.kt` itself was already correct, only the graph had
+drifted. **Not yet pushed, not yet CI-confirmed** — this entire slice is new since the last
+"real CI" snapshot below and carries the same standing caveat every other new file in this
+project carries until it's been through a real compiler (§4 item 2).
+
+**Phase 2 status (below) is unchanged by this session** — no enforcement-loop code was
+touched. What follows is the prior session's snapshot, left as-is for history:
+
+**Prior entry — 2026-08-07 (fourth continuation — `:app:testDebugUnitTest`
+wired into CI and confirmed green for the first time)**
 **Current phase:** Phase 0 and Phase 0.5 remain complete and confirmed on real CI, fully
 green (unchanged since last entry). Phase 1 remains functionally complete (§5.9's spec gap
 aside). **Phase 2 is now CI-confirmed to compile, package, AND pass its own test suite** —
@@ -697,7 +711,16 @@ verification either.
 **If you are the next agent picking this up: do this first, in order.**
 
 1. Read §0–§1 of this file (you're doing that now).
-2. **CI is green — this is no longer a "push and wait" item.** Phase 0.5 is fully done:
+2. **New, on top of everything below: the Phase 3 nav skeleton (§3's newest entry, §5.20)
+   exists on disk but has not been pushed or run through CI yet.** Deploy it the same way as
+   every prior slice (`bash ~/scripts/deploy_update.sh <zip>`, review the diff, commit, push,
+   watch Actions), then confirm `:app:assembleDebug` still succeeds with the trimmed nav graph
+   and, once on-device, that tapping Next/Back actually walks all 9 placeholder destinations
+   in the right order including the Tier Selection → Iron Calibration Gate → Mission Profile
+   Setup convergence. This is the first genuinely new thing to verify — everything in items
+   3–6 below is unchanged, already-settled context from before this slice existed.
+3. **CI is green — this is no longer a "push and wait" item** for everything that predates
+   item 2 above. Phase 0.5 is fully done:
    Gradle project shell, GitHub Actions workflow, `:app` skeleton, and now two real bugs
    found and fixed with a confirmed green re-run (§5.8, §5.12). Don't re-flag "hasn't been
    through a real compiler" for any code that predates this entry — it has. Anything *new*
@@ -705,7 +728,7 @@ verification either.
    the standing discipline (manual cross-check against real signatures, hand-simulate any
    new hand-written SQL against real SQLite, then push and let CI have the final word) still
    applies to new work, just not to what's already green.
-3. **§5.5 is still open** — the shared-cause guard's rolling-window cutoff still needs either
+4. **§5.5 is still open** — the shared-cause guard's rolling-window cutoff still needs either
    a real value (once Phase 5 pilot data exists) or an explicit decision that cluster IDs are
    always short-lived enough not to matter. **§5.9 is still open** — `demotion_triggered`'s
    `tier_floor`/`N` values are absent from the spec, not just unvalidated; this needs a
@@ -715,9 +738,9 @@ verification either.
    for sign-off, not silently assumed correct. **§5.15 is now also open** — Explicit
    Downgrade's target tier (one-tier-down) is a Phase 2 judgment call with the same
    "flagged, not assumed" status as §5.5/§5.9/§5.10.
-4. **Phase 1 is functionally complete and CI-verified** except the `demotion_triggered` gap
+5. **Phase 1 is functionally complete and CI-verified** except the `demotion_triggered` gap
    (§5.9) — that's a spec gap, not an engineering task, and shouldn't block Phase 2.
-5. **Phase 2's code/resource/manifest/test work is done and CI-confirmed — what's left is
+6. **Phase 2's code/resource/manifest/test work is done and CI-confirmed — what's left is
    verification, not authoring.** The Play Console research blocker in Architecture §1.2 was
    explicitly and correctly skipped for this pass (sideload-only distribution, your call) —
    don't redo that research unless distribution scope changes. Everything below is now true,
@@ -1486,6 +1509,70 @@ configurable (e.g. a build-config field or a second debug-only settings toggle) 
 hardcoded to whatever happened to be installed on one specific test device, or accept the
 current hardcoding as fine for its narrow purpose and say so explicitly here rather than
 leaving it to be rediscovered as "why is the logcat app blocklisted" later.
+
+---
+
+### 5.20 — RESOLVED, found before ever reaching CI — stale `nextActionId` arguments left in
+`onboarding_nav_graph.xml` after the resource-ID-default pattern was abandoned
+
+**What happened:** mid-session, while first drafting the Phase 3 nav skeleton,
+`OnboardingPlaceholderFragment` originally took its "next" destination as a passed-in
+`Bundle` argument — `<argument android:name="nextActionId" app:argType="integer"
+android:defaultValue="@id/action_xxx">` in the nav graph XML, with the Fragment reading it back
+via `arguments?.getInt(ARG_NEXT_ACTION_ID)`. This was deliberately dropped before being pushed
+or run through CI: there's no existing precedent anywhere in this codebase for resolving a
+resource ID via an `<argument>` default value (`MissionInterceptionActivity`'s Intent-extras
+pattern, the only real precedent, always passes primitive values it constructs itself, never a
+resource ID), and per §4 item 2's standing caution about reasoning past what's actually been
+compiler-verified, shipping a nav skeleton's first real test of an untested XML-resolution
+trick was the wrong risk to take. The Fragment was rewritten to instead ask
+`findNavController()` for its *current destination's* own outgoing actions directly at
+click-time — an API shape with real, ordinary precedent in Navigation Component's documented
+usage, not a resource-default trick unique to this file.
+
+**The bug:** the Kotlin-side rewrite was done correctly — `OnboardingPlaceholderFragment.kt`
+never reads `nextActionId` and has no `ARG_NEXT_ACTION_ID` constant. But the seven
+`<argument android:name="nextActionId" ...>` declarations in `onboarding_nav_graph.xml` (one
+per destination except `firstMissionSchedulingFragment`, which correctly has none) were never
+removed when the Kotlin side changed. This left the exact XML pattern the rewrite existed to
+avoid still sitting live in the graph — unread by any code, but still present, and still
+carrying the same "genuinely not fully certain this resolves correctly at build time" risk the
+rewrite's own reasoning flagged. `firstMissionSchedulingFragment`'s surrounding comment also
+still described the Fragment's Next-button-hiding behavior in terms of the old mechanism
+("nextActionId is left unset (0)") rather than the new one, which would have misled the next
+reader (human or agent) about which mechanism was actually live.
+
+**Caught:** during a manual cross-check pass matching this file's own §4 item 2 standing
+discipline (no compiler in the authoring sandbox for Android/Kotlin, so every cross-file
+reference gets read against the others by hand before being trusted) — not by CI, since this
+was found and fixed before ever being pushed.
+
+**Fix:** removed all seven stale `nextActionId` `<argument>` declarations from
+`onboarding_nav_graph.xml`, leaving only the three arguments the Fragment actually reads
+(`title`, `stepNumber`, `totalSteps`). Updated `firstMissionSchedulingFragment`'s comment to
+describe the actual current mechanism (`findNavController().currentDestination?.actions`
+coming back empty) instead of the abandoned one. No Kotlin changes needed — `Onboarding
+PlaceholderFragment.kt` was already correct; only the XML had drifted from it.
+
+**Why this is logged even though it never reached CI:** this file's own standard (§0, §6) is
+to log a judgment call or a caught mistake when it happens, not just when CI catches it —
+CI-confirmed bugs (§5.8, §5.12, §5.16, §5.17) get logged because they were real and costly to
+find; this one is logged because it's the same *category* of drift (code and its written
+rationale disagreeing about which mechanism is actually live) and leaving it undocumented
+would mean the next person has no record that the nav-arg approach was tried, rejected, and
+then almost partially un-rejected by an incomplete cleanup.
+
+**Also flagged, not yet decided:** `MainActivity` has no declared `android:theme`, unlike
+`MissionInterceptionActivity` (`Theme.NoTitleBar.Fullscreen`, set explicitly). Not a bug —
+falls back to the platform default — but worth an explicit decision before real onboarding
+screen content goes in rather than staying implicit. Low priority for a skeleton; noted here
+so it isn't silently decided either way.
+
+**Status: fixed, not yet pushed or CI-confirmed.** Per §4 item 2's standing caution, this
+graduates to "verified" the same way §5.8/§5.12/§5.16/§5.17/§5.19 did — once pushed and CI
+confirms `:app:assembleDebug` still succeeds with the trimmed graph (removing unread arguments
+shouldn't change compiled behavior, but "shouldn't" is exactly the word this file's own history
+keeps flagging as insufficient on its own).
 
 ---
 

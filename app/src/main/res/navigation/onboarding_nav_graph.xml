@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    ROADMAP.md Phase 3 — navigation skeleton for Onboarding, Consent & Interaction Spec §1's
+    nine-screen sequence:
+        1. Welcome / Product Philosophy         (§2.1)
+        2. Goal Definition                       (§2.2)
+        3. Tier Explanation                      (§2.3)
+        4. Tier Selection                        (§2.4)
+           -> if Iron selected: Iron Calibration Gate (§2.5 / PRD §12.6)
+        5. Mission Profile Setup                 (§2.8)
+        6. Core Data Consent                     (§2.6)
+        7. Unsupervised Reliability Opt-In       (§2.7)
+        8. First Mission Scheduling              (§2.9)
+
+    Every destination currently points at OnboardingPlaceholderFragment (see that class's
+    kdoc for why: nav-graph structure verified in isolation before any real screen content is
+    built on top of it, matching this project's incremental-slice discipline). Real screens
+    replace these one at a time; the graph's structure (destination IDs, action IDs, the
+    Tier-Selection branch) is the part meant to survive that replacement unchanged, since other
+    Fragments will navigate by action ID, not by re-deriving the sequence each time.
+
+    **Known simplification, flagged not hidden:** the Tier Selection -> Iron Calibration Gate
+    branch is only a real conditional once Tier Selection (§2.4) has actual tier-choice logic;
+    a placeholder Fragment has no way to know which tier the user picked. Two actions exist
+    from tierSelectionFragment (actionTierSelectionToIronGate, actionTierSelectionToMissionProfileSetup)
+    so the graph *shape* is correct now, but the real conditional branch — which action fires
+    based on the user's actual tier choice — has to be written into Tier Selection's real
+    Fragment when that screen is built, not simulated here. Both of this placeholder's
+    "Next"-button destinations currently go to the same place (Mission Profile Setup) via the
+    graph's default action per destination; the Iron Gate is reachable but not yet
+    conditionally routed to automatically. See OnboardingPlaceholderFragment's kdoc for the
+    same "skeleton first, real logic per-screen later" reasoning.
+-->
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/onboarding_nav_graph"
+    app:startDestination="@id/welcomeFragment">
+
+    <!-- 1. Welcome / Product Philosophy — §2.1 -->
+    <fragment
+        android:id="@+id/welcomeFragment"
+        android:name="com.disciplineos.app.onboarding.OnboardingPlaceholderFragment"
+        android:label="Welcome / Product Philosophy">
+        <argument android:name="title" app:argType="string" android:defaultValue="Welcome / Product Philosophy" />
+        <argument android:name="stepNumber" app:argType="integer" android:defaultValue="1" />
+        <argument android:name="totalSteps" app:argType="integer" android:defaultValue="8" />
+        <action
+            android:id="@+id/action_welcome_to_goalDefinition"
+            app:destination="@id/goalDefinitionFragment" />
+    </fragment>
+
+    <!-- 2. Goal Definition — §2.2 -->
+    <fragment
+        android:id="@+id/goalDefinitionFragment"
+        android:name="com.disciplineos.app.onboarding.OnboardingPlaceholderFragment"
+        android:label="Goal Definition">
+        <argument android:name="title" app:argType="string" android:defaultValue="Goal Definition" />
+        <argument android:name="stepNumber" app:argType="integer" android:defaultValue="2" />
+        <argument android:name="totalSteps" app:argType="integer" android:defaultValue="8" />
+        <action
+            android:id="@+id/action_goalDefinition_to_tierExplanation"
+            app:destination="@id/tierExplanationFragment" />
+    </fragment>
+
+    <!-- 3. Tier Explanation — §2.3, "highest-stakes copy in onboarding" -->
+    <fragment
+        android:id="@+id/tierExplanationFragment"
+        android:name="com.disciplineos.app.onboarding.OnboardingPlaceholderFragment"
+        android:label="Tier Explanation">
+        <argument android:name="title" app:argType="string" android:defaultValue="Tier Explanation" />
+        <argument android:name="stepNumber" app:argType="integer" android:defaultValue="3" />
+        <argument android:name="totalSteps" app:argType="integer" android:defaultValue="8" />
+        <action
+            android:id="@+id/action_tierExplanation_to_tierSelection"
+            app:destination="@id/tierSelectionFragment" />
+    </fragment>
+
+    <!-- 4. Tier Selection — §2.4. Real branch logic (Iron -> Calibration Gate, else -> Mission
+         Profile Setup) belongs in this screen's real Fragment; see top-of-file note. Both
+         actions exist so the graph shape is correct ahead of that. -->
+    <fragment
+        android:id="@+id/tierSelectionFragment"
+        android:name="com.disciplineos.app.onboarding.OnboardingPlaceholderFragment"
+        android:label="Tier Selection">
+        <argument android:name="title" app:argType="string" android:defaultValue="Tier Selection" />
+        <argument android:name="stepNumber" app:argType="integer" android:defaultValue="4" />
+        <argument android:name="totalSteps" app:argType="integer" android:defaultValue="8" />
+        <action
+            android:id="@+id/action_tierSelection_to_ironCalibrationGate"
+            app:destination="@id/ironCalibrationGateFragment" />
+        <action
+            android:id="@+id/action_tierSelection_to_missionProfileSetup"
+            app:destination="@id/missionProfileSetupFragment" />
+    </fragment>
+
+    <!-- Iron Calibration Gate — §2.5 / PRD §12.6. Conditional: only reached if Iron was
+         selected at Tier Selection. Converges back to Mission Profile Setup, same as the
+         non-Iron path — the calibration window doesn't change what comes after it in the
+         onboarding sequence itself, per §1's flow diagram. -->
+    <fragment
+        android:id="@+id/ironCalibrationGateFragment"
+        android:name="com.disciplineos.app.onboarding.OnboardingPlaceholderFragment"
+        android:label="Iron Calibration Gate">
+        <argument android:name="title" app:argType="string" android:defaultValue="Iron Calibration Gate" />
+        <argument android:name="stepNumber" app:argType="integer" android:defaultValue="4" />
+        <argument android:name="totalSteps" app:argType="integer" android:defaultValue="8" />
+        <action
+            android:id="@+id/action_ironCalibrationGate_to_missionProfileSetup"
+            app:destination="@id/missionProfileSetupFragment" />
+    </fragment>
+
+    <!-- 5. Mission Profile Setup — §2.8 (first allowlist/blocklist) -->
+    <fragment
+        android:id="@+id/missionProfileSetupFragment"
+        android:name="com.disciplineos.app.onboarding.OnboardingPlaceholderFragment"
+        android:label="Mission Profile Setup">
+        <argument android:name="title" app:argType="string" android:defaultValue="Mission Profile Setup" />
+        <argument android:name="stepNumber" app:argType="integer" android:defaultValue="5" />
+        <argument android:name="totalSteps" app:argType="integer" android:defaultValue="8" />
+        <action
+            android:id="@+id/action_missionProfileSetup_to_coreDataConsent"
+            app:destination="@id/coreDataConsentFragment" />
+    </fragment>
+
+    <!-- 6. Core Data Consent — §2.6, required (not optional like the next screen) -->
+    <fragment
+        android:id="@+id/coreDataConsentFragment"
+        android:name="com.disciplineos.app.onboarding.OnboardingPlaceholderFragment"
+        android:label="Core Data Consent">
+        <argument android:name="title" app:argType="string" android:defaultValue="Core Data Consent" />
+        <argument android:name="stepNumber" app:argType="integer" android:defaultValue="6" />
+        <argument android:name="totalSteps" app:argType="integer" android:defaultValue="8" />
+        <action
+            android:id="@+id/action_coreDataConsent_to_unsupervisedReliabilityOptIn"
+            app:destination="@id/unsupervisedReliabilityOptInFragment" />
+    </fragment>
+
+    <!-- 7. Unsupervised Reliability Opt-In — §2.7, "separate screen, genuinely optional".
+         PRD §13.4 hard rule: must never be bundled into Core Data Consent above — kept as its
+         own distinct destination for exactly that reason, not merged for convenience. -->
+    <fragment
+        android:id="@+id/unsupervisedReliabilityOptInFragment"
+        android:name="com.disciplineos.app.onboarding.OnboardingPlaceholderFragment"
+        android:label="Unsupervised Reliability Opt-In">
+        <argument android:name="title" app:argType="string" android:defaultValue="Unsupervised Reliability Opt-In" />
+        <argument android:name="stepNumber" app:argType="integer" android:defaultValue="7" />
+        <argument android:name="totalSteps" app:argType="integer" android:defaultValue="8" />
+        <action
+            android:id="@+id/action_unsupervisedReliabilityOptIn_to_firstMissionScheduling"
+            app:destination="@id/firstMissionSchedulingFragment" />
+    </fragment>
+
+    <!-- 8. First Mission Scheduling — §2.9, closes onboarding. No next destination: this
+         Fragment declares no outgoing <action>, so OnboardingPlaceholderFragment's
+         findNavController().currentDestination?.actions lookup comes back empty and it hides
+         its Next button rather than wiring it to a no-op — see that class's kdoc. Real
+         "onboarding complete -> hand off to Mission enforcement" transition is a Phase 3 item
+         for when this screen gets real content, not something to fake here. -->
+    <fragment
+        android:id="@+id/firstMissionSchedulingFragment"
+        android:name="com.disciplineos.app.onboarding.OnboardingPlaceholderFragment"
+        android:label="First Mission Scheduling">
+        <argument android:name="title" app:argType="string" android:defaultValue="First Mission Scheduling" />
+        <argument android:name="stepNumber" app:argType="integer" android:defaultValue="8" />
+        <argument android:name="totalSteps" app:argType="integer" android:defaultValue="8" />
+    </fragment>
+
+</navigation>

@@ -6,8 +6,10 @@ plugins {
 // Originally deliberately minimal (this module existed only so :data and :domain had a real
 // application module depending on them, giving CI a full AGP variant graph to build). Stale
 // as of Phase 2: this module now contains the real Accessibility Service, interception
-// Activity, layout/strings/manifest resources, and their test coverage — see ROADMAP.md
-// Phase 2 for what actually lives here now. Phase 3 (onboarding UI) is still ahead of this.
+// Activity, layout/strings/manifest resources, and their test coverage. Phase 3 (onboarding
+// UI): the navigation skeleton (MainActivity + NavHostFragment + placeholder onboarding
+// destinations) now exists too — see ROADMAP.md Phase 3 for what's implemented vs. still
+// placeholder content.
 android {
     namespace = "com.disciplineos.app"
     compileSdk = 34
@@ -73,6 +75,20 @@ dependencies {
     // Android Keystore-backed storage, not be hardcoded). Found via real CI failure — nothing
     // previously declared this dependency despite DbPassphraseProvider.kt needing it since
     // whenever that file was written; never caught until :app actually compiled for real.
+    implementation("androidx.fragment:fragment-ktx:1.8.2") // Phase 3 (ROADMAP.md): onboarding
+    // screens are Fragments navigated via Jetpack Navigation Component, not Compose —
+    // matching the "no framework not already justified" stance activity_mission_interception.xml's
+    // own top comment already committed this project to (that layout explicitly notes "no
+    // Compose dependency exists yet" as the reason for its own plain-View approach). Adding
+    // Compose now for onboarding alone would contradict that existing, deliberate decision
+    // rather than build on it.
+    implementation("androidx.navigation:navigation-fragment-ktx:2.7.7")
+    implementation("androidx.navigation:navigation-ui-ktx:2.7.7")
+    // Manual DI (AppContainer), not Hilt, per AppContainer.kt's own kdoc: Hilt is "a
+    // reasonable escalation" once manual wiring becomes genuinely unwieldy, not an automatic
+    // trigger at Phase 3's first screen — see that file's kdoc for the full reasoning. Revisit
+    // once onboarding's real per-screen state (not just navigation) makes manual wiring
+    // actually painful, not preemptively here.
 
     testImplementation("junit:junit:4.13.2")
     // Mirrors :domain/build.gradle.kts's test dependency set exactly (see that file's
@@ -92,4 +108,10 @@ dependencies {
     // assertFailsWith), so this gap was specific to :app and only surfaced once CI actually
     // ran :app:compileDebugUnitTestKotlin for the first time (see §5.16's own addendum on why
     // that task wasn't wired into CI until this same pass).
+    testImplementation("androidx.fragment:fragment-testing:1.8.2") // FragmentScenario, for
+    // OnboardingPlaceholderFragmentTest (ROADMAP.md Phase 3) — launches a Fragment in
+    // isolation under Robolectric without needing a real hosting Activity/nav graph, matching
+    // this project's existing Robolectric-based approach to Android-framework-dependent tests
+    // (InterceptionControllerTest) rather than requiring an instrumented on-device test for
+    // logic this simple.
 }

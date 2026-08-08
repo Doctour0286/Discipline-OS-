@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    OnboardingPlaceholderFragment's layout. Placeholder only — see that class's kdoc for why
+    this exists (nav-skeleton verification, not a preview of any real screen's design). Real
+    per-screen layouts (Onboarding doc §2.1–2.9) get their own dedicated XML files when built,
+    not a themed variant of this one.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="24dp">
+
+    <TextView
+        android:id="@+id/stepProgressText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="14sp"
+        android:textColor="@android:color/darker_gray"
+        tools:text="3 of 9" />
+
+    <TextView
+        android:id="@+id/stepTitleText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="48dp"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        tools:text="Tier Explanation" />
+
+    <Button
+        android:id="@+id/nextButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:text="@string/onboarding_placeholder_next" />
+
+    <Button
+        android:id="@+id/backButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/onboarding_placeholder_back" />
+
+</LinearLayout>

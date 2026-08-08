@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    MainActivity's content view — a single NavHostFragment container running the onboarding
+    nav graph (res/navigation/onboarding_nav_graph.xml). ROADMAP.md Phase 3 navigation
+    skeleton; see MainActivity.kt's kdoc for why this exists and what it does/doesn't cover.
+-->
+<androidx.fragment.app.FragmentContainerView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/navHostFragmentContainer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:name="androidx.navigation.fragment.NavHostFragment"
+    app:navGraph="@navigation/onboarding_nav_graph"
+    app:defaultNavHost="true" />
