@@ -6,6 +6,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.disciplineos.data.entity.DisputeStatus
 import com.disciplineos.data.entity.Mission
+import com.disciplineos.data.entity.MissionProfile
 import com.disciplineos.data.entity.MissionStatus
 import com.disciplineos.data.entity.OutputArtifact
 import com.disciplineos.data.entity.TierEvent
@@ -153,6 +154,39 @@ interface MissionDao {
     /** Backs `recovery_per_completed_mission` (Data Model §3.5) — a simple count, one credit per completed Mission in the window. */
     @Query("SELECT COUNT(*) FROM missions WHERE userId = :userId AND status = 'COMPLETED' AND actualStart >= :since")
     suspend fun completedMissionsSince(userId: UUID, since: Instant): Int
+}
+
+/**
+ * Backs [MissionProfile] (see that file's kdoc for why this table exists at all — closes a
+ * pre-existing gap, `Mission.missionProfileId` had nothing to point at before this). Kept as
+ * its own `@Dao` matching [TierDao]'s own stated reasoning: a distinct table with its own
+ * query shape, not folded into [MissionDao] just because the two entities are related.
+ *
+ * No `@Update` yet — Mission Profile Setup (Onboarding §2.8, this pass) only ever creates the
+ * first Profile a user has. Editing an existing Profile is real future work (a profile-picker
+ * UI doesn't exist yet either — see [MissionProfile]'s kdoc) but nothing in this pass needs
+ * it, so it isn't speculatively added ahead of a real call site needing it.
+ */
+@Dao
+interface MissionProfileDao {
+    @Insert
+    suspend fun insert(profile: MissionProfile)
+
+    @Query("SELECT * FROM mission_profiles WHERE id = :id")
+    suspend fun get(id: UUID): MissionProfile?
+
+    /**
+     * Onboarding §2.8's "should default to suggestions... rather than a blank list" requires
+     * knowing what a user already has, if anything — used by [MissionProfileSetupFragment]'s
+     * same re-entry guard every other onboarding screen in this project already applies
+     * (Back-then-resubmit, or a slow double-tap, must not create a second Profile row; see
+     * `TierSelectionFragment`/`TierConfirmationFragment`'s own kdoc for the identical
+     * reasoning applied to `User`). `LIMIT 1` matches this project's existing single-profile
+     * assumption for this pass — see [MissionProfile]'s kdoc on why a picker UI is future
+     * work, not this pass's scope.
+     */
+    @Query("SELECT * FROM mission_profiles WHERE userId = :userId LIMIT 1")
+    suspend fun mostRecentFor(userId: UUID): MissionProfile?
 }
 
 @Dao

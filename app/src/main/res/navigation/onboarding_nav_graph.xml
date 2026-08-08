@@ -136,14 +136,18 @@
             app:destination="@id/missionProfileSetupFragment" />
     </fragment>
 
-    <!-- 5. Mission Profile Setup — §2.8 (first allowlist/blocklist) -->
+    <!--
+        5. Mission Profile Setup — §2.8 (first allowlist/blocklist). Real content as of this
+        pass — see MissionProfileSetupFragment's own kdoc. No `title`/`stepNumber`/`totalSteps`
+        arguments (those were OnboardingPlaceholderFragment's own mechanism for a generic
+        screen to render step-progress text); this Fragment has real layout content instead,
+        matching how tierSelectionFragment/tierConfirmationFragment dropped those same
+        placeholder-only arguments when they got real content.
+    -->
     <fragment
         android:id="@+id/missionProfileSetupFragment"
-        android:name="com.disciplineos.app.onboarding.OnboardingPlaceholderFragment"
+        android:name="com.disciplineos.app.onboarding.MissionProfileSetupFragment"
         android:label="Mission Profile Setup">
-        <argument android:name="title" app:argType="string" android:defaultValue="Mission Profile Setup" />
-        <argument android:name="stepNumber" app:argType="integer" android:defaultValue="5" />
-        <argument android:name="totalSteps" app:argType="integer" android:defaultValue="8" />
         <action
             android:id="@+id/action_missionProfileSetup_to_coreDataConsent"
             app:destination="@id/coreDataConsentFragment" />

@@ -558,7 +558,28 @@ after N more days" note — never a silently-picked number.
 
 ## 3. Current state snapshot
 
-**Last updated:** 2026-08-07 (this session, sixth continuation — Phase 3 nav skeleton
+**Last updated:** 2026-08-08 (this session — Mission Profile Setup, §5.22). Tier Selection
+and Tier Confirmation (§5.21, below) are **confirmed done, both on CI and on-device** — the
+entries immediately below predate that confirmation and are left as history, but treat that
+work as finished, not "in progress," when reading them. This session's own addition, Mission
+Profile Setup, is **not yet CI-confirmed** (see §5.22 for exactly what's unverified) — don't
+conflate the two statuses when picking this up next.
+
+```
+Onboarding sequence, screen by screen (Onboarding doc §1, 8 steps as actually wired):
+1. Welcome                    — placeholder (OnboardingPlaceholderFragment)
+2. Goal Definition             — placeholder — real content NOT started, blocks §2.8 defaults
+3. Tier Explanation            — placeholder
+4. Tier Selection              — REAL, confirmed CI + device (§5.21)
+   ↳ Tier Confirmation         — REAL, confirmed CI + device (§5.21) — Warden path only
+   ↳ Iron Calibration Gate     — placeholder, unreached (Iron unselectable at onboarding)
+5. Mission Profile Setup       — REAL, written this session (§5.22) — NOT YET CI-confirmed
+6. Core Data Consent           — placeholder
+7. Unsupervised Reliability    — placeholder
+8. First Mission Scheduling    — placeholder
+```
+
+**Prior entry — 2026-08-07 (sixth continuation — Phase 3 nav skeleton
 **CI-confirmed green**). `MainActivity`, `OnboardingPlaceholderFragment`, `activity_main.xml`,
 `fragment_onboarding_placeholder.xml`, `onboarding_nav_graph.xml` (9 destinations,
 Recruit-through-Iron sequence per Onboarding doc §1), manifest launcher entry, and matching
@@ -743,7 +764,35 @@ verification either.
 
 ## 4. Immediate next action
 
-**If you are the next agent picking this up: do this first, in order.**
+**Updated 2026-08-08 (§5.22) — items 2–6 below predate Tier Selection/Confirmation's
+CI+device confirmation and Mission Profile Setup's construction; left as history, not
+current status. Read this paragraph first, then treat the numbered list as background, not
+as what's actually next.**
+
+**What's actually next, as of this entry:**
+1. **Push this session's work (`MissionProfile` entity/DAO, schema v4, `MissionProfileSetupFragment`,
+   layout, strings, nav graph edit, `OnboardingPlaceholderFragment` dead-branch removal, new
+   test file) and confirm CI green** — `:data:testDebugUnitTest` and `:app:testDebugUnitTest`
+   both need to pick up and pass the new `MissionProfileSetupFragmentTest` cases, and the
+   schema v4 bump needs to not break anything already passing. Nothing here has been through
+   a real compiler yet (§5.22 has the full "manually checked, not compiled" caveat).
+2. **Once green, on-device verify Mission Profile Setup** the same way §5.21 verified Tier
+   Selection/Confirmation: walk Welcome → ... → Tier Selection/Confirmation → Mission Profile
+   Setup on a real device, confirm the screen renders, Continue actually writes a
+   `MissionProfile` row (check via logcat or a follow-up read), the empty-input case doesn't
+   crash, and Back returns to the prior screen without writing anything.
+3. **After that, the next real screen to build is Core Data Consent (§2.6)** — Mission Profile
+   Setup's own action already routes there
+   (`action_missionProfileSetup_to_coreDataConsent`), it's just still placeholder content on
+   the receiving end.
+4. **Separately, not blocking the above:** Goal Definition (§2.2) is still a placeholder and
+   is the actual blocker for closing the gap §5.22 flagged (Mission Profile Setup's missing
+   §2.8 "default suggestions"). Worth picking up before or after Core Data Consent, not
+   strictly ordered relative to it — but closing §2.8's gap requires this screen specifically,
+   not just "onboarding progress" in general.
+
+**Historical items below (2026-08-07 and earlier) — superseded by the above, kept for
+context on decisions already made, not as a current task list:**
 
 1. Read §0–§1 of this file (you're doing that now).
 2. **RESOLVED — the Phase 3 nav skeleton's fix is now CI-confirmed.** The first push failed
@@ -1691,8 +1740,8 @@ worth blocking on.
 
 ---
 
-### 5.22 — NOT YET CI-VERIFIED — Tier Selection (§2.4) and Tier Confirmation (§2.4) given real
-content, replacing `OnboardingPlaceholderFragment` at those two destinations
+### 5.22 — RESOLVED, confirmed on real CI + real device — Tier Selection (§2.4) and Tier
+Confirmation (§2.4) given real content, replacing `OnboardingPlaceholderFragment`
 
 **What changed, concretely:**
 - `:data` — `TierEventKind.INITIAL_SELECTION` added. Every other kind on this enum represents
@@ -1764,19 +1813,128 @@ looked right.
 - `UserDao.getSingleLocalUser()` and `AppContainer.database(context)` — both real, already-
   existing methods being called correctly, not invented API.
 
-**What this entry does NOT claim, unlike §5.16/§5.17/§5.21 above it:** those entries say
-"CONFIRMED GREEN" because a real CI run backed the claim. This one can't say that — the
-authoring environment this pass ran in has no Android SDK, no Google Maven access, and no
-Kotlin compiler on `PATH` (`gradlew` itself fails outside the sandbox network allowlist, before
-ever reaching a compile step). Every check above is real and was actually run, but textual
-cross-referencing is not a compiler, and this project's own stated lesson (§5.8, §5.16, §5.17,
-§5.21) is that "reads correct, cross-checked by hand" and "compiles" are different claims that
-have diverged before, more than once, in this exact codebase. **Treat this as UNVERIFIED until
-`build-and-test` actually runs against it — do not update this entry's own status to
-"CONFIRMED GREEN" until a real CI run says so, and do not let the next phase build on top of
-Tier Selection as if it were.**
+**What this entry did NOT claim when first written, unlike §5.16/§5.17/§5.21 above it:** those
+entries say "CONFIRMED GREEN" because a real CI run backed the claim. This one couldn't say
+that at the time — the authoring environment this pass ran in has no Android SDK, no Google
+Maven access, and no Kotlin compiler on `PATH` (`gradlew` itself fails outside the sandbox
+network allowlist, before ever reaching a compile step). Every check listed above was real and
+was actually run, but textual cross-referencing is not a compiler, and this project's own
+stated lesson (§5.8, §5.16, §5.17, §5.21) is that "reads correct, cross-checked by hand" and
+"compiles" are different claims that have diverged before, more than once, in this exact
+codebase. Left in place below, unedited, as the accurate record of what was and wasn't known
+at commit time — the status line above is what changed, not this reasoning.
 
+**Status: CONFIRMED GREEN — both on CI and on a real device.** `build-and-test` ran clean on
+push to a feature branch (not `main` directly, given this pass had zero prior compiler
+verification) after the fixes described above landed. Separately, and more strongly than any
+CI run alone: manually verified on a physical device — Tier Selection renders correctly (four
+tiers visible, Recruit pre-selected as PRD §12.6 requires, Iron shown-disabled with its
+calibration-window reason stated in the label itself), Recruit/Operator submit directly to
+Mission Profile Setup with no extra friction, and Warden correctly routes through
+`TierConfirmationFragment`'s distinct confirmation screen before reaching Mission Profile
+Setup — both branches §2.4 requires were exercised, not just the happy-path one. This is the
+first onboarding screen in this project to be confirmed both ways (CI + device), not just one.
 
+---
+
+**§5.22 — Mission Profile Setup built; closes a real, previously-undocumented spec gap
+(`MissionProfile` never existed as an entity).** Picked up this session per §4's own
+"immediate next action" — except that section (and §3's snapshot) was itself stale by the
+time this session started: the §5.21 entry immediately above already recorded Tier
+Selection/Tier Confirmation as **CONFIRMED GREEN on both CI and device**, but §3/§4 still
+described Phase 3 in terms that predated that confirmation and didn't name Mission Profile
+Setup as the next real screen at all. Corrected here rather than silently worked around — see
+the §3/§4 edits accompanying this entry.
+
+**The gap found, checked before assuming it was real:** `Mission.missionProfileId` /
+`mission_profile_id` has existed since Phase 0 (both in code and in Data Model doc §2.2), but
+nothing has ever backed it — grepped the entire tree (`data/`, `domain/`, `app/`) for
+`MissionProfile`: every single reference across four `:domain` test files, `DebugSeeder`, and
+`InterceptionControllerTest` is `UUID.randomUUID()`, never a real row. Checked the Data Model
+doc itself too, not just the code — it only ever shows `mission_profile_id: UUID` on the
+`Mission` block, never a `MissionProfile { }` block of its own. This is a genuine spec gap
+(the schema doc's own §2 never defined the entity it references), not a Phase 0–2 shortcut
+this session is only now noticing.
+
+**Built, matching every existing convention checked against real code, not assumed:**
+- `:data` — new `MissionProfile` entity (`data/.../entity/MissionProfile.kt`): `id`, `userId`,
+  `name`, `allowlist`/`blocklist` (reuses `Converters.fromStringList`/`toStringList`, already
+  registered — no new converter needed), `createdAt`. New `MissionProfileDao`
+  (`insert`, `get(id)`, `mostRecentFor(userId)` — the last one backing the same re-entry-guard
+  pattern `TierSelectionFragment`/`TierConfirmationFragment` already use for `User`, applied
+  here to this table instead). Added to `DisciplineOsDatabase`'s entity list, schema bumped
+  **v3 → v4** — no migration written, same explicit pre-launch reasoning `DisciplineOsDatabase`
+  already states for `fallbackToDestructiveMigration()` (v2, v3) applies unchanged to v4; not
+  a new decision, just this bump inheriting it.
+- `:app` — `MissionProfileSetupFragment` (Onboarding §2.8), replacing
+  `OnboardingPlaceholderFragment` at that one nav-graph destination, same pattern as
+  `TierSelectionFragment`/`TierConfirmationFragment`'s own recent replacement of the
+  placeholder at their destinations. Collects a name + allowlist + blocklist (one package id
+  per line, plain `EditText` — no installed-app picker exists anywhere in this project yet to
+  build a real picker against) and inserts one `MissionProfile` row directly via
+  `MissionProfileDao`, **not** wrapped in a new `:domain` use-case — a single unconditional
+  insert with no other table to coordinate in the same transaction doesn't meet the bar
+  `RecordViolationUseCase`/`TierTransitionUseCase` exist for; logged as a judgment call rather
+  than silently deciding "always add a use-case" as a blanket rule.
+- `onboarding_nav_graph.xml` — `missionProfileSetupFragment` now points at the real Fragment
+  class; dropped its placeholder-only `title`/`stepNumber`/`totalSteps` arguments, matching
+  what happened to `tierSelectionFragment`/`tierConfirmationFragment` when they got real
+  content.
+- `OnboardingPlaceholderFragment.kt` — removed the now-dead
+  `R.id.missionProfileSetupFragment -> ...` branch from the hardcoded next-action `when` (same
+  reasoning already applied there to `tierSelectionFragment`/`tierConfirmationFragment`: a
+  destination this class no longer serves shouldn't keep a mapping nothing can ever hit).
+- New layout (`fragment_mission_profile_setup.xml`) and 13 new strings, all cross-referenced
+  by hand against real declared IDs/strings (see "What was checked" below) — not eyeballed.
+- New test file `MissionProfileSetupFragmentTest.kt` — DAO-level coverage (round-trip of
+  name/allowlist/blocklist including the empty-list case, `mostRecentFor`'s re-entry-guard
+  query) plus direct tests of the Fragment's `parseLines` line-parsing logic, duplicated as a
+  private function in the test rather than reflectively invoked (see file's own kdoc for why:
+  this module deliberately has no `fragment-testing` dependency — it was removed in the §5.21
+  session specifically because it existed only to justify a test that was never written, and
+  re-adding it for one more screen would repeat exactly the mistake that removal corrected).
+
+**A real, previously-unflagged gap this pass explicitly did NOT paper over:** Onboarding
+§2.8 says this screen "should default to suggestions drawn from §2.2's flagged categories
+rather than a blank list, to reduce first-session abandonment." That data doesn't exist —
+Goal Definition (§2.2, step 2, two screens earlier in this same sequence) is still
+`OnboardingPlaceholderFragment` content, with nowhere to persist a flagged-category list even
+if it had real UI. Rather than inventing a plausible-looking default list (which is exactly
+the "silently resolving an open question" failure mode §0 of this file names explicitly), the
+allowlist/blocklist fields ship empty, with the dependency gap stated in both the layout's own
+top comment and this entry. **Not this pass's job to close** — closing it means giving Goal
+Definition real content first, which is separate, un-started work (Phase 3 still lists it as
+0%, see §3).
+
+**What was checked, textually, against real declarations (same discipline §5.21 and earlier
+entries used, not a lighter pass because this felt like a smaller screen):**
+- Every `findViewById<...>(R.id....)` target in `MissionProfileSetupFragment.kt` against
+  `fragment_mission_profile_setup.xml`'s declared `android:id`s — diffed programmatically,
+  exact match, nothing referenced that isn't declared.
+- Every `@string/*` reference in the new layout against `strings.xml`'s real declared
+  entries — diffed programmatically, all 14 references resolve (13 new + the existing
+  `onboarding_placeholder_back`, reused rather than redeclared).
+- `R.id.action_missionProfileSetup_to_coreDataConsent` (the one nav action this Fragment
+  calls) confirmed still declared in the graph, unchanged by this session's edit to that
+  destination's own `<fragment>` block.
+- `MissionProfileDao.insert`/`get`/`mostRecentFor` signatures in the Fragment and test file
+  both checked against the DAO as actually written in this same pass (not from memory of an
+  earlier draft) — named arguments throughout, matching real parameter names.
+- `User`'s real 9-field constructor (6 required, 3 defaulted) checked directly against
+  `User.kt` before writing the test's `seedUser()` helper — confirmed named-argument call
+  supplies all 6 required fields with correct names, relies on defaults for the rest, same
+  pattern `DebugSeederTest`/`RecordViolationUseCaseTest` already establish.
+
+**Same standing caveat as every other new file in this project until it's been through real
+CI:** manually cross-checked as above, not compiled — no Android/Kotlin compiler in this
+authoring sandbox (§4 item 2's standing note, unchanged). Push, let CI confirm
+`:data:testDebugUnitTest` and `:app:testDebugUnitTest` both pick up and pass the new test
+file and the schema-v4 bump doesn't break anything already-passing, then this note graduates
+the same way §5.8/§5.16/§5.17/§5.21 did before it. On-device verification (does the real
+screen render, does Continue actually write a row, does the empty-input case behave as
+designed) is a separate, still-open step after that — not yet attempted this session.
+
+---
 
 - **Tag every unresolved number `[HYPOTHESIS]`** in code comments, matching the spec docs'
   own convention. Never let a placeholder look like a decided value.

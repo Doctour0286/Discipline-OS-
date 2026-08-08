@@ -95,11 +95,12 @@ class OnboardingPlaceholderFragment : Fragment(R.layout.fragment_onboarding_plac
         // isn't in use in this project (no libs.versions.toml / Safe Args plugin anywhere in
         // settings.gradle.kts or app/build.gradle.kts as of this session).
         //
-        // tierSelectionFragment and tierConfirmationFragment are deliberately absent from
-        // this map — both destinations now run TierSelectionFragment / TierConfirmationFragment
-        // (real content, this session), not this placeholder class, so their branches here
-        // would be dead code: findNavController().currentDestination?.id can never actually
-        // equal R.id.tierSelectionFragment or R.id.tierConfirmationFragment while this
+        // tierSelectionFragment, tierConfirmationFragment, and (this session)
+        // missionProfileSetupFragment are deliberately absent from this map — all three
+        // destinations now run their own real Fragment classes (TierSelectionFragment /
+        // TierConfirmationFragment / MissionProfileSetupFragment), not this placeholder
+        // class, so their branches here would be dead code: findNavController()
+        // .currentDestination?.id can never actually equal any of those three IDs while this
         // placeholder's own onViewCreated is running, since a different Fragment class is
         // what's hosted at those destinations now. Removed rather than left in as unreachable
         // scaffolding — leaving a mapping for a destination this class no longer serves is the
@@ -111,7 +112,6 @@ class OnboardingPlaceholderFragment : Fragment(R.layout.fragment_onboarding_plac
             R.id.goalDefinitionFragment -> R.id.action_goalDefinition_to_tierExplanation
             R.id.tierExplanationFragment -> R.id.action_tierExplanation_to_tierSelection
             R.id.ironCalibrationGateFragment -> R.id.action_ironCalibrationGate_to_missionProfileSetup
-            R.id.missionProfileSetupFragment -> R.id.action_missionProfileSetup_to_coreDataConsent
             R.id.coreDataConsentFragment -> R.id.action_coreDataConsent_to_unsupervisedReliabilityOptIn
             R.id.unsupervisedReliabilityOptInFragment -> R.id.action_unsupervisedReliabilityOptIn_to_firstMissionScheduling
             // firstMissionSchedulingFragment (§2.9, last screen) falls through to null —
