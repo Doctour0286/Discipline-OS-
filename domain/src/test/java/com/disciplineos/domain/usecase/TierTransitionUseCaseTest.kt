@@ -247,6 +247,52 @@ class TierTransitionUseCaseTest {
     }
 
     @Test
+    fun `select initial tier creates the user, logs INITIAL_SELECTION, and sets fromTier equal to toTier`() = runTest {
+        assertNull(db.userDao().get(userId)) // no User row exists yet — this is the point of the test
+
+        val event = useCase.selectInitialTier(userId, Tier.OPERATOR, onboardingConsentVersion = "v1")
+
+        assertEquals(TierEventKind.INITIAL_SELECTION, event.kind)
+        assertEquals(Tier.OPERATOR, event.fromTier) // no real "prior tier" exists — see TierEventKind kdoc
+        assertEquals(Tier.OPERATOR, event.toTier)
+        assertNull(event.reasonNote)
+
+        val user = db.userDao().get(userId)!!
+        assertEquals(Tier.OPERATOR, user.currentTier)
+        assertEquals("v1", user.onboardingConsentVersion)
+        assertEquals(user.tierSelectedAt, user.tierActivationAt) // no calibration lag outside Iron
+    }
+
+    @Test
+    fun `select initial tier accepts Recruit, Operator, and Warden`() = runTest {
+        for (tier in listOf(Tier.RECRUIT, Tier.OPERATOR, Tier.WARDEN)) {
+            val freshUserId = UUID.randomUUID()
+            val event = useCase.selectInitialTier(freshUserId, tier, onboardingConsentVersion = "v1")
+            assertEquals(tier, event.toTier)
+            assertEquals(tier, db.userDao().get(freshUserId)!!.currentTier)
+        }
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `select initial tier rejects Iron with no exception path, per PRD §12_6`() = runTest {
+        useCase.selectInitialTier(userId, Tier.IRON, onboardingConsentVersion = "v1")
+    }
+
+    @Test
+    fun `select initial tier rejecting Iron leaves no user row created`() = runTest {
+        try {
+            useCase.selectInitialTier(userId, Tier.IRON, onboardingConsentVersion = "v1")
+        } catch (_: IllegalArgumentException) {
+            // expected — asserted by the dedicated @Test(expected = ...) case above.
+        }
+
+        // The rejection happens via require() before the transaction body runs at all, so
+        // no User row should exist afterward — not a half-created user stuck without a
+        // valid tier.
+        assertNull(db.userDao().get(userId))
+    }
+
+    @Test
     fun `tier events are queryable in occurred-at order`() = runTest {
         seedUser(tier = Tier.OPERATOR)
         useCase.explicitDowngrade(userId, Tier.RECRUIT)

@@ -93,16 +93,23 @@ class OnboardingPlaceholderFragment : Fragment(R.layout.fragment_onboarding_plac
         // action ID is the exact <action android:id="@+id/action_..."> already declared for
         // that destination in onboarding_nav_graph.xml — kept in sync manually since Safe Args
         // isn't in use in this project (no libs.versions.toml / Safe Args plugin anywhere in
-        // settings.gradle.kts or app/build.gradle.kts as of this session). tierSelectionFragment
-        // intentionally has two possible actions in the graph (Iron Calibration Gate branch,
-        // §2.4's real conditional) — this placeholder always takes the non-Iron path, matching
-        // the "graph shape correct now, real conditional logic when Tier Selection gets real
-        // content" note already in onboarding_nav_graph.xml's top-of-file comment.
+        // settings.gradle.kts or app/build.gradle.kts as of this session).
+        //
+        // tierSelectionFragment and tierConfirmationFragment are deliberately absent from
+        // this map — both destinations now run TierSelectionFragment / TierConfirmationFragment
+        // (real content, this session), not this placeholder class, so their branches here
+        // would be dead code: findNavController().currentDestination?.id can never actually
+        // equal R.id.tierSelectionFragment or R.id.tierConfirmationFragment while this
+        // placeholder's own onViewCreated is running, since a different Fragment class is
+        // what's hosted at those destinations now. Removed rather than left in as unreachable
+        // scaffolding — leaving a mapping for a destination this class no longer serves is the
+        // same category of drift ROADMAP.md's own conventions ask to flag, just one step
+        // removed from §5.20's stale-argument case (a mapping nothing can ever hit, instead of
+        // an argument nothing reads).
         val nextActionId = when (findNavController().currentDestination?.id) {
             R.id.welcomeFragment -> R.id.action_welcome_to_goalDefinition
             R.id.goalDefinitionFragment -> R.id.action_goalDefinition_to_tierExplanation
             R.id.tierExplanationFragment -> R.id.action_tierExplanation_to_tierSelection
-            R.id.tierSelectionFragment -> R.id.action_tierSelection_to_missionProfileSetup
             R.id.ironCalibrationGateFragment -> R.id.action_ironCalibrationGate_to_missionProfileSetup
             R.id.missionProfileSetupFragment -> R.id.action_missionProfileSetup_to_coreDataConsent
             R.id.coreDataConsentFragment -> R.id.action_coreDataConsent_to_unsupervisedReliabilityOptIn

@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Onboarding, Consent & Interaction Spec §2.4 (Tier Selection) real content — replaces
+    OnboardingPlaceholderFragment at this one destination. §2.3's requirement that all four
+    tiers show "side by side, not sequentially revealed" was already satisfied one screen
+    earlier (Tier Explanation, still a placeholder — not this screen's job to repeat it); this
+    screen's own job per §2.4 is the actual choice, plus "an explicit anti-pattern to avoid: do
+    not visually code Iron as 'the real/serious choice' and Recruit as 'for beginners/not
+    serious'" (§2.3) and PRD §12.6's hard requirement that Iron isn't selectable at first-time
+    onboarding at all.
+
+    ScrollView wraps the whole thing — four RadioButtons plus explanatory text and a
+    confirmation button is taller content than any prior placeholder screen carried, and this
+    is the first real screen in the app where that's actually true.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:id="@+id/tierSelectionStepProgressText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textColor="@android:color/darker_gray"
+            android:text="@string/tier_selection_step_progress" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="8dp"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:text="@string/tier_selection_title" />
+
+        <!--
+            §2.4: "no visual coding of Iron as the real choice, Recruit as for beginners" —
+            this is why every RadioButton below shares one plain style (no per-tier color,
+            size, or icon treatment) and why Recruit is listed first only because Onboarding
+            §1's flow diagram and PRD §12.6 both describe the tiers in Recruit→Iron order, not
+            because first position is meant to read as "default/easy."
+        -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:textSize="14sp"
+            android:text="@string/tier_selection_intro" />
+
+        <RadioGroup
+            android:id="@+id/tierRadioGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/tierRecruitRadio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="@string/tier_recruit_label"
+                android:checked="true" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="36dp"
+                android:layout_marginBottom="16dp"
+                android:textSize="13sp"
+                android:textColor="@android:color/darker_gray"
+                android:text="@string/tier_recruit_description" />
+
+            <RadioButton
+                android:id="@+id/tierOperatorRadio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="@string/tier_operator_label" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="36dp"
+                android:layout_marginBottom="16dp"
+                android:textSize="13sp"
+                android:textColor="@android:color/darker_gray"
+                android:text="@string/tier_operator_description" />
+
+            <RadioButton
+                android:id="@+id/tierWardenRadio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="@string/tier_warden_label" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="36dp"
+                android:layout_marginBottom="16dp"
+                android:textSize="13sp"
+                android:textColor="@android:color/darker_gray"
+                android:text="@string/tier_warden_description" />
+
+            <!--
+                §12.6: "Iron is not selectable at first-time onboarding regardless of stated
+                user intent... no exception path." Shown, not hidden — §2.3 requires all four
+                tiers visible for comparison — but disabled, so tapping it cannot check it.
+                android:enabled="false" on a RadioButton both blocks the click and gives it a
+                platform-standard greyed-out visual treatment for free, without needing a
+                custom disabled-state drawable for this first pass.
+            -->
+            <RadioButton
+                android:id="@+id/tierIronRadio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:enabled="false"
+                android:text="@string/tier_iron_label" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="36dp"
+                android:layout_marginBottom="16dp"
+                android:textSize="13sp"
+                android:textColor="@android:color/darker_gray"
+                android:text="@string/tier_iron_description" />
+
+        </RadioGroup>
+
+        <!--
+            §2.4: "requires an explicit secondary confirmation step for Warden/Iron
+            specifically (not for Recruit/Operator)... something closer to 'type to confirm'
+            or a distinct confirmation screen." This screen implements the distinct-screen
+            form: selecting Warden and tapping Continue routes through a confirmation step
+            before selectInitialTier() is actually called, rather than confirming inline.
+        -->
+        <Button
+            android:id="@+id/tierSelectionContinueButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/tier_selection_continue" />
+
+        <Button
+            android:id="@+id/tierSelectionBackButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/onboarding_placeholder_back" />
+
+    </LinearLayout>
+
+</ScrollView>

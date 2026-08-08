@@ -165,6 +165,62 @@ class TierTransitionUseCase(
     }
 
     /**
+     * Onboarding §2.4 Tier Selection — the user's *first-ever* tier choice, made before any
+     * [User] row exists. Every other public method on this class transitions an existing
+     * user between tiers; this one creates the user.
+     *
+     * **Hard-rejects [Tier.IRON]**, unconditionally — Onboarding doc §2.5 / PRD §12.6:
+     * "Iron is not selectable at first-time onboarding regardless of stated user intent,"
+     * with "no exception path." This isn't a UI-layer nicety to enforce by graying out a
+     * button; §12.6 states it as a hard requirement on the same footing as the calibration
+     * gate itself, so it's enforced here, at the one call site that can create the user's
+     * very first tier, the same way [activateIron] enforces the calibration *window* at the
+     * one call site that can activate Iron later. A caller that wants Iron still reaches it
+     * only through the normal path: select Recruit or Operator here, accumulate the
+     * [User.calibrationWindowDays] window, then call [activateIron].
+     *
+     * [tier] is otherwise unrestricted — Recruit, Operator, or Warden are all valid
+     * first-onboarding choices per §12.6 ("subject to the existing Warden confirmation
+     * screen"); that confirmation-screen requirement is Onboarding doc §2.4 UI, not something
+     * this use-case can check, so it's the caller's responsibility to have shown it before
+     * calling this with [Tier.WARDEN].
+     *
+     * [TierEvent.fromTier] is set equal to [tier] (see [TierEventKind.INITIAL_SELECTION]'s
+     * kdoc for why — [TierEvent.fromTier] is non-nullable and there is no real prior tier to
+     * put there).
+     *
+     * `tierActivationAt` is set equal to `tierSelectedAt` (both `now`) for every tier this
+     * method accepts — the calibration-window gap between the two fields exists specifically
+     * for Iron ([activateIron] is the only place that ever sets them apart), and this method
+     * never produces Iron, so there is no lag to represent here.
+     */
+    suspend fun selectInitialTier(
+        userId: UUID,
+        tier: Tier,
+        onboardingConsentVersion: String,
+        now: Instant = Instant.now(),
+    ): TierEvent {
+        require(tier != Tier.IRON) {
+            "selectInitialTier rejects IRON — Onboarding doc §2.5 / PRD §12.6: Iron is not " +
+                "selectable at first-time onboarding regardless of stated intent, no exception " +
+                "path. Select Recruit/Operator/Warden here, then reach Iron later via activateIron() " +
+                "once the calibration window has elapsed."
+        }
+        return database.withTransaction {
+            val user = User(
+                id = userId,
+                createdAt = now,
+                currentTier = tier,
+                tierSelectedAt = now,
+                tierActivationAt = now,
+                onboardingConsentVersion = onboardingConsentVersion,
+            )
+            userDao.insert(user)
+            writeEvent(userId, fromTier = tier, toTier = tier, TierEventKind.INITIAL_SELECTION, reasonNote = null, now)
+        }
+    }
+
+    /**
      * §12.3 Upgrade — "recommended, never imposed." This records that the user accepted an
      * already-presented recommendation; it does not decide whether to recommend one (that
      * belongs to whatever surfaces the Recalibration Voice prompt, not this use-case) and it

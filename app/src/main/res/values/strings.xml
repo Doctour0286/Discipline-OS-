@@ -91,4 +91,46 @@
     <string name="onboarding_placeholder_next">Next</string>
     <string name="onboarding_placeholder_back">Back</string>
 
+    <!--
+        ROADMAP.md Phase 3 continuation — TierSelectionFragment strings, replacing
+        OnboardingPlaceholderFragment at the tierSelectionFragment destination. Checked
+        against PRD §22.1's behavior-vs-identity test and Onboarding §2.3's explicit
+        anti-pattern ("do not visually code Iron as the real/serious choice and Recruit as
+        for beginners/not serious") before being written — descriptions state what each tier
+        does, not what kind of person picks it.
+    -->
+    <string name="tier_selection_step_progress">Step 4 of 8</string>
+    <string name="tier_selection_title">Tier Selection</string>
+    <string name="tier_selection_intro">Pick where to start. You can move to a stricter tier later — Recruit and Operator adjust immediately, Warden and Iron need a confirmation step.</string>
+
+    <string name="tier_recruit_label">Recruit</string>
+    <string name="tier_recruit_description">Lower-pressure enforcement. Casual exits available. A reasonable place to start if you\'re not sure yet.</string>
+
+    <string name="tier_operator_label">Operator</string>
+    <string name="tier_operator_description">Stricter blocking during Missions, standard violation feedback. No casual-exit restriction beyond what Recruit already has.</string>
+
+    <string name="tier_warden_label">Warden</string>
+    <string name="tier_warden_description">Maximum enforcement, no casual exits once a Mission starts. Direct, evidence-based feedback on violations. Requires confirming on the next screen.</string>
+
+    <!--
+        PRD §12.6: "Iron is not selectable at first-time onboarding regardless of stated user
+        intent... no exception path." Description states the actual reason (a real
+        calibration requirement, not the system doubting the user — matching §2.5's own copy
+        requirement: "frame this as protecting the parameters that will govern Iron, not as
+        the system doubting the user's commitment") rather than a vague "not available yet."
+    -->
+    <string name="tier_iron_label">Iron (unlocks after 10 days at Recruit or Operator)</string>
+    <string name="tier_iron_description">Same enforcement as Warden, no in-the-moment exit at all. Locked at first setup so its stricter limits are set from your own data, not guessed — available once you\'ve used Recruit or Operator for a while.</string>
+
+    <string name="tier_selection_continue">Continue</string>
+
+    <!--
+        PRD §22.1 / Onboarding §4: static confirmation copy, reviewed against the same
+        behavior-vs-identity shape as everything else — states what Warden does and what
+        confirming means, not a claim about the user\'s resolve or character.
+    -->
+    <string name="tier_confirmation_title">Confirm Warden</string>
+    <string name="tier_confirmation_body">At Warden, Missions have no casual exit once started. Violations get direct, evidence-based feedback — never a judgment about who you are. Confirming starts you at Warden; you can still request a lower tier at any time.</string>
+    <string name="tier_confirmation_confirm">Confirm Warden</string>
+
 </resources>

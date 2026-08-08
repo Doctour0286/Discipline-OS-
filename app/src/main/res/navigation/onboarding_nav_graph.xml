@@ -14,22 +14,28 @@
 
     Every destination currently points at OnboardingPlaceholderFragment (see that class's
     kdoc for why: nav-graph structure verified in isolation before any real screen content is
-    built on top of it, matching this project's incremental-slice discipline). Real screens
-    replace these one at a time; the graph's structure (destination IDs, action IDs, the
-    Tier-Selection branch) is the part meant to survive that replacement unchanged, since other
-    Fragments will navigate by action ID, not by re-deriving the sequence each time.
+    built on top of it, matching this project's incremental-slice discipline) — EXCEPT
+    tierSelectionFragment and the new tierConfirmationFragment, which got real content this
+    session (TierSelectionFragment / TierConfirmationFragment — see those classes' kdocs).
+    Real screens replace the remaining placeholders one at a time; the graph's structure
+    (destination IDs, action IDs, the Tier-Selection branch) is the part meant to survive that
+    replacement unchanged, since other Fragments will navigate by action ID, not by re-deriving
+    the sequence each time.
 
-    **Known simplification, flagged not hidden:** the Tier Selection -> Iron Calibration Gate
-    branch is only a real conditional once Tier Selection (§2.4) has actual tier-choice logic;
-    a placeholder Fragment has no way to know which tier the user picked. Two actions exist
-    from tierSelectionFragment (actionTierSelectionToIronGate, actionTierSelectionToMissionProfileSetup)
-    so the graph *shape* is correct now, but the real conditional branch — which action fires
-    based on the user's actual tier choice — has to be written into Tier Selection's real
-    Fragment when that screen is built, not simulated here. Both of this placeholder's
-    "Next"-button destinations currently go to the same place (Mission Profile Setup) via the
-    graph's default action per destination; the Iron Gate is reachable but not yet
-    conditionally routed to automatically. See OnboardingPlaceholderFragment's kdoc for the
-    same "skeleton first, real logic per-screen later" reasoning.
+    **Iron branch status, updated:** the "known simplification" this comment used to describe
+    (Tier Selection had no real tier-choice logic, so neither action from it was ever truly
+    conditional) is now only half true. TierSelectionFragment's Iron RadioButton is disabled
+    (§12.6, no exception path) — Iron genuinely cannot be chosen here, not just "not yet
+    wired." Warden correctly routes through tierConfirmationFragment before ever calling
+    selectInitialTier(). The one thing still not real: action_tierSelection_to_ironCalibrationGate
+    remains unreachable from any code path, same as before — not because the branch logic is
+    unbuilt, but because Iron is categorically unavailable at first-time onboarding by design,
+    so there is currently no user-facing route that should ever fire this specific action.
+    Left in the graph (rather than removed) because the destination and action still need to
+    exist for whatever later flow lets an *existing* user reach Iron once their calibration
+    window elapses (TierTransitionUseCase.activateIron, already built and tested — see
+    ROADMAP.md Phase 1) — that flow is a Tier Selection *outside* onboarding, which this graph
+    doesn't model at all yet.
 -->
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -75,21 +81,42 @@
             app:destination="@id/tierSelectionFragment" />
     </fragment>
 
-    <!-- 4. Tier Selection — §2.4. Real branch logic (Iron -> Calibration Gate, else -> Mission
-         Profile Setup) belongs in this screen's real Fragment; see top-of-file note. Both
-         actions exist so the graph shape is correct ahead of that. -->
+    <!-- 4. Tier Selection — §2.4. Real content as of this session: TierSelectionFragment
+         replaces OnboardingPlaceholderFragment here. Recruit/Operator submit directly;
+         Warden routes through the new Tier Confirmation screen first; Iron's RadioButton is
+         disabled in the layout (§12.6, no exception path) so it can never be selected here at
+         all — the Iron Calibration Gate destination below stays unreached from this pass,
+         same as it was under the placeholder (see that destination's own comment). -->
     <fragment
         android:id="@+id/tierSelectionFragment"
-        android:name="com.disciplineos.app.onboarding.OnboardingPlaceholderFragment"
+        android:name="com.disciplineos.app.onboarding.TierSelectionFragment"
         android:label="Tier Selection">
-        <argument android:name="title" app:argType="string" android:defaultValue="Tier Selection" />
-        <argument android:name="stepNumber" app:argType="integer" android:defaultValue="4" />
-        <argument android:name="totalSteps" app:argType="integer" android:defaultValue="8" />
+        <action
+            android:id="@+id/action_tierSelection_to_tierConfirmation"
+            app:destination="@id/tierConfirmationFragment" />
         <action
             android:id="@+id/action_tierSelection_to_ironCalibrationGate"
             app:destination="@id/ironCalibrationGateFragment" />
         <action
             android:id="@+id/action_tierSelection_to_missionProfileSetup"
+            app:destination="@id/missionProfileSetupFragment" />
+    </fragment>
+
+    <!-- Tier Confirmation — §2.4's "distinct confirmation screen" form of the Warden/Iron
+         secondary-confirmation requirement. Only Warden routes here in this pass (Iron is
+         rejected one screen earlier, at Tier Selection itself, before it could ever reach a
+         confirmation step) — see TierConfirmationFragment's kdoc for why the class is still
+         written to be extendable to Iron's own confirmation later without restructuring. -->
+    <fragment
+        android:id="@+id/tierConfirmationFragment"
+        android:name="com.disciplineos.app.onboarding.TierConfirmationFragment"
+        android:label="Confirm Tier">
+        <argument
+            android:name="tier"
+            app:argType="string"
+            android:defaultValue="WARDEN" />
+        <action
+            android:id="@+id/action_tierConfirmation_to_missionProfileSetup"
             app:destination="@id/missionProfileSetupFragment" />
     </fragment>
 
