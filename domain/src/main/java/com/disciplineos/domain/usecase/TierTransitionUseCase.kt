@@ -152,8 +152,9 @@ class TierTransitionUseCase(
     suspend fun ironCrisisExit(userId: UUID, missionId: UUID, now: Instant = Instant.now()): TierEvent {
         return database.withTransaction {
             val user = requireUser(userId)
-            require(user.currentTier == Tier.IRON) {
-                "ironCrisisExit called for user $userId at tier ${user.currentTier} — " +
+            val currentTier = user.currentTier
+            require(currentTier == Tier.IRON) {
+                "ironCrisisExit called for user $userId at tier $currentTier — " +
                     "this control only exists on the Iron-tier interception screen (PRD §12.4.4)"
             }
             val mission = requireNotNull(missionDao.get(missionId)) {
@@ -166,7 +167,7 @@ class TierTransitionUseCase(
             missionDao.update(mission.copy(status = MissionStatus.ABORTED_CRISIS_EXIT, actualEnd = now))
 
             val event = writeEvent(
-                userId, user.currentTier, Tier.RECRUIT, TierEventKind.IRON_CRISIS_EXIT,
+                userId, currentTier, Tier.RECRUIT, TierEventKind.IRON_CRISIS_EXIT,
                 reasonNote = null, occurredAt = now,
             )
             userDao.update(
