@@ -15,8 +15,9 @@
     Every destination currently points at OnboardingPlaceholderFragment (see that class's
     kdoc for why: nav-graph structure verified in isolation before any real screen content is
     built on top of it, matching this project's incremental-slice discipline) — EXCEPT
-    tierSelectionFragment and the new tierConfirmationFragment, which got real content this
-    session (TierSelectionFragment / TierConfirmationFragment — see those classes' kdocs).
+    goalDefinitionFragment, tierExplanationFragment, tierSelectionFragment,
+    tierConfirmationFragment, and missionProfileSetupFragment, which have real content as of
+    this session or a prior one (see each Fragment class's own kdoc).
     Real screens replace the remaining placeholders one at a time; the graph's structure
     (destination IDs, action IDs, the Tier-Selection branch) is the part meant to survive that
     replacement unchanged, since other Fragments will navigate by action ID, not by re-deriving
@@ -69,14 +70,14 @@
             app:destination="@id/tierExplanationFragment" />
     </fragment>
 
-    <!-- 3. Tier Explanation — §2.3, "highest-stakes copy in onboarding" -->
+    <!-- 3. Tier Explanation — §2.3, "highest-stakes copy in onboarding". Real content as of
+         this pass: TierExplanationFragment replaces OnboardingPlaceholderFragment here. No
+         title/stepNumber/totalSteps arguments, same reasoning as every other real-content
+         destination in this graph. -->
     <fragment
         android:id="@+id/tierExplanationFragment"
-        android:name="com.disciplineos.app.onboarding.OnboardingPlaceholderFragment"
+        android:name="com.disciplineos.app.onboarding.TierExplanationFragment"
         android:label="Tier Explanation">
-        <argument android:name="title" app:argType="string" android:defaultValue="Tier Explanation" />
-        <argument android:name="stepNumber" app:argType="integer" android:defaultValue="3" />
-        <argument android:name="totalSteps" app:argType="integer" android:defaultValue="8" />
         <action
             android:id="@+id/action_tierExplanation_to_tierSelection"
             app:destination="@id/tierSelectionFragment" />

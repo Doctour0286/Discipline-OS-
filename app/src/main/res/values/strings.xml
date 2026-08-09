@@ -161,4 +161,70 @@
     <string name="goal_definition_link_note">The categories you flag here are the only ones we\'ll ever look at outside your Missions — see Unsupervised Reliability later in setup.</string>
     <string name="goal_definition_continue">Continue</string>
 
+    <!--
+        §2.3 Tier Explanation — spec's own label: "highest-stakes copy in onboarding."
+        Three content requirements per tier, all satisfied per-tier below:
+        - enforcement (blocking behavior, countdown mechanics, exit availability) — every
+          number here (5s/10s/10s/15s countdown, no-early-dismissal at Warden/Iron, mandatory
+          reason entry at Iron) is read directly off InterceptionPolicy.kt's real
+          countdownDuration/allowsEarlyDismissal/requiresBreakCommitmentReason functions, not
+          invented for this copy — see that file's own kdoc, which cites PRD §14 as the
+          literal source for these figures.
+        - Voice tone — tier_explanation_operator_voice/warden_voice/iron_voice each quote an
+          actual line from FallbackVoiceBank.kt ("You opened a blocked app during an active
+          Mission." — that bank's own OFF_ALLOWLIST section), this codebase's own authored
+          content, not third-party material. Recruit has no voice line (tier_explanation_
+          recruit_voice states this plainly) — InterceptionPolicy.usesWardenVoice(RECRUIT) is
+          false, matching PRD §14/§22.1's "Recruit's interception content is informational,
+          not Warden Voice at all."
+        - casual-exit disclosure — every _exit string below states plainly whether the tier
+          allows leaving a Mission before it ends; Warden/Iron's "no casual exit" framing is
+          the literal disclosure §2.3 calls "the single most important disclosure in the whole
+          flow," so it gets its own dedicated line per tier rather than being folded into the
+          enforcement paragraph.
+
+        **Anti-pattern check (§2.3's own explicit requirement) before writing a single line
+        below:** no tier's copy states or implies anything about who "needs" it or what kind
+        of person picks it — every string describes only what the system does at that tier.
+        Recruit is listed first strictly because Onboarding §1's flow diagram and PRD §12.6
+        both describe the tiers in Recruit→Iron order, matching tier_selection's own existing
+        ordering rationale (see that screen's layout comment) — not because first position is
+        meant to read as "the default/easy choice." No tier gets bold/emphasized/differently
+        -sized text, a color treatment the others lack, or an icon the others lack; all four
+        cards share one identical structural template in the layout, differing only in the
+        string content each one points to.
+    -->
+    <string name="tier_explanation_step_progress">Step 3 of 8</string>
+    <string name="tier_explanation_title">The four tiers, compared</string>
+    <string name="tier_explanation_intro">Enforcement gets stricter as you move down this list. Compare all four before choosing — the next screen is where you actually pick.</string>
+
+    <!-- Shared section labels, same three across every card — see layout comment on why a
+         shared, identical structural template is how this screen enforces §2.3's
+         no-differential-visual-treatment requirement rather than relying on manual upkeep. -->
+    <string name="tier_explanation_section_enforcement">Enforcement</string>
+    <string name="tier_explanation_section_voice">Voice tone</string>
+    <string name="tier_explanation_section_exit">Leaving a Mission early</string>
+
+    <string name="tier_explanation_recruit_label">Recruit</string>
+    <string name="tier_explanation_recruit_enforcement">A blocked app during a Mission shows a 5-second informational countdown, then you decide whether to continue the Mission or end it.</string>
+    <string name="tier_explanation_recruit_voice">No AI feedback line — Recruit\'s interception screen is informational only.</string>
+    <string name="tier_explanation_recruit_exit">You can end a Mission early at any time, no confirmation required.</string>
+
+    <string name="tier_explanation_operator_label">Operator</string>
+    <string name="tier_explanation_operator_enforcement">A blocked app shows a 10-second countdown. You can still dismiss it early and continue the Mission if you choose.</string>
+    <string name="tier_explanation_operator_voice">You\'ll get a direct, evidence-based line describing what happened — e.g. \"You opened a blocked app during an active Mission.\" Never a comment on who you are, only on what you did.</string>
+    <string name="tier_explanation_operator_exit">You can end a Mission early at any time, no confirmation required.</string>
+
+    <string name="tier_explanation_warden_label">Warden</string>
+    <string name="tier_explanation_warden_enforcement">A blocked app shows a 10-second countdown with no early dismissal — you have to wait it out before choosing to continue or end the Mission.</string>
+    <string name="tier_explanation_warden_voice">Same direct, evidence-based feedback as Operator — e.g. \"You opened a blocked app during an active Mission.\" Never a comment on who you are, only on what you did.</string>
+    <string name="tier_explanation_warden_exit">No casual exit once a Mission starts. Ending it early counts as a violation — there\'s no quiet way to back out mid-Mission.</string>
+
+    <string name="tier_explanation_iron_label">Iron (unlocks after 10 days at Recruit or Operator)</string>
+    <string name="tier_explanation_iron_enforcement">A blocked app shows a 15-second countdown with no early dismissal. Ending the Mission early requires entering a reason before it\'s confirmed.</string>
+    <string name="tier_explanation_iron_voice">Same direct, evidence-based feedback as Operator and Warden. Never a comment on who you are, only on what you did.</string>
+    <string name="tier_explanation_iron_exit">No casual exit once a Mission starts, same as Warden — plus a mandatory reason entry to confirm ending it early. A separate Crisis Exit control exists for situations that call for immediate relief, logged as a distinct event from a normal early end.</string>
+
+    <string name="tier_explanation_continue">Continue to Tier Selection</string>
+
 </resources>
