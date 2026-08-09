@@ -42,12 +42,16 @@ import java.util.UUID
  * at all — there is nothing to read an id *from*. A fresh [UUID] is generated here and is,
  * by construction, this device's one and only user id from this point on.
  *
- * **Consent version:** [ONBOARDING_CONSENT_VERSION] is a plain string constant, not read
- * from any consent-copy screen, because Core Data Consent (§2.6) is still
- * [OnboardingPlaceholderFragment] content in this pass — there is no real consent copy yet
- * to version against. Flagged here rather than silently hardcoded as if it meant something:
- * bump this constant (and give it a real versioning scheme) when Core Data Consent gets real
- * content, not before.
+ * **Consent version:** [ONBOARDING_CONSENT_VERSION] is a plain placeholder string, not read
+ * from any consent-copy screen — [selectInitialTier][com.disciplineos.domain.usecase
+ * .TierTransitionUseCase.selectInitialTier] requires a non-null value at this point in the
+ * flow (screen 4, before Core Data Consent's screen 6 has run), so this was never going to be
+ * able to hold a real version. **Now resolved:** Core Data Consent (§2.6) has real content as
+ * of this pass ([CoreDataConsentFragment]) and overwrites whatever value is written here with
+ * a real version the moment the user actually reaches and agrees to that screen's copy — see
+ * that Fragment's own kdoc for the full account. The value this constant holds is
+ * intentionally never read back or compared against anything; it only needs to be non-null
+ * long enough to satisfy the row's constructor until Core Data Consent overwrites it.
  */
 class TierSelectionFragment : Fragment(R.layout.fragment_tier_selection) {
 

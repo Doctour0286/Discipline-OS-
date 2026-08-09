@@ -558,24 +558,26 @@ after N more days" note — never a silently-picked number.
 
 ## 3. Current state snapshot
 
-**Last updated:** 2026-08-08 (this session — Mission Profile Setup, §5.22). Tier Selection
-and Tier Confirmation (§5.21, below) are **confirmed done, both on CI and on-device** — the
-entries immediately below predate that confirmation and are left as history, but treat that
-work as finished, not "in progress," when reading them. This session's own addition, Mission
-Profile Setup, is **not yet CI-confirmed** (see §5.22 for exactly what's unverified) — don't
-conflate the two statuses when picking this up next.
+**Last updated:** 2026-08-09 (this session — Core Data Consent, §5.23). Welcome, Goal
+Definition, Tier Explanation, Tier Selection, Tier Confirmation, and Mission Profile Setup are
+all merged to `main`; Tier Selection/Confirmation are **confirmed done, both on CI and
+on-device**. Welcome, Goal Definition, Tier Explanation, Mission Profile Setup, and this
+session's Core Data Consent are all **written, not yet CI-confirmed** (no compiler in this
+authoring sandbox — verified via static/manual review only; see each screen's own PR/kdoc) —
+don't conflate that status with Tier Selection/Confirmation's actual on-device confirmation
+when picking this up next.
 
 ```
 Onboarding sequence, screen by screen (Onboarding doc §1, 8 steps as actually wired):
-1. Welcome                    — placeholder (OnboardingPlaceholderFragment)
-2. Goal Definition             — placeholder — real content NOT started, blocks §2.8 defaults
-3. Tier Explanation            — placeholder
+1. Welcome                    — REAL, written (not yet CI-confirmed)
+2. Goal Definition             — REAL, written (not yet CI-confirmed)
+3. Tier Explanation            — REAL, written (not yet CI-confirmed)
 4. Tier Selection              — REAL, confirmed CI + device (§5.21)
    ↳ Tier Confirmation         — REAL, confirmed CI + device (§5.21) — Warden path only
    ↳ Iron Calibration Gate     — placeholder, unreached (Iron unselectable at onboarding)
-5. Mission Profile Setup       — REAL, written this session (§5.22) — NOT YET CI-confirmed
-6. Core Data Consent           — placeholder
-7. Unsupervised Reliability    — placeholder
+5. Mission Profile Setup       — REAL, written (§5.22) — not yet CI-confirmed
+6. Core Data Consent           — REAL, written this session (§5.23) — not yet CI-confirmed
+7. Unsupervised Reliability    — placeholder — next real screen to build
 8. First Mission Scheduling    — placeholder
 ```
 
@@ -1988,6 +1990,69 @@ file and the schema-v4 bump doesn't break anything already-passing, then this no
 the same way §5.8/§5.16/§5.17/§5.21 did before it. On-device verification (does the real
 screen render, does Continue actually write a row, does the empty-input case behave as
 designed) is a separate, still-open step after that — not yet attempted this session.
+
+---
+
+### 5.23 — RESOLVED, written this session, not yet CI-confirmed — Core Data Consent (§2.6)
+given real content, replacing `OnboardingPlaceholderFragment`; Welcome (§2.1) and Tier
+Explanation (§2.3) merged to `main` from two previously-unmerged branches
+
+**Two unrelated pieces of work landed together this session — recorded separately below.**
+
+**Part one: `onboarding-welcome-screen` and `onboarding-tier-explanation-screen` merged.**
+Both branches had already been written and pushed in a prior session (see the Welcome/Tier
+Explanation entries in §3's history above) but neither had been merged to `main`, and neither
+merges cleanly against the other — both touch `OnboardingPlaceholderFragment.kt` (each removes
+a different destination from the routing `when` block), `onboarding_nav_graph.xml` (a
+doc-comment listing which destinations have real content), and `strings.xml` (both insert a
+new string block at the same anchor point). All three conflicts are mechanical, not semantic —
+no string names collide, and the actual `<fragment>`/`<action>` XML tags in the nav graph
+auto-merged cleanly with no conflict, only the surrounding doc-comment did. Resolved by
+merging both branches into a dedicated branch (`merge-welcome-and-tier-explanation`), keeping
+both branches' edits in each of the three conflicting files, then merging that branch to
+`main` as PR #10. Verified before pushing: no leftover conflict markers, all touched XML
+well-formed, every `R.string`/`R.id`/action reference used by either new Fragment resolves to
+a real declaration, onboarding step-progress numbering (1–5 of 8) consistent across both new
+screens.
+
+**Part two: Core Data Consent (§2.6).** `CoreDataConsentFragment` replaces
+`OnboardingPlaceholderFragment` at `coreDataConsentFragment`. Two content requirements per
+spec, both in `strings.xml`: local-storage-is-required (Mission enforcement is core function,
+must work offline — Architecture doc §3.1), and a plain-language local-first + optional-
+cloud-sync explanation (same §3.1 citation). A third paragraph mentions the local
+delete-my-data affordance Architecture doc §3.2's rescoped-for-personal-use section calls out
+as the one concrete requirement that section still imposes. Required, not optional — no
+decline path, since there's nothing to decline into (matches this destination's own existing
+nav-graph comment, "required, not optional like the next screen").
+
+**Closes a gap `TierSelectionFragment`/`TierConfirmationFragment` deliberately left open.**
+Both screens run earlier in the flow (screens 4/4a vs. this screen's 6) but
+`TierTransitionUseCase.selectInitialTier` requires a non-null `onboardingConsentVersion`
+argument at call time, so both wrote a plain placeholder constant
+(`"unversioned-pre-consent-copy"`) with an explicit kdoc instruction: bump it once Core Data
+Consent has real content, not before. Rather than bump that shared constant from a screen that
+doesn't own it, `CoreDataConsentFragment` instead **overwrites** whatever value is on the
+user's row with a real version (`CONSENT_VERSION = "v1"`) the moment the user actually reaches
+and agrees to this screen's copy — the version now genuinely describes "the consent copy this
+user agreed to," which the placeholder never could, since it was written before any such copy
+existed. Both tier screens' kdocs updated to point at this resolution instead of describing an
+open gap.
+
+**Versioning scheme:** a plain hand-bumped literal, not derived from a hash or resource id —
+checked, nothing currently reads or compares `onboardingConsentVersion` programmatically
+(display/storage only), so there's no migration logic this scheme needs to satisfy yet. Bump
+by hand if this screen's copy is ever materially rewritten.
+
+**No DAO round-trip test file for this screen, deliberately** — the write is a single
+unconditional field overwrite with no branch logic (unlike `GoalDefinitionFragment`'s genuine
+insert-vs-update split), so a DAO-level test wouldn't catch anything the compiler doesn't
+already guarantee. Revisit if this screen ever grows a second write path.
+
+**Same standing caveat as every other new file in this project until it's been through real
+CI:** manually cross-checked (XML well-formedness, every resource reference resolves, brace/
+paren balance), not compiled — no Android/Kotlin compiler in this authoring sandbox. Push, let
+CI confirm, then this note graduates the same way §5.21/§5.22 did before it. On-device
+verification is a separate, still-open step after that.
 
 ---
 

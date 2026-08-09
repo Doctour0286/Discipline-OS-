@@ -44,7 +44,7 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-09 (through §5.5/§5.9/§5.10/§5.15 resolution and implementation)
+**Last synced to ROADMAP.md:** 2026-08-09 (through §5.23 — Welcome/Tier Explanation merge, Core Data Consent)
 
 ---
 
@@ -68,7 +68,7 @@ check.
 | 0.5 — Real Build Verification (CI) | ✅ | Gradle/CI pipeline itself confirmed working. |
 | 1 — Domain / Use-Case Layer | 🟢 | Functionally complete. §5.9's tier-floor gap resolved (see MVP table below) — no open spec gaps remain. |
 | 2 — Core Enforcement Loop | ✅ | Interception loop confirmed on-device via `DebugSeeder` (no real Mission-creation UI yet, so seeding is still required to trigger it). |
-| 3 — Onboarding & Core UI | 🟡 | See screen-by-screen table below. Tier Selection/Confirmation and Mission Profile Setup are merged to `main` (was previously noted as unmerged — stale, corrected here). |
+| 3 — Onboarding & Core UI | 🟡 | See screen-by-screen table below. Welcome, Goal Definition, Tier Explanation, Tier Selection/Confirmation, Mission Profile Setup, and Core Data Consent all have real content and are merged to `main` (or, for Core Data Consent, written this session — see `ROADMAP.md` §5.23). Iron Calibration Gate, Unsupervised Reliability Opt-In, and First Mission Scheduling remain placeholders. |
 | 4 — Behavioral Fingerprint / Predictive Failure (F1–F5) | ⬜ | Not started. Depends on Phase 3's alert-card pattern existing to render into. |
 | 5 — Pilot & Hypothesis Resolution | ⬜ | Not started. No new app code — this is "use it, gather data, resolve `[HYPOTHESIS]` constants." |
 
@@ -86,15 +86,15 @@ and `git log main --oneline -5` for ground truth rather than trusting this note 
 
 | # | Screen | Status | Notes |
 |---|---|---|---|
-| 1 | Welcome / Product Philosophy | ⬜ | Placeholder (`OnboardingPlaceholderFragment`) |
-| 2 | Goal Definition | ⬜ | Placeholder — **blocks** Mission Profile Setup's §2.8 default-suggestions requirement |
-| 3 | Tier Explanation | ⬜ | Placeholder |
+| 1 | Welcome / Product Philosophy | 🟡 | Merged to `main` (2026-08-09, `merge-welcome-and-tier-explanation`). Written, not yet CI-confirmed. No persistence — pure disclosure screen. |
+| 2 | Goal Definition | 🟡 | Written, not yet CI-confirmed. Has a test file (`GoalDefinitionFragmentTest.kt`). No longer blocks Mission Profile Setup's §2.8 default-suggestions requirement now that it exists, though 2.8 itself hasn't been revisited to actually consume it yet — see `BUILD_PLAN.md`. |
+| 3 | Tier Explanation | 🟡 | Merged to `main` (2026-08-09, `merge-welcome-and-tier-explanation`). Written, not yet CI-confirmed. All four tiers side-by-side, enforcement copy read from `InterceptionPolicy`'s real values. |
 | 4 | Tier Selection | ✅ | Confirmed CI + device. Merged to `main` (was previously noted unmerged — stale, corrected) |
 | 4a | ↳ Tier Confirmation | ✅ | Confirmed CI + device — Warden path only exercised so far. Merged to `main` |
 | 4b | ↳ Iron Calibration Gate | ⬜ | **Corrected 2026-08-09** (previous note was wrong): not simply "unrouted" — Iron's RadioButton is disabled at Tier Selection itself, so Iron cannot be chosen at first-time onboarding at all, by design. The gate destination/action exist for a different, currently unmodeled flow (an existing user reaching Iron later via `TierTransitionUseCase.activateIron`), not for anything reachable in the current onboarding sequence. See `BUILD_PLAN.md` Batch B for detail. |
 | 5 | Mission Profile Setup | 🟡 | Merged to `main`, has a test file (`MissionProfileSetupFragmentTest.kt`) — CI status on `main` itself not independently re-confirmed by this correction pass; verify before assuming green. |
-| 6 | Core Data Consent | ⬜ | Placeholder — next real screen to build |
-| 7 | Unsupervised Reliability Opt-In | ⬜ | Placeholder |
+| 6 | Core Data Consent | 🟡 | Written this session, not yet CI-confirmed (no compiler in this authoring sandbox — verified via static/manual review only, see the PR). Also overwrites the placeholder `onboardingConsentVersion` written earlier at Tier Selection/Confirmation with a real version (`CoreDataConsentFragment.CONSENT_VERSION`, `"v1"`) — see that Fragment's kdoc. |
+| 7 | Unsupervised Reliability Opt-In | ⬜ | Placeholder — next real screen to build |
 | 8 | First Mission Scheduling | ⬜ | Placeholder |
 
 **Other Phase 3 screens (not in the onboarding sequence):**
