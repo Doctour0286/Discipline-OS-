@@ -44,7 +44,7 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-08 (through §5.23 / Mission Profile Setup entry)
+**Last synced to ROADMAP.md:** 2026-08-09 (through §5.5/§5.9/§5.10/§5.15 resolution)
 
 ---
 
@@ -66,7 +66,7 @@ check.
 |---|---|---|
 | 0 — Data Layer | ✅ | Entities, dual encrypted DBs, event-sourced Ledger, formula tests. |
 | 0.5 — Real Build Verification (CI) | ✅ | Gradle/CI pipeline itself confirmed working. |
-| 1 — Domain / Use-Case Layer | 🟢 | Functionally complete; one spec gap open (§5.9, tier-floor values missing from spec, not an engineering task). |
+| 1 — Domain / Use-Case Layer | 🟢 | Functionally complete. §5.9's tier-floor gap resolved (see MVP table below) — no open spec gaps remain. |
 | 2 — Core Enforcement Loop | ✅ | Interception loop confirmed on-device via `DebugSeeder` (no real Mission-creation UI yet, so seeding is still required to trigger it). |
 | 3 — Onboarding & Core UI | 🟡 | See screen-by-screen table below. Tier Selection/Confirmation and Mission Profile Setup exist on the unmerged `onboarding-tier-selection` branch — not yet on `main`. |
 | 4 — Behavioral Fingerprint / Predictive Failure (F1–F5) | ⬜ | Not started. Depends on Phase 3's alert-card pattern existing to render into. |
@@ -111,7 +111,7 @@ current-state-of-truth until it's merged, not `main` alone.
 | Feature | Status | Notes |
 |---|---|---|
 | Discipline Debt + Ceiling, tier decay | ✅ | Formulas + Ledger + shared-cause guard |
-| Reputation w/ decay-based demotion | 🟢 | `demotion_triggered` threshold values missing from spec (§5.9, open) |
+| Reputation w/ decay-based demotion | 🟢 | `demotion_triggered` fully specified (§5.9, resolved: 7 tier bands + N=3, `[HYPOTHESIS]`) — not yet re-verified by CI/device since the resolution |
 | Four-Tier Enforcement + transitions | 🟢 | Upgrade/downgrade logic done; Iron path unexercised on-device |
 | Mission Enforcement (lock/allowlist loop) | ✅ | Verified via `DebugSeeder`, not yet via real UI-created Missions |
 | Distraction Interception | ✅ | |
@@ -128,12 +128,19 @@ current-state-of-truth until it's merged, not `main` alone.
 
 ## Open decisions needing sign-off (full detail in ROADMAP.md §5)
 
-| § | One-line summary |
+**None open as of this sync.** §5.5, §5.9, §5.10, and §5.15 — the four items previously
+listed here — were all resolved in a single product-owner sign-off session on 2026-08-09.
+Full rationale for each lives in `ROADMAP.md` §5; not duplicated here.
+
+| § | Resolved as |
 |---|---|
-| 5.5 | Shared-cause guard has no rolling-window cutoff — safe-direction default chosen, real window value still needed (Phase 5 data or explicit "doesn't matter" call) |
-| 5.9 | `demotion_triggered`'s `tier_floor`/`N` values are **absent from the spec**, not just unvalidated — needs a spec-doc decision, not engineering |
-| 5.10 | Crisis-stabilization pause reused to also gate Reputation decay, not just Debt — judgment call, not spec-stated |
-| 5.15 | Explicit Downgrade's target tier (one-tier-down) — judgment call, not spec-stated |
+| 5.5 | 3-day rolling window for the shared-cause guard |
+| 5.9 | 7 Reputation tier bands (0–20/21–40/41–54/55–69/70–84/85–94/95–100) + `N=3` days, `[HYPOTHESIS]` |
+| 5.10 | Reputation decay pauses during crisis-stabilization too, same as Debt accrual |
+| 5.15 | Explicit Downgrade: one tier down, 24h rolling cooldown between uses |
+
+**New follow-up task from this session (not yet built):** §5.15's 24h cooldown needs real
+implementation in `TierTransitionUseCase.explicitDowngrade` — currently decided, not coded.
 
 ---
 

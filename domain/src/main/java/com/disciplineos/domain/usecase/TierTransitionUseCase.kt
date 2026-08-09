@@ -80,6 +80,17 @@ class TierTransitionUseCase(
      * accepting a caller-supplied one, since requiring or even offering a reason field on
      * this specific control would add exactly the friction §12.4.2 says this path must not
      * have.
+     *
+     * **Target tier and cooldown decided (2026-08-09, ROADMAP.md §5.15) but cooldown is NOT
+     * YET IMPLEMENTED here.** Product-owner sign-off: one tier down per use (already how the
+     * caller in [com.disciplineos.app.enforcement.MissionInterceptionActivity.oneTierDown]
+     * computes [toTier]), plus a **24-hour rolling cooldown** between uses — tracked from the
+     * timestamp of the last use, not a calendar-day reset, to avoid a midnight-boundary
+     * loophole. This method currently has no cooldown enforcement at all; a caller can invoke
+     * it repeatedly with no restriction. Do not treat this as "done" for §5.15 purposes until
+     * the cooldown check exists (likely a new `User` field for last-use timestamp, checked
+     * here or in the caller before invoking) and is CI-verified. See ROADMAP.md §5.15 for
+     * full rationale.
      */
     suspend fun explicitDowngrade(userId: UUID, toTier: Tier, now: Instant = Instant.now()) =
         transition(userId, toTier, TierEventKind.EXPLICIT_DOWNGRADE, reasonNote = null, now = now)
