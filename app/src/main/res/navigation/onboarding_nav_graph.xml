@@ -23,10 +23,11 @@
     replacement unchanged, since other Fragments will navigate by action ID, not by re-deriving
     the sequence each time.
 
-    **As of this pass:** unsupervisedReliabilityOptInFragment also has real content now
-    (UnsupervisedReliabilityOptInFragment) — see that destination's own comment below. Only
-    ironCalibrationGateFragment and firstMissionSchedulingFragment remain
-    OnboardingPlaceholderFragment.
+    **As of this pass:** unsupervisedReliabilityOptInFragment and firstMissionSchedulingFragment
+    also have real content now (UnsupervisedReliabilityOptInFragment,
+    FirstMissionSchedulingFragment respectively) — see each destination's own comment below.
+    Only ironCalibrationGateFragment remains OnboardingPlaceholderFragment; see row 4b's own
+    note on why that's a deliberate, currently-correct state rather than a gap.
 
     **Iron branch status, updated:** the "known simplification" this comment used to describe
     (Tier Selection had no real tier-choice logic, so neither action from it was ever truly
@@ -193,19 +194,16 @@
             app:destination="@id/firstMissionSchedulingFragment" />
     </fragment>
 
-    <!-- 8. First Mission Scheduling — §2.9, closes onboarding. No next destination: this
-         Fragment declares no outgoing <action>, so OnboardingPlaceholderFragment's
-         findNavController().currentDestination?.actions lookup comes back empty and it hides
-         its Next button rather than wiring it to a no-op — see that class's kdoc. Real
-         "onboarding complete -> hand off to Mission enforcement" transition is a Phase 3 item
-         for when this screen gets real content, not something to fake here. -->
+    <!-- 8. First Mission Scheduling — §2.9, closes onboarding. Real content as of this pass:
+         FirstMissionSchedulingFragment replaces OnboardingPlaceholderFragment here. No
+         title/stepNumber/totalSteps arguments, same reasoning as every other real-content
+         destination in this graph. Still no outgoing <action> — this Fragment creates the
+         first real Mission row (see its own kdoc) but does not navigate anywhere further;
+         real "onboarding complete -> hand off to Mission enforcement" transition remains a
+         later item, not something this pass fakes just to have a destination to point at. -->
     <fragment
         android:id="@+id/firstMissionSchedulingFragment"
-        android:name="com.disciplineos.app.onboarding.OnboardingPlaceholderFragment"
-        android:label="First Mission Scheduling">
-        <argument android:name="title" app:argType="string" android:defaultValue="First Mission Scheduling" />
-        <argument android:name="stepNumber" app:argType="integer" android:defaultValue="8" />
-        <argument android:name="totalSteps" app:argType="integer" android:defaultValue="8" />
-    </fragment>
+        android:name="com.disciplineos.app.onboarding.FirstMissionSchedulingFragment"
+        android:label="First Mission Scheduling" />
 
 </navigation>

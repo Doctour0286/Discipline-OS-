@@ -313,4 +313,22 @@
     <string name="unsupervised_reliability_enable_button">Enable and continue</string>
     <string name="unsupervised_reliability_skip_button">Skip for now</string>
 
+    <!--
+        §2.9 First Mission Scheduling. Spec's own text: the schedule-vs-start-now choice is
+        "the first data point for Self-Initiation Trend (Data Model doc §3.6)... even though
+        it's measurement-only and doesn't affect this screen's design" — so intro copy below
+        does not mention that fact or nudge toward either option; it's neutral by design, not
+        an oversight. Closes onboarding: no further screen is referenced from this one.
+    -->
+    <string name="first_mission_scheduling_step_progress">Step 8 of 8</string>
+    <string name="first_mission_scheduling_title">Start your first Mission</string>
+    <string name="first_mission_scheduling_intro_body">You can jump in right now, or schedule your first Mission for a specific time. Either way, it\'ll use the Mission Profile you just set up.</string>
+    <string name="first_mission_scheduling_start_now_button">Start now</string>
+    <string name="first_mission_scheduling_schedule_label">Or schedule it for later</string>
+    <string name="first_mission_scheduling_schedule_hint">e.g. 2026-08-10 09:00</string>
+    <string name="first_mission_scheduling_schedule_format_note">Enter a date and time as yyyy-MM-dd HH:mm, in your device\'s local time.</string>
+    <string name="first_mission_scheduling_schedule_button">Schedule Mission</string>
+    <string name="first_mission_scheduling_invalid_time">That doesn\'t look like a valid date/time. Use the format shown above.</string>
+    <string name="first_mission_scheduling_no_profile">No Mission Profile was found to start from. Go back and finish Mission Profile Setup first.</string>
+
 </resources>
