@@ -44,7 +44,9 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-09 (through §5.5/§5.9/§5.10/§5.15 resolution)
+**Last synced to ROADMAP.md:** 2026-08-09 (§5.5/§5.9/§5.10/§5.15 resolution, plus a
+branch-merge staleness correction — see "Branch note" and Iron Calibration Gate row below for
+what was wrong and why)
 
 ---
 
@@ -68,14 +70,17 @@ check.
 | 0.5 — Real Build Verification (CI) | ✅ | Gradle/CI pipeline itself confirmed working. |
 | 1 — Domain / Use-Case Layer | 🟢 | Functionally complete. §5.9's tier-floor gap resolved (see MVP table below) — no open spec gaps remain. |
 | 2 — Core Enforcement Loop | ✅ | Interception loop confirmed on-device via `DebugSeeder` (no real Mission-creation UI yet, so seeding is still required to trigger it). |
-| 3 — Onboarding & Core UI | 🟡 | See screen-by-screen table below. Tier Selection/Confirmation and Mission Profile Setup exist on the unmerged `onboarding-tier-selection` branch — not yet on `main`. |
+| 3 — Onboarding & Core UI | 🟡 | See screen-by-screen table below. Tier Selection/Confirmation and Mission Profile Setup are merged to `main` (was previously noted as unmerged — stale, corrected here). |
 | 4 — Behavioral Fingerprint / Predictive Failure (F1–F5) | ⬜ | Not started. Depends on Phase 3's alert-card pattern existing to render into. |
 | 5 — Pilot & Hypothesis Resolution | ⬜ | Not started. No new app code — this is "use it, gather data, resolve `[HYPOTHESIS]` constants." |
 
-**Branch note:** as of this sync, `main` is 3 commits *behind* `onboarding-tier-selection`,
-which has Tier Selection/Confirmation, Mission Profile Setup, and a restore of CI-workflow/
-executable-bit state lost in an earlier zip round-trip. Treat `onboarding-tier-selection` as
-current-state-of-truth until it's merged, not `main` alone.
+**Branch note (corrected 2026-08-09, was stale):** `onboarding-tier-selection` merged to
+`main` some time ago — this section previously said otherwise. `main` also now has
+`add-status-sync-check` and `resolve-open-decisions` merged. Still unmerged as of this
+correction: `implement-decided-follow-ups` (§5.5/§5.9/§5.15 implementation, DB v4→v5) and
+`build-plan-document` (this file's own branch, plus `BUILD_PLAN.md`). Check `git branch -r`
+and `git log main --oneline -5` for ground truth rather than trusting this note indefinitely
+— this exact staleness is why that check is worth doing rather than skipping.
 
 ---
 
@@ -86,10 +91,10 @@ current-state-of-truth until it's merged, not `main` alone.
 | 1 | Welcome / Product Philosophy | ⬜ | Placeholder (`OnboardingPlaceholderFragment`) |
 | 2 | Goal Definition | ⬜ | Placeholder — **blocks** Mission Profile Setup's §2.8 default-suggestions requirement |
 | 3 | Tier Explanation | ⬜ | Placeholder |
-| 4 | Tier Selection | ✅ | Confirmed CI + device (on `onboarding-tier-selection`, unmerged) |
-| 4a | ↳ Tier Confirmation | ✅ | Confirmed CI + device — Warden path only exercised so far |
-| 4b | ↳ Iron Calibration Gate | ⬜ | Destination exists in nav graph; nothing routes to it yet (Iron path unexercised) |
-| 5 | Mission Profile Setup | 🟡 | Written on `onboarding-tier-selection`, not yet CI-confirmed |
+| 4 | Tier Selection | ✅ | Confirmed CI + device. Merged to `main` (was previously noted unmerged — stale, corrected) |
+| 4a | ↳ Tier Confirmation | ✅ | Confirmed CI + device — Warden path only exercised so far. Merged to `main` |
+| 4b | ↳ Iron Calibration Gate | ⬜ | **Corrected 2026-08-09** (previous note was wrong): not simply "unrouted" — Iron's RadioButton is disabled at Tier Selection itself, so Iron cannot be chosen at first-time onboarding at all, by design. The gate destination/action exist for a different, currently unmodeled flow (an existing user reaching Iron later via `TierTransitionUseCase.activateIron`), not for anything reachable in the current onboarding sequence. See `BUILD_PLAN.md` Batch B for detail. |
+| 5 | Mission Profile Setup | 🟡 | Merged to `main`, has a test file (`MissionProfileSetupFragmentTest.kt`) — CI status on `main` itself not independently re-confirmed by this correction pass; verify before assuming green. |
 | 6 | Core Data Consent | ⬜ | Placeholder — next real screen to build |
 | 7 | Unsupervised Reliability Opt-In | ⬜ | Placeholder |
 | 8 | First Mission Scheduling | ⬜ | Placeholder |
