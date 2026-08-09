@@ -782,6 +782,29 @@ judgment call from this pass, needs sign-off before Phase 5: which Reputation ba
 (Operator↔INCONSISTENT, Warden↔RELIABLE, Iron↔DISCIPLINED) — see
 `ApplyReputationDecayUseCase`'s kdoc.
 
+**Updated 2026-08-09 (reviewed before merge, separate session) — two issues found and fixed
+in the above, neither caught by the authoring session since no compiler was reachable there
+either:**
+1. **Real bug:** `TierTransitionUseCase.explicitDowngrade`'s cooldown check had an inverted
+   boolean (`elapsed < cooldown` where `elapsed >= cooldown` was intended) — it would have
+   blocked users whose cooldown had genuinely elapsed and let through users mid-cooldown, the
+   exact opposite of §5.15's purpose. Caught by manually tracing the patch's own three
+   boundary tests (23h/24h/25h) against the literal code before applying it — all three would
+   have failed had a real compiler run them. Fixed; see the method's inline comment for the
+   corrected logic and reasoning.
+2. **Design fix, not a bug:** `ApplyReputationDecayUseCase` originally wrote demotion
+   `TierEvent`s directly via `TierDao`, bypassing `TierTransitionUseCase.standardDowngrade`
+   even though its own kdoc described calling that method. Confirmed `standardDowngrade`'s
+   internals do nothing beyond what was being duplicated (no missed side effect), so this
+   wasn't a correctness bug — but fixed to actually call `standardDowngrade`, removing the
+   duplication. Required restructuring `execute()` so the tier-change call happens outside
+   the method's own `withTransaction` block (see that method's kdoc for why) — a real,
+   non-obvious ordering constraint worth understanding before touching this method again.
+
+Net: this is a concrete example of why every change gets reviewed before merge rather than
+pushed straight through, especially given no session in this project's history has had a
+working compiler — see STATUS.md's standing gaps list.
+
 **Updated 2026-08-08 (§5.22) — items 2–6 below predate Tier Selection/Confirmation's
 CI+device confirmation and Mission Profile Setup's construction; left as history, not
 current status. Read this paragraph first, then treat the numbered list as background, not

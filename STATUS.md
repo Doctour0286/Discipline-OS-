@@ -147,6 +147,14 @@ Written but **not yet run through a real compiler** — no Gradle/Android toolch
 from the authoring sandbox (same standing gap noted elsewhere in this file). Run
 `./gradlew :domain:test :data:test` before merging.
 
+**Reviewed and corrected before merge (separate session, same day):** two issues found by
+manually tracing the code against its own tests before applying — (1) a real inverted-boolean
+bug in the §5.15 cooldown check that would have blocked available attempts and allowed
+mid-cooldown ones, now fixed; (2) §5.9's demotion firing bypassed `TierTransitionUseCase`
+instead of reusing it, now fixed to call `standardDowngrade` properly. Full detail in
+`ROADMAP.md`'s matching entry. Neither issue would have been caught without this review step —
+worth remembering for every future patch, not just this one.
+
 **One open judgment call from this work, flagged for sign-off before Phase 5:** §5.9's bands
 describe Reputation *value* ranges, not tiers — nothing in the PRD/Data Model doc states which
 band each tier's "floor" is. Implementation assumes tier rank position maps to band rank

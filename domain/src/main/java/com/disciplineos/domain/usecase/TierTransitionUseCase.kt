@@ -124,7 +124,21 @@ class TierTransitionUseCase(
             val lastUse = user.lastExplicitDowngradeAt
             if (lastUse != null) {
                 val elapsed = Duration.between(lastUse, now)
-                check(!elapsed.isNegative && elapsed < explicitDowngradeCooldown) {
+                // BUGFIX (caught in review before merge, 2026-08-09): this condition was
+                // originally written as `!elapsed.isNegative && elapsed < explicitDowngradeCooldown`,
+                // which is inverted — check() throws when its argument is FALSE, so that
+                // version threw exactly when the cooldown HAD elapsed (elapsed >= cooldown
+                // makes `elapsed < cooldown` false) and passed silently when it hadn't
+                // (elapsed < cooldown is true while still within the blocked window). The
+                // three boundary tests below this class (23h/24h/25h) were written against
+                // the *intended* behavior and would have failed against that version had they
+                // been run through a real compiler — confirms why review-before-merge matters
+                // when nothing in the authoring loop can compile Kotlin/Android code.
+                // Correct intent: throw (block) only while elapsed < cooldown; once
+                // elapsed >= cooldown, allow it. A negative elapsed (clock skew / lastUse in
+                // the future) is treated as "cooldown not satisfied" (blocked), matching the
+                // conservative direction — never let clock skew accidentally bypass the gate.
+                check(!elapsed.isNegative && elapsed >= explicitDowngradeCooldown) {
                     "explicitDowngrade blocked by 24h rolling cooldown for user $userId: " +
                         "last used at $lastUse, now $now, elapsed ${elapsed.toMinutes()}min, " +
                         "cooldown ${explicitDowngradeCooldown.toHours()}h (ROADMAP.md §5.15)"

@@ -54,7 +54,12 @@ class ApplyReputationDecayUseCaseTest {
             userDao = db.userDao(),
             missionDao = db.missionDao(),
             ledgerDao = db.ledgerDao(),
-            tierDao = db.tierDao(),
+            tierTransitionUseCase = TierTransitionUseCase(
+                database = db,
+                userDao = db.userDao(),
+                tierDao = db.tierDao(),
+                missionDao = db.missionDao(),
+            ),
             policy = HypothesisReputationDecayPolicy(),
         )
     }
