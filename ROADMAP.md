@@ -2067,3 +2067,85 @@ verification is a separate, still-open step after that.
 - **When a spec doc's own Open Questions (PRD §42) get resolved by real data (Phase 5),**
   update both the spec doc itself (bump its version per its own revision-note convention)
   and this roadmap — don't let the roadmap and the spec drift apart on what's still open.
+
+---
+
+### 5.24 — RESOLVED, written this session, not yet CI-confirmed — First Mission Scheduling
+(§2.9) given real content, closing onboarding; STATUS.md branch note corrected a second time
+
+**Part one: STATUS.md correction.** The "Branch note" section and the Unsupervised Reliability
+Opt-In row both still said `onboarding-unsupervised-reliability-opt-in` was unmerged — it had
+actually been merged to `main` as PR #12 in the session that wrote it. `implement-decided-
+follow-ups` and `build-plan-document`, also listed there as unmerged, no longer exist as
+remote branches at all (`git branch -r` confirms) — likely already merged and deleted, but not
+independently re-verified this pass beyond confirming they're gone. Both corrected in place.
+Second time this exact section has needed a correction — worth treating as a standing hazard
+for this doc specifically (a narrative note describing branch state ages faster than the
+merges it's describing), not a one-off mistake.
+
+**Part two: First Mission Scheduling (§2.9).** `FirstMissionSchedulingFragment` replaces
+`OnboardingPlaceholderFragment` at `firstMissionSchedulingFragment` — the last remaining real
+screen in the onboarding sequence (Iron Calibration Gate stays a placeholder deliberately, see
+row 4b of STATUS.md's screen table). Two actions, per spec's "schedule vs. start-now choice is
+itself the first data point for Self-Initiation Trend (§3.6)" language: **Start now** creates a
+`Mission` row with `scheduledStart = null`, `status = ACTIVE`, `actualStart = now()`; **Schedule
+Mission** takes a plain `yyyy-MM-dd HH:mm` text field (parsed via `DateTimeFormatter`, same
+plain-`EditText`-over-a-picker precedent `MissionProfileSetupFragment`'s layout already set)
+and writes that parsed time as `scheduledStart` instead. Neither button is styled as the
+recommended path — spec is explicit that this choice "doesn't affect this screen's design"
+despite being a real measurement, so the screen doesn't nudge either way.
+
+**This is the first real call site that ever sets `Mission.scheduledStart` to anything other
+than an implicit always-null placeholder** — every existing Mission-creating code (`DebugSeeder`,
+every `:domain` use-case test) has only ever needed `ACTIVE`/`COMPLETED`/`VIOLATED` rows for
+scoring-formula testing, never touched this field meaningfully. `Mission.kt`'s own kdoc already
+documented the field's intended meaning ("null means ad hoc — feeds Self-Initiation Trend")
+before any code actually wrote a non-null value here — this pass is what makes that comment
+true in practice, not just in the entity's own documentation.
+
+**Reads the `MissionProfile` `Mission Profile Setup` (§2.8) already wrote** — same
+`MissionProfileDao.mostRecentFor(userId)` query that screen's own re-entry guard already
+relies on — and carries its `allowlist`/`blocklist`/`id` straight onto the new `Mission` row.
+A null profile (should be unreachable via this graph's own ordering) shows an inline error and
+creates no row, rather than crashing — same defensive posture every other screen in this
+package already takes for its own equivalent "should be impossible, handle gracefully anyway"
+case.
+
+**Two judgment calls, both `[HYPOTHESIS]`, both flagged in the Fragment's own kdoc rather than
+silently assumed:**
+1. **`Mission.plannedDurationMin`** has no spec-mandated value anywhere in §2.9, the Data Model
+   doc, or the PRD. This pass hardcodes a fixed default (25 minutes) rather than adding a
+   duration picker this screen was never asked to have. Revisit once a real duration control
+   exists somewhere upstream (Mission Profile Setup or a future Mission Launch Protocol screen)
+   to source this from instead of a bare constant.
+2. **Both "Start now" and "Schedule Mission" set `status = ACTIVE` immediately**, including the
+   scheduled case, where the Mission hasn't actually started yet at the moment the row is
+   created. No status exists in `MissionStatus` for "scheduled, not yet started" — the Data
+   Model doc only ever describes `scheduledStart` as a nullable field on the existing
+   four-status enum, never as implying a fifth status — so this pass reuses `ACTIVE` rather
+   than inventing one unprompted. A real Mission Launch Protocol screen (PRD §7), if/when
+   built, would likely need to properly gate a scheduled Mission's actual activation instead of
+   this shortcut — noted here so that future work doesn't have to rediscover the gap from
+   scratch.
+
+**No re-entry guard, deliberately** — unlike Mission Profile Setup's genuine "don't create a
+second Profile" guard, creating a second Mission for the same user on a repeat visit to this
+screen is correct behavior (that's what using the app a second time looks like), not a bug to
+defend against.
+
+**Test file**: `FirstMissionSchedulingFragmentTest.kt`, same DAO-level round-trip strategy as
+every other screen-level test in this package — covers the null-vs-non-null `scheduledStart`
+branch, the allowlist/blocklist/missionProfileId carry-over from the existing `MissionProfile`,
+the missing-profile edge case, and confirms no re-entry guard blocks a second Mission.
+
+**Same standing caveat as every other new file in this project until it's been through real
+CI:** manually cross-checked (XML well-formedness, every `R.layout`/`R.id`/`R.string` reference
+in the new Fragment resolves to a real declaration in the new layout/strings.xml additions,
+`Mission`/`MissionProfile` constructor calls checked against each entity's actual field order
+and types) — no Android/Kotlin compiler reachable in this authoring sandbox (`./gradlew
+--version` fails: `services.gradle.org` isn't on this sandbox's allowed network egress list,
+same standing gap noted elsewhere in this file). Push, let CI confirm, then this note graduates
+the same way §5.21/§5.22/§5.23 did before it. On-device verification is a separate, still-open
+step after that — and this screen, being the one that finally exercises the real
+Mission-creation path (as opposed to `DebugSeeder`'s synthetic rows), is a meaningfully higher-
+value on-device check than most of onboarding's other screens once CI is green.

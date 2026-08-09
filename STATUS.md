@@ -44,7 +44,7 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-09 (through §5.23 — Welcome/Tier Explanation merge, Core Data Consent)
+**Last synced to ROADMAP.md:** 2026-08-09 (through §5.24 — First Mission Scheduling, STATUS.md branch-note correction)
 
 ---
 
@@ -68,17 +68,22 @@ check.
 | 0.5 — Real Build Verification (CI) | ✅ | Gradle/CI pipeline itself confirmed working. |
 | 1 — Domain / Use-Case Layer | 🟢 | Functionally complete. §5.9's tier-floor gap resolved (see MVP table below) — no open spec gaps remain. |
 | 2 — Core Enforcement Loop | ✅ | Interception loop confirmed on-device via `DebugSeeder` (no real Mission-creation UI yet, so seeding is still required to trigger it). |
-| 3 — Onboarding & Core UI | 🟡 | See screen-by-screen table below. Welcome, Goal Definition, Tier Explanation, Tier Selection/Confirmation, Mission Profile Setup, Core Data Consent, and Unsupervised Reliability Opt-In all have real content — merged to `main`, except Core Data Consent and Unsupervised Reliability Opt-In, both written but not yet merged (see `ROADMAP.md` §5.23 and this session's entry). Iron Calibration Gate and First Mission Scheduling remain placeholders. |
+| 3 — Onboarding & Core UI | 🟡 | See screen-by-screen table below. Every onboarding screen except Iron Calibration Gate now has real content. Welcome, Goal Definition, Tier Explanation, Tier Selection/Confirmation, Mission Profile Setup, Core Data Consent, and Unsupervised Reliability Opt-In are merged to `main`. First Mission Scheduling is written this session (branch `onboarding-first-mission-scheduling`, see `ROADMAP.md` §5.24), not yet merged. Iron Calibration Gate remains a placeholder — deliberately, not a gap (see row 4b below). |
 | 4 — Behavioral Fingerprint / Predictive Failure (F1–F5) | ⬜ | Not started. Depends on Phase 3's alert-card pattern existing to render into. |
 | 5 — Pilot & Hypothesis Resolution | ⬜ | Not started. No new app code — this is "use it, gather data, resolve `[HYPOTHESIS]` constants." |
 
-**Branch note (corrected 2026-08-09, was stale):** `onboarding-tier-selection` merged to
-`main` some time ago — this section previously said otherwise. `main` also now has
-`add-status-sync-check` and `resolve-open-decisions` merged. Still unmerged as of this
-correction: `implement-decided-follow-ups` (§5.5/§5.9/§5.15 implementation, DB v4→v5) and
-`build-plan-document` (this file's own branch, plus `BUILD_PLAN.md`). Check `git branch -r`
-and `git log main --oneline -5` for ground truth rather than trusting this note indefinitely
-— this exact staleness is why that check is worth doing rather than skipping.
+**Branch note (corrected 2026-08-09, was stale twice over):** `onboarding-tier-selection`
+merged to `main` some time ago — this section previously said otherwise. `main` also now has
+`add-status-sync-check`, `resolve-open-decisions`, `merge-welcome-and-tier-explanation`
+(PR #10), `core-data-consent-screen` (PR #11), and `onboarding-unsupervised-reliability-opt-in`
+(PR #12) all merged — the last of these was still listed as unmerged in the previous version
+of this note, which was itself already wrong about two other branches. `implement-decided-
+follow-ups` and `build-plan-document`, previously listed here as unmerged, no longer exist as
+remote branches at all — most likely merged and deleted, but not independently confirmed by
+this pass; if their content matters, verify via `git log main` rather than trusting that
+inference. Check `git branch -r` and `git log main --oneline -10` for ground truth rather than
+trusting this note indefinitely — this exact staleness, twice in a row, is why that check is
+worth doing every session rather than skipping it.
 
 ---
 
@@ -94,8 +99,8 @@ and `git log main --oneline -5` for ground truth rather than trusting this note 
 | 4b | ↳ Iron Calibration Gate | ⬜ | **Corrected 2026-08-09** (previous note was wrong): not simply "unrouted" — Iron's RadioButton is disabled at Tier Selection itself, so Iron cannot be chosen at first-time onboarding at all, by design. The gate destination/action exist for a different, currently unmodeled flow (an existing user reaching Iron later via `TierTransitionUseCase.activateIron`), not for anything reachable in the current onboarding sequence. See `BUILD_PLAN.md` Batch B for detail. |
 | 5 | Mission Profile Setup | 🟡 | Merged to `main`, has a test file (`MissionProfileSetupFragmentTest.kt`) — CI status on `main` itself not independently re-confirmed by this correction pass; verify before assuming green. |
 | 6 | Core Data Consent | 🟡 | Written this session, not yet CI-confirmed (no compiler in this authoring sandbox — verified via static/manual review only, see the PR). Also overwrites the placeholder `onboardingConsentVersion` written earlier at Tier Selection/Confirmation with a real version (`CoreDataConsentFragment.CONSENT_VERSION`, `"v1"`) — see that Fragment's kdoc. |
-| 7 | Unsupervised Reliability Opt-In | 🟡 | Written this session (branch `onboarding-unsupervised-reliability-opt-in`), not yet CI-confirmed (no compiler in this authoring sandbox — verified via static/manual review only, see the PR). Genuinely optional per §2.7/PRD §13.4 — Enable and Skip both route to the same next screen. Writes the previously-unused `User.unsupervisedReliabilityOptIn`/`optInAt` fields. New `OnboardingScreenEvent` table (DB v6→v7) instruments completion/drop-off per the spec's own explicit ask — see `OnboardingScreenEvent.kt` kdoc for why this is a narrow, screen-scoped log rather than general analytics. Has a test file (`UnsupervisedReliabilityOptInFragmentTest.kt`). |
-| 8 | First Mission Scheduling | ⬜ | Placeholder — next real screen to build |
+| 7 | Unsupervised Reliability Opt-In | 🟡 | Merged to `main` (PR #12, `onboarding-unsupervised-reliability-opt-in`) — previously listed here as unmerged; corrected. Still not CI-confirmed (no compiler in this authoring sandbox — verified via static/manual review only, see the PR). Genuinely optional per §2.7/PRD §13.4 — Enable and Skip both route to the same next screen. Writes the previously-unused `User.unsupervisedReliabilityOptIn`/`optInAt` fields. New `OnboardingScreenEvent` table (DB v6→v7) instruments completion/drop-off per the spec's own explicit ask — see `OnboardingScreenEvent.kt` kdoc for why this is a narrow, screen-scoped log rather than general analytics. Has a test file (`UnsupervisedReliabilityOptInFragmentTest.kt`). |
+| 8 | First Mission Scheduling | 🟡 | Written this session (branch `onboarding-first-mission-scheduling`), not yet CI-confirmed (no compiler in this authoring sandbox — verified via static/manual review only, see `ROADMAP.md` §5.24 and the PR). Closes onboarding — no outgoing nav action from this destination. Creates the first real `Mission` row (Start now vs. Schedule, setting `scheduledStart` meaningfully for the first time — see `FirstMissionSchedulingFragment`'s kdoc). Has a test file (`FirstMissionSchedulingFragmentTest.kt`). Two `[HYPOTHESIS]` judgment calls flagged in that kdoc: a hardcoded default Mission duration, and reusing `ACTIVE` status for a not-yet-started scheduled Mission (no "scheduled" status exists in `MissionStatus`). |
 
 **Other Phase 3 screens (not in the onboarding sequence):**
 
@@ -116,7 +121,7 @@ and `git log main --oneline -5` for ground truth rather than trusting this note 
 | Discipline Debt + Ceiling, tier decay | ✅ | Formulas + Ledger + shared-cause guard |
 | Reputation w/ decay-based demotion | 🟡 | `demotion_triggered` implemented (§5.9: 7 tier bands + N=3, `[HYPOTHESIS]`) — written, not yet CI/device-verified (no compiler in authoring sandbox) |
 | Four-Tier Enforcement + transitions | 🟢 | Upgrade/downgrade logic done; Iron path unexercised on-device |
-| Mission Enforcement (lock/allowlist loop) | ✅ | Verified via `DebugSeeder`, not yet via real UI-created Missions |
+| Mission Enforcement (lock/allowlist loop) | ✅ | Verified via `DebugSeeder`; First Mission Scheduling (§2.9, this session) is the first screen that creates a real Mission row via actual UI rather than seeding — not yet on-device verified through that specific path |
 | Distraction Interception | ✅ | |
 | Mission Profiles | 🟡 | Setup screen written, not CI-confirmed; not yet wired into real Mission creation |
 | Recovery Mode | ⬜ | Referenced by domain logic; no dedicated flow/UI |
@@ -178,11 +183,28 @@ position (Operator's floor = INCONSISTENT, Warden's = RELIABLE, Iron's = DISCIPL
 
 ## What's actually next (per ROADMAP.md §4, condensed)
 
-1. Merge `onboarding-tier-selection` into `main` (or open/land its PR) — `main` is currently stale relative to real progress.
-2. Confirm Mission Profile Setup's CI status on that branch.
-3. On-device verify Mission Profile Setup the same way Tier Selection was verified.
-4. Build Core Data Consent (§2.6) — Mission Profile Setup's nav action already points there. **Done** (written, PR #11, merged).
-5. Separately: build Goal Definition (§2.2) — it's the actual blocker for Mission Profile Setup's missing "default suggestions" behavior, not strictly ordered before/after #4. **Done** (written, merged).
-6. Build Unsupervised Reliability Opt-In (§2.7) — Core Data Consent's nav action already points there. **Done this session** (branch `onboarding-unsupervised-reliability-opt-in`, not yet merged — see PR).
-7. Build First Mission Scheduling (§2.9) — closes onboarding. The one remaining real screen in Batch B's sequence besides Iron Calibration Gate (§2.5, blocked on the separate "Tier Selection outside onboarding" flow not existing yet — see row 4b above).
-8. Revisit Mission Profile Setup (§2.8) to actually wire in Goal Definition's flagged-categories default suggestions — the requirement is unblocked (step 5) but not yet consumed.
+Everything through Core Data Consent, Goal Definition, and Unsupervised Reliability Opt-In is
+merged to `main` (corrected this session — see the Branch note above). **Done, this session:**
+First Mission Scheduling (§2.9) — written, branch `onboarding-first-mission-scheduling`, not
+yet merged (see `ROADMAP.md` §5.24 and the PR). That closes the onboarding sequence itself —
+every screen except Iron Calibration Gate (deliberately deferred, row 4b) now has real content.
+
+Real remaining items, in rough priority order:
+
+1. **Merge `onboarding-first-mission-scheduling`** once CI confirms it green.
+2. **Revisit Mission Profile Setup (§2.8)** to wire in Goal Definition's flagged-categories
+   default suggestions — unblocked since Goal Definition merged, but still not consumed.
+3. **On-device verify First Mission Scheduling** specifically the real-Mission-creation path
+   (Start now and Schedule both) — this is the first screen that exercises Mission creation
+   through actual UI rather than `DebugSeeder`, so it's a meaningfully higher-value on-device
+   check than most onboarding screens got.
+4. **Resolve the two `[HYPOTHESIS]` items §5.24 flagged**: a hardcoded default Mission
+   duration with no spec source, and reusing `ACTIVE` status for a scheduled-but-not-yet-
+   started Mission (no dedicated status exists for that state).
+5. **CI-confirm the still-unconfirmed screens** generally (Welcome, Goal Definition, Tier
+   Explanation, Core Data Consent, Unsupervised Reliability Opt-In, First Mission Scheduling) —
+   several sessions in a row have shipped "written, not compiled" work; a real CI pass across
+   all of it at once is overdue.
+6. **Phase 4 (Behavioral Fingerprint / Predictive Failure)** can start once the above settles —
+   it depends on Phase 3's alert-card pattern (§3.5 of the Onboarding spec already defines the
+   pattern in full) existing to render into, which nothing above blocks structurally.
