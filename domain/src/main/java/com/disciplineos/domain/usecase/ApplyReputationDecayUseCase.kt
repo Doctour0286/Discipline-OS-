@@ -35,16 +35,22 @@ import java.util.UUID
  * Phase 2) is expected to invoke this once per elapsed day per user; this use-case does not
  * schedule itself.
  *
- * **`demotion_triggered` is NOT implemented here.** Data Model §3.5 defines it as
- * "Reputation < tier_floor for tier N consecutive days" but neither the PRD nor the Data
- * Model doc gives `tier_floor` values for the seven ranks in §35 (Undisciplined →
- * Iron Will) or a value for `N`. Both are unflagged gaps — not marked [HYPOTHESIS] anywhere,
- * unlike the decay rate itself — which makes them a genuine missing spec, not just an
- * unvalidated constant. Per ROADMAP.md's own instruction ("if you're about to invent a
- * constant... stop"), this use-case computes and writes the running Reputation value and
- * stops there; rank-band mapping and demotion-trigger logic are left for whoever resolves
- * those two values, flagged in the class-level kdoc rather than guessed. See
- * ROADMAP.md §5 decision log for this entry.
+ * **`demotion_triggered` values are now decided (2026-08-09, ROADMAP.md §5.9) but NOT YET
+ * IMPLEMENTED in this class.** Data Model §3.5 defines the trigger as "Reputation < tier_floor
+ * for tier N consecutive days." Product-owner sign-off set, `[HYPOTHESIS]` pending Phase 5
+ * pilot data:
+ * ```
+ * Undisciplined  0–20    Relentless  70–84
+ * Inconsistent  21–40    Elite       85–94
+ * Reliable      41–54    Iron Will   95–100
+ * Disciplined   55–69
+ * N = 3 consecutive days below a rank's floor before demotion_triggered fires
+ * ```
+ * This use-case still only computes and writes the running Reputation *value* — rank-band
+ * mapping and demotion-trigger firing logic (walking the table above, tracking consecutive
+ * days below floor, emitting a demotion event) are a scoped follow-up task, not yet written.
+ * Do not treat this class as "done" for §5.9 purposes until that logic exists and is
+ * CI-verified. See ROADMAP.md §5.9 for full rationale.
  *
  * **Crisis stabilization pause — a judgment call, not directly specified.** PRD §12.4.3
  * states Crisis Downgrade "pauses debt accrual" and is "a stabilization event, not a

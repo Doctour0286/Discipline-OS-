@@ -688,7 +688,8 @@ one-time lesson from Phase 0.5.
 Phase 0 — Data Layer            █████████████████████  100% (code done, real CI green)
 Phase 1 — Domain/Use-Cases      ████████████████████░  ~95% (4 of 4 use-cases written and
                                                         passing on real CI; demotion_triggered
-                                                        rank-band gap still open, §5.9)
+                                                        rank-band VALUES decided §5.9 (2026-08-09)
+                                                        but firing logic not yet coded/CI-verified)
 Phase 2 — Enforcement Loop      ██████████████████░░░  ~85% (all logic, resources, manifest,
                                                         and tests written, self-consistent,
                                                         AND now confirmed compiling,
@@ -763,6 +764,13 @@ verification either.
 ---
 
 ## 4. Immediate next action
+
+**Updated 2026-08-09 — §5.5, §5.9, §5.10, and §5.15 are now all RESOLVED** (product owner
+sign-off session). See each section for the actual decisions. Historical item 4 below, which
+lists them as open, is superseded — left as a record of what was outstanding at the time, not
+current status. One new follow-up task exists from this session: §5.15's 24h cooldown logic
+is decided but not yet implemented in `TierTransitionUseCase.explicitDowngrade` — see §5.15
+for what's still needed.
 
 **Updated 2026-08-08 (§5.22) — items 2–6 below predate Tier Selection/Confirmation's
 CI+device confirmation and Mission Profile Setup's construction; left as history, not
@@ -997,35 +1005,40 @@ prose," which was a reasonable inference but not a citation.
 "overturned" if anyone revises that doc — flagged here rather than edited directly, since
 changing spec docs isn't this codebase's call to make unilaterally.
 
-### 5.5 — OPEN, needs your sign-off — Shared-cause guard has no rolling-window cutoff
+### 5.5 — RESOLVED — Shared-cause guard: 3-day rolling window
 
 **Where:** `domain/.../usecase/RecordViolationUseCase.clusterAlreadyHasActiveEntry()`
 
 **The gap:** Data Model §3.5 specifies the shared-cause guard should check for existing
-same-cluster consequences "within a rolling window," but no window length is given anywhere
+same-cluster consequences "within a rolling window," but no window length was given anywhere
 in the spec (unlike Reliability Index's explicit 14-day default, or the Debt Ceiling's
 explicit 14-day default).
 
-**What's implemented now:** no window at all — the guard checks for *any* active (non-reversed)
-same-cluster entry, regardless of age. This means if a `rootCauseClusterId` is reused far
-apart in time (the spec doesn't say clusters expire), a second violation in that cluster will
-never get penalized, even months later.
+**What was implemented before this decision:** no window at all — the guard checked for
+*any* active (non-reversed) same-cluster entry, regardless of age. This meant if a
+`rootCauseClusterId` was reused far apart in time, a second violation in that cluster would
+never get penalized, even months later — which silently undermines the purpose of tracking
+recurring patterns at all.
 
-**Why implemented this way rather than picking a plausible window:** picking a number (e.g.
-"same day," "7 days") would be exactly the invented-precision failure mode this project's own
-docs argue against (Data Model §3.1). An unconditional guard is the strictly safer of the two
-unvalidated options in one direction — it can only under-penalize, never double-penalize,
-which matches the spec's stated intent ("must not... without a deduplication check") even if
-it's more conservative than the spec's "rolling window" language implies.
+**Call made (product owner sign-off, this session):** implement a **3-day rolling window**.
+A same-cluster violation is deduplicated (not double-penalized) only if a prior active entry
+for that `rootCauseClusterId` exists within the last 3 days; outside that window, a repeat of
+the same root cause is treated as a new, independently-real pattern.
 
-**Why this matters enough to block on:** if `rootCauseClusterId` values get reused or
-long-lived in whatever code eventually creates Violations (not yet written), this could
-silently suppress legitimate penalties indefinitely. Needs either (a) a real window length
-once Phase 5 pilot data exists, or (b) a decision that cluster IDs are always short-lived
-enough that this doesn't matter, made explicitly rather than assumed.
+**Rationale:** an unconditional (forever) guard, while the strictly "safe" direction in the
+sense of never double-penalizing, actively works against the app's own purpose — genuinely
+recurring problems (e.g. the same excuse reused every few weeks) would be permanently
+invisible to Debt Ceiling accounting, which undermines the "effort and lapses stay real"
+principle Data Model §3.1 is built around. 3 days is long enough to cover a single genuinely
+connected cluster of misses (e.g. one bad week caused by one disruption) without either
+under- or over-counting, and short enough that a recurrence next month is correctly treated
+as a new instance of a pattern worth flagging, not a mechanical repeat of the old one. No
+external research literature gives a "correct" number for this — it is a product-scale
+judgment call, made explicitly rather than left as an unbounded default, and flagged
+`[HYPOTHESIS]` per this project's standing convention pending Phase 5 pilot data.
 
-**Action needed:** confirm the no-window behavior is acceptable for now, or supply a window
-value to encode as `[HYPOTHESIS]` (same posture as the Reputation decay rate).
+**Revisit when:** Phase 5 pilot data exists to check whether 3 days over- or under-catches
+real shared-cause clusters in practice.
 
 ### 5.6 — RESOLVED — Crisis-exit missions hard-fail in `RecordViolationUseCase`, not silently skipped
 
@@ -1124,43 +1137,36 @@ worth getting right).
 original framing, unchanged) — destructive fallback stops being acceptable the moment a
 schema bump could actually erase a real person's history, not just a developer's test data.
 
-### 5.10 — OPEN, needs your sign-off — Crisis-stabilization pause reused for Reputation decay, not just Debt
+### 5.10 — RESOLVED — Crisis-stabilization pause applies to Reputation decay too, not just Debt
 
 **Where:** `domain/.../usecase/ApplyReputationDecayUseCase.execute()`
 
 **The gap:** PRD §12.4.3 states Crisis Downgrade "pauses debt accrual" and frames the whole
 event as "a stabilization event, not a punishment event"; §12.4.4 adds that the Iron Crisis
-Exit specifically "carries no score penalty." None of this explicitly says whether
+Exit specifically "carries no score penalty." None of this explicitly said whether
 Reputation *decay* (the scheduled `decay_per_missed_day` term this use-case implements, as
 opposed to a Violation's immediate per-event Reputation penalty, which is moot here since a
 crisis-exit Mission never reaches `RecordViolationUseCase` at all) should also pause during
 the same window.
 
-**Call made:** treated `User.debtAccrualPausedUntil` as gating Reputation decay too, rather
-than adding a second field or leaving decay unaffected. Reasoning: decay is itself a
-Reputation-penalty mechanism, and continuing to silently apply it during a window the PRD
-explicitly frames as protective sits uneasily against "stabilization event, not a punishment
-event" — letting decay run during exactly the window meant to protect the user reads like
-the punishment the PRD says this isn't. Reused the existing field rather than adding
-`reputationDecayPausedUntil` as a separate column, since both `TierTransitionUseCase` paths
-that would set either field (Crisis Downgrade, Iron Crisis Exit) already set
-`debtAccrualPausedUntil` to the identical 24-hour instant, and the PRD gives no indication
-the two are meant to diverge — a second field would be schema complexity with no behavioral
-difference to justify it, at least until a scenario is identified where they should differ.
+**Call made (product owner sign-off, this session):** confirmed — `User.debtAccrualPausedUntil`
+gates Reputation decay too, not just Debt accrual, using the same field rather than a second
+one.
+
+**Rationale:** if Reputation kept quietly draining during the one window explicitly designed
+to protect the user, the app would be punishing them during the exact moment it claims not
+to be — a direct contradiction between the PRD's stated framing ("stabilization event, not a
+punishment event") and actual behavior. Pausing both mechanisms together keeps that framing
+honest rather than technically-true-but-misleading. Reusing the existing field (rather than
+adding `reputationDecayPausedUntil` separately) remains correct: both `TierTransitionUseCase`
+paths that set either field already set `debtAccrualPausedUntil` to the identical 24-hour
+instant, and no scenario has been identified where the two should diverge.
 
 **Recovery credit is NOT paused by the same window** — crediting a completed Mission during
-stabilization is never adverse to the user, so none of the "punishment event" concern above
-applies to it, and pausing it would arguably undercut the stabilization framing rather than
-support it (a user completing a Mission during a stabilization window is doing exactly what
-recovery should reward).
+stabilization is never adverse to the user, so pausing it would undercut the stabilization
+framing rather than support it.
 
-**Why this needs sign-off rather than standing as settled:** this is an inference from
-"stabilization event, not a punishment event" framing language, not a literal spec
-instruction — a defensible reading, but a reading, and the field-reuse decision means
-un-reusing it later (if the two should diverge) is a real schema change, not a one-line
-policy swap.
-
-### 5.9 — OPEN, flagged rather than guessed — `demotion_triggered`'s `tier_floor`/`N` are missing from the spec, not just unvalidated
+### 5.9 — RESOLVED — `demotion_triggered`'s `tier_floor`/`N` values, decided by product owner
 
 **Where:** `domain/.../usecase/ApplyReputationDecayUseCase` (class-level kdoc has the full
 version of this note; repeated here per this file's own "log at the time the call is made"
@@ -1169,36 +1175,42 @@ convention)
 **The gap:** Data Model doc §3.5 states the demotion-trigger formula as `demotion_triggered
 when Reputation < tier_floor for tier N consecutive days` — but neither `tier_floor` (a
 value per rank, for the seven ranks in PRD §35: Undisciplined → Inconsistent → Reliable →
-Disciplined → Relentless → Elite → Iron Will) nor `N` (the consecutive-day count) has a
-value anywhere in the PRD or Data Model doc. This is a different category of gap from the
-decay rate itself (`decay_per_missed_day`), which is at least explicitly flagged
-`[HYPOTHESIS]` in §42 — `tier_floor`/`N` aren't flagged as unresolved anywhere; they're just
-absent, which reads as an oversight in the spec rather than a deliberately-deferred decision.
+Disciplined → Relentless → Elite → Iron Will) nor `N` (the consecutive-day count) had a
+value anywhere in the PRD or Data Model doc — not flagged `[HYPOTHESIS]` like the decay rate,
+just absent.
 
-**Call made:** did not implement `demotion_triggered` or any rank-band mapping.
-`ApplyReputationDecayUseCase` computes and writes the running Reputation *value* via the
-Ledger (the `decay_per_missed_day`/`recovery_per_completed_mission` terms, which *are*
-specified, if only as placeholders) and stops there — it does not attempt to map that value
-onto the seven §35 ranks or decide when a demotion event should fire. Per ROADMAP.md's own
-standing instruction ("if you're about to invent a constant... stop"), seven tier-floor
-values and a day-count would be eight invented numbers with zero grounding, which is a
-larger and more consequential version of exactly the failure mode Data Model §3.1's cut
-Discipline Score composite already established as unacceptable for this project.
+**Call made (product owner sign-off, this session):** Reputation is a 0–100 scale, banded as
+follows, explicitly marked `[HYPOTHESIS]` pending Phase 5 pilot data:
 
-**Why this is a Phase 1 exit-criterion gap worth naming explicitly rather than closing
-Phase 1 as if it weren't there:** without `demotion_triggered`, nothing in the app can
-actually move a user's *rank* (Undisciplined/Disciplined/etc. — the user-facing identity the
-Reputation number is supposed to represent per §35) even though the underlying Ledger value
-driving it is now fully wired. This is a real functional gap, not a cosmetic one — flagging
-it here is what keeps it from being silently treated as "done" because the adjacent
-machinery compiles and passes tests.
+| Rank | Reputation range | Width |
+|---|---|---|
+| Undisciplined | 0–20 | 21 |
+| Inconsistent | 21–40 | 20 |
+| Reliable | 41–54 | 14 |
+| Disciplined | 55–69 | 15 |
+| Relentless | 70–84 | 15 |
+| Elite | 85–94 | 10 |
+| Iron Will | 95–100 | 6 |
 
-**Revisit when:** whoever owns the spec docs supplies real `tier_floor` values and `N` —
-this is arguably better resolved by an explicit spec-doc revision (Data Model doc gains a
-real §3.5 table, version-bumped per that doc's own convention) than by an engineering-side
-guess, given how directly it defines what "Disciplined" vs. "Inconsistent" *means* to a
-user — that's a product-design decision wearing a formula's clothing, not a pure engineering
-gap like the shared-cause guard's window (§5.5).
+`N = 3` consecutive days below a rank's floor before `demotion_triggered` fires — consistent
+with §5.5's 3-day window, on the same reasoning: long enough to reflect a real pattern rather
+than one bad day, short enough to react promptly.
+
+**Rationale for band shape:** middle bands (Reliable, Disciplined) are widest since most
+users should live there day-to-day; top and bottom bands are narrower so that "Elite" and
+"Iron Will" mean something rare and earned, and "Undisciplined" isn't trivially exited.
+Bands were checked programmatically to be contiguous with no gaps or overlaps, covering
+0–100 exactly.
+
+**Why this was a product decision, not an engineering guess:** no external research
+literature supplies "correct" tier-floor values for a bespoke 7-rank reputation system — this
+directly defines what "Disciplined" vs. "Inconsistent" *means* to a user, which is a
+product-design decision, not a formula gap. Recorded here as the product owner's explicit
+call rather than an invented default.
+
+**Revisit when:** Phase 5 pilot data exists to check whether these bands over- or
+under-demote in practice; expect the boundaries (not necessarily the rank order or count) to
+move once real usage data exists.
 
 ### 5.7 — RESOLVED, but with an unaddressed follow-on — `LedgerEntry.pausedAt` added; no migration written
 
@@ -1299,27 +1311,37 @@ device or in some other context an `Activity` launch can't reach (overlay window
 activities have different capabilities here), this choice needs re-examining — it was made for
 setup-friction reasons, not because overlays are impossible.
 
-### 5.15 — OPEN, needs your sign-off — Explicit Downgrade's target tier: one-tier-down, not spec-stated
+### 5.15 — RESOLVED — Explicit Downgrade: one tier down, with a 24h rolling cooldown
 
 **Where:** `app/.../MissionInterceptionActivity.kt` (`oneTierDown()`),
 `domain/.../TierTransitionUseCase.kt` (`explicitDowngrade`).
 
-**Call made:** PRD §12.4.2 describes Explicit Downgrade as "a persistent, always-visible 'this
+**The gap:** PRD §12.4.2 describes Explicit Downgrade as "a persistent, always-visible 'this
 is too much right now' control," but — unlike §12.4.3's Crisis Downgrade, which explicitly
 names Recruit as the fixed landing tier — §12.4.1/§12.4.2 never states what tier an Explicit
-Downgrade actually lands on. Implemented as one tier down from the user's current tier
-(Iron→Warden→Operator→Recruit), with Recruit itself having no further-down target (button is a
-no-op at Recruit, since there's nowhere lower to go).
+Downgrade actually lands on.
 
-**Why this reading:** an always-available "too much right now" control reads as calibration,
-not crisis — jumping straight to Recruit the way Crisis Downgrade does would conflate a
-user's own "dial it back" self-report with the Tampering/Critical-violation trigger §12.4.3
-is reserved for. One-tier-down is the smallest change that still respects the button's
-stated purpose.
+**Call made (product owner sign-off, this session):** one tier down from the user's current
+tier (Iron→Warden→Operator→Recruit), no-op at Recruit — confirmed as originally implemented.
+**New:** a **24-hour rolling cooldown** between uses, tracked from the timestamp of the last
+use (not a calendar-day reset), surfaced in the UI so the user can see when the control is
+next available.
 
-**Needs sign-off because:** this is a genuine spec gap, not a case where the "right" answer is
-obvious from other stated rules — worth confirming against product intent before treating it as
-settled, the same way §5.9 and §5.10 are logged as open rather than silently decided.
+**Rationale:** an always-available "too much right now" control reads as calibration, not
+crisis — jumping straight to Recruit the way Crisis Downgrade does would conflate a user's
+own "dial it back" self-report with the Tampering/Critical-violation trigger §12.4.3 is
+reserved for, and could paradoxically discourage early use of a preventive tool by making it
+feel as heavy as the emergency one. One-tier-down is the smallest change that still respects
+the button's stated purpose. The cooldown exists because an unlimited, repeatable
+tier-down action — even though each individual use only ever reduces enforcement, never
+increases it — could otherwise function as a de facto bypass of the tier system entirely if
+chained rapidly. A 24h *rolling* window (not a calendar-day cap) was chosen specifically to
+avoid the midnight-boundary loophole a calendar-day reset would allow (e.g. using it at
+11:58pm and again at 12:01am, three minutes later, under a calendar-day rule).
+
+**Not yet implemented as of this decision:** the cooldown tracking field/logic itself —
+`explicitDowngrade` currently has no cooldown enforcement. This is now a scoped, well-defined
+follow-up task rather than an open design question.
 
 ### 5.3 — RESOLVED — Two databases split into two files, not one
 

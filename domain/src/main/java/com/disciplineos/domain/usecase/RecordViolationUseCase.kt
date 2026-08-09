@@ -116,13 +116,18 @@ class RecordViolationUseCase(
 
     /**
      * §3.5 shared-cause guard: true if some *other* Violation sharing [clusterId] already
-     * has an active (non-reversed) [metric] entry. Deliberately does not exclude entries by
-     * age/window — the spec (§3.5) says "within a rolling window" but doesn't define the
-     * window length anywhere, and picking one here would be exactly the kind of invented
-     * constant ConsequencePolicy's kdoc and Data Model §3.1 both argue against. Until §42
-     * resolves a real value, the guard is unconditional (any active same-cluster entry
-     * blocks a second one), which is the strictly safer of the two unvalidated options —
-     * it can only under-penalize relative to a windowed version, never double-penalize.
+     * has an active (non-reversed) [metric] entry.
+     *
+     * **Window value decided (2026-08-09, ROADMAP.md §5.5) but NOT YET IMPLEMENTED here.**
+     * Product-owner sign-off: **3-day rolling window**, `[HYPOTHESIS]` pending Phase 5 pilot
+     * data — a same-cluster entry only counts as "already active" for guard purposes if it
+     * falls within 3 days of the new Violation; outside that window, treat it as a new,
+     * independently-real pattern rather than a duplicate.
+     *
+     * This method currently still checks unconditionally (any active same-cluster entry,
+     * regardless of age) — the 3-day cutoff itself is not yet coded. Do not treat this as
+     * "done" for §5.5 purposes until the window check exists here and is CI-verified. See
+     * ROADMAP.md §5.5 for full rationale.
      */
     private suspend fun clusterAlreadyHasActiveEntry(
         clusterId: UUID,
