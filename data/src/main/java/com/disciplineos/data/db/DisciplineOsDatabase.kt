@@ -57,10 +57,16 @@ import net.sqlcipher.database.SupportFactory
     // MissionProfile.kt kdoc for the full account; logged ROADMAP.md §5). No migration
     // written, same v3 reasoning applies unchanged — still pre-launch, still no real
     // installed base whose data fallbackToDestructiveMigration() would put at risk.
-    // v5 (Batch B): User gained flaggedCategories + 4 nullable tier fields — see User.kt.
-    // MERGE HAZARD: implement-decided-follow-ups branch also bumps to v5, independently.
-    // Whichever merges second needs v6 + manual rebase, not an automatic merge.
-    version = 5,
+    // v5 (§5.5/§5.9/§5.15 implementation): no schema change for §5.5 (window is computed
+    // from existing Violation.detectedAt, nothing new stored). User gained
+    // consecutiveDaysBelowFloor (§5.9 demotion tracking) and lastExplicitDowngradeAt (§5.15
+    // cooldown tracking) — see User.kt kdoc for both. Same v3/v4 fallbackToDestructiveMigration
+    // reasoning applies unchanged.
+    // v6 (Batch B, resolving merge conflict with the v5 above — both bumped independently
+    // from the same v4 base): User gained flaggedCategories + 4 nullable tier fields — see
+    // User.kt. Same fallbackToDestructiveMigration reasoning applies unchanged; still no real
+    // installed base.
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

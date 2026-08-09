@@ -63,6 +63,7 @@ class TierTransitionUseCaseTest {
         tier: Tier = Tier.OPERATOR,
         tierSelectedAt: Instant = Instant.now(),
         calibrationWindowDays: Int = 10,
+        lastExplicitDowngradeAt: Instant? = null,
     ) {
         db.userDao().insert(
             User(
@@ -73,6 +74,7 @@ class TierTransitionUseCaseTest {
                 tierActivationAt = tierSelectedAt,
                 calibrationWindowDays = calibrationWindowDays,
                 onboardingConsentVersion = "v1",
+                lastExplicitDowngradeAt = lastExplicitDowngradeAt,
             )
         )
     }
@@ -105,6 +107,72 @@ class TierTransitionUseCaseTest {
         assertEquals(Tier.OPERATOR, event.toTier)
         assertNull(event.reasonNote)
         assertEquals(Tier.OPERATOR, db.userDao().get(userId)!!.currentTier)
+        // lastExplicitDowngradeAt should now be set (a real timestamp), proving the cooldown
+        // tracking field actually gets written on a successful use.
+        assertTrue(db.userDao().get(userId)!!.lastExplicitDowngradeAt != null)
+    }
+
+    // --- §5.15 24h rolling cooldown -----------------------------------------------------
+
+    @Test
+    fun `explicit downgrade is blocked within 24h of the last use`() = runTest {
+        val now = Instant.ofEpochMilli(Instant.now().toEpochMilli())
+        seedUser(tier = Tier.WARDEN, lastExplicitDowngradeAt = now.minus(java.time.Duration.ofHours(23)))
+
+        try {
+            useCase.explicitDowngrade(userId, Tier.OPERATOR, now = now)
+            org.junit.Assert.fail("expected IllegalStateException — cooldown not yet elapsed")
+        } catch (e: IllegalStateException) {
+            // expected
+        }
+        // Tier must not have changed.
+        assertEquals(Tier.WARDEN, db.userDao().get(userId)!!.currentTier)
+    }
+
+    @Test
+    fun `explicit downgrade succeeds exactly at the 24h boundary`() = runTest {
+        val now = Instant.ofEpochMilli(Instant.now().toEpochMilli())
+        seedUser(tier = Tier.WARDEN, lastExplicitDowngradeAt = now.minus(java.time.Duration.ofHours(24)))
+
+        // At exactly 24h elapsed, `elapsed < cooldown` is false (elapsed == cooldown), which
+        // per this method's check is the boundary already outside the block — matches the
+        // §5.15 framing "you can do this again in X hours," i.e. available *at* the Xth hour,
+        // not only strictly after it.
+        val event = useCase.explicitDowngrade(userId, Tier.OPERATOR, now = now)
+
+        assertEquals(Tier.OPERATOR, event.toTier)
+    }
+
+    @Test
+    fun `explicit downgrade succeeds once 24h have elapsed`() = runTest {
+        val now = Instant.ofEpochMilli(Instant.now().toEpochMilli())
+        seedUser(tier = Tier.WARDEN, lastExplicitDowngradeAt = now.minus(java.time.Duration.ofHours(25)))
+
+        val event = useCase.explicitDowngrade(userId, Tier.OPERATOR, now = now)
+
+        assertEquals(Tier.OPERATOR, event.toTier)
+        assertEquals(now.toEpochMilli(), db.userDao().get(userId)!!.lastExplicitDowngradeAt!!.toEpochMilli())
+    }
+
+    @Test
+    fun `explicit downgrade with no prior use is never blocked by cooldown`() = runTest {
+        seedUser(tier = Tier.WARDEN, lastExplicitDowngradeAt = null)
+
+        val event = useCase.explicitDowngrade(userId, Tier.OPERATOR)
+
+        assertEquals(Tier.OPERATOR, event.toTier)
+    }
+
+    @Test
+    fun `explicitDowngradeAvailableAt reflects the cooldown correctly`() = runTest {
+        val now = Instant.ofEpochMilli(Instant.now().toEpochMilli())
+        seedUser(tier = Tier.WARDEN, lastExplicitDowngradeAt = now.minus(java.time.Duration.ofHours(10)))
+        val user = db.userDao().get(userId)!!
+
+        val availableAt = useCase.explicitDowngradeAvailableAt(user)
+
+        requireNotNull(availableAt)
+        assertEquals(now.plus(java.time.Duration.ofHours(14)).toEpochMilli(), availableAt.toEpochMilli())
     }
 
     @Test

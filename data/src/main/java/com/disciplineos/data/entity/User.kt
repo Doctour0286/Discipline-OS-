@@ -87,4 +87,13 @@ data class User(
     // state for every consumer of this field (Unsupervised Reliability scope, Mission Profile
     // Setup's default-suggestions), so there's no meaningful null case to represent.
     val flaggedCategories: List<String> = emptyList(),
+    // §5.9 (resolved 2026-08-09): demotion_triggered needs "N consecutive days below a
+    // rank's floor," which is state that must survive across separate
+    // ApplyReputationDecayUseCase invocations (one call per elapsed day, per that class's
+    // kdoc) — a single call can't derive "consecutive" from nothing else stored. Reset to 0
+    // the moment Reputation is at/above the current band's floor; incremented by 1 each
+    // day the post-decay value is still below it. See ApplyReputationDecayUseCase for the
+    // actual demotion-firing logic this field feeds.
+    val consecutiveDaysBelowFloor: Int = 0,
+    val lastExplicitDowngradeAt: Instant? = null, // §5.15: 24h rolling cooldown between Explicit Downgrade uses
 )

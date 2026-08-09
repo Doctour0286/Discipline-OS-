@@ -58,6 +58,26 @@ class TierTransitionUseCase(
     private val crisisStabilizationWindow: Duration = Duration.ofHours(24)
 
     /**
+     * §12.4.2 / ROADMAP.md §5.15: 24-hour rolling cooldown between Explicit Downgrade uses.
+     * Exposed so a caller (e.g. the interception screen) can compute "next available at"
+     * for display using the same value this class enforces, rather than duplicating the
+     * number — see [explicitDowngradeAvailableAt].
+     */
+    val explicitDowngradeCooldown: Duration = Duration.ofHours(24)
+
+    /**
+     * Convenience for callers that want to show/hide or disable the Explicit Downgrade
+     * control without invoking it — returns the instant at which [explicitDowngrade] will
+     * next succeed for [user], or null if it's available right now (no prior use, or the
+     * cooldown has already elapsed).
+     */
+    fun explicitDowngradeAvailableAt(user: User): Instant? {
+        val lastUse = user.lastExplicitDowngradeAt ?: return null
+        val availableAt = lastUse.plus(explicitDowngradeCooldown)
+        return availableAt
+    }
+
+    /**
      * §12.4.1 Standard Downgrade — "triggered by sustained depletion signal across a rolling
      * window, not a single bad day." This use-case does not itself decide *whether* the
      * signal warrants a downgrade — that's the Behavioral Fingerprint / Predictive Failure
@@ -81,19 +101,54 @@ class TierTransitionUseCase(
      * this specific control would add exactly the friction §12.4.2 says this path must not
      * have.
      *
-     * **Target tier and cooldown decided (2026-08-09, ROADMAP.md §5.15) but cooldown is NOT
-     * YET IMPLEMENTED here.** Product-owner sign-off: one tier down per use (already how the
-     * caller in [com.disciplineos.app.enforcement.MissionInterceptionActivity.oneTierDown]
-     * computes [toTier]), plus a **24-hour rolling cooldown** between uses — tracked from the
-     * timestamp of the last use, not a calendar-day reset, to avoid a midnight-boundary
-     * loophole. This method currently has no cooldown enforcement at all; a caller can invoke
-     * it repeatedly with no restriction. Do not treat this as "done" for §5.15 purposes until
-     * the cooldown check exists (likely a new `User` field for last-use timestamp, checked
-     * here or in the caller before invoking) and is CI-verified. See ROADMAP.md §5.15 for
-     * full rationale.
+     * **Target tier and cooldown (2026-08-09, ROADMAP.md §5.15) — now implemented.**
+     * Product-owner sign-off: one tier down per use (already how the caller in
+     * [com.disciplineos.app.enforcement.MissionInterceptionActivity.oneTierDown] computes
+     * [toTier]), plus a **24-hour rolling cooldown** between uses — tracked from the
+     * timestamp of the last use ([User.lastExplicitDowngradeAt]), not a calendar-day reset,
+     * to avoid a midnight-boundary loophole (see ROADMAP.md §5.15's discussion of exactly
+     * that edge case).
+     *
+     * @throws IllegalStateException if fewer than [explicitDowngradeCooldown] have elapsed
+     *   since [User.lastExplicitDowngradeAt]. A hard failure rather than a silent no-op —
+     *   same reasoning as [activateIron]'s gate: a caller invoking this believing it will
+     *   take effect needs to know immediately if it won't, not have it quietly do nothing.
+     *   The interception-screen caller is expected to check availability (e.g. disable/hide
+     *   the control) before ever calling this, using the same [explicitDowngradeCooldown]
+     *   constant, so reaching this exception in practice means the UI-side check was skipped
+     *   or stale, not a normal user path.
      */
-    suspend fun explicitDowngrade(userId: UUID, toTier: Tier, now: Instant = Instant.now()) =
-        transition(userId, toTier, TierEventKind.EXPLICIT_DOWNGRADE, reasonNote = null, now = now)
+    suspend fun explicitDowngrade(userId: UUID, toTier: Tier, now: Instant = Instant.now()): TierEvent {
+        return database.withTransaction {
+            val user = requireUser(userId)
+            val lastUse = user.lastExplicitDowngradeAt
+            if (lastUse != null) {
+                val elapsed = Duration.between(lastUse, now)
+                // BUGFIX (caught in review before merge, 2026-08-09): this condition was
+                // originally written as `!elapsed.isNegative && elapsed < explicitDowngradeCooldown`,
+                // which is inverted — check() throws when its argument is FALSE, so that
+                // version threw exactly when the cooldown HAD elapsed (elapsed >= cooldown
+                // makes `elapsed < cooldown` false) and passed silently when it hadn't
+                // (elapsed < cooldown is true while still within the blocked window). The
+                // three boundary tests below this class (23h/24h/25h) were written against
+                // the *intended* behavior and would have failed against that version had they
+                // been run through a real compiler — confirms why review-before-merge matters
+                // when nothing in the authoring loop can compile Kotlin/Android code.
+                // Correct intent: throw (block) only while elapsed < cooldown; once
+                // elapsed >= cooldown, allow it. A negative elapsed (clock skew / lastUse in
+                // the future) is treated as "cooldown not satisfied" (blocked), matching the
+                // conservative direction — never let clock skew accidentally bypass the gate.
+                check(!elapsed.isNegative && elapsed >= explicitDowngradeCooldown) {
+                    "explicitDowngrade blocked by 24h rolling cooldown for user $userId: " +
+                        "last used at $lastUse, now $now, elapsed ${elapsed.toMinutes()}min, " +
+                        "cooldown ${explicitDowngradeCooldown.toHours()}h (ROADMAP.md §5.15)"
+                }
+            }
+            val event = writeEvent(userId, user.currentTier, toTier, TierEventKind.EXPLICIT_DOWNGRADE, reasonNote = null, now)
+            userDao.update(user.copy(currentTier = toTier, lastExplicitDowngradeAt = now))
+            event
+        }
+    }
 
     /**
      * §12.4.3 Crisis Downgrade — "reserved for Tampering/Critical violations. Moves the user
