@@ -141,7 +141,7 @@ pass before Phase 5, but doesn't block any batch below.
 | 2.4a | Tier Confirmation | Already built, merged. Warden path confirmed on-device; **Iron path still unexercised** — worth a real on-device pass once 2.5 exists, since Iron routes through it. |
 | 2.5 | Iron Calibration Gate | **Correction after checking the real nav graph (not just grepping for it):** this isn't simply "unrouted." `TierSelectionFragment`'s Iron option is disabled in the layout itself — Iron cannot be *selected* at first-time onboarding at all, by design (§12.6, no exception path), so `action_tierSelection_to_ironCalibrationGate` has no code path that can ever fire it. The destination and action are deliberately left in the graph for a *different*, currently unmodeled flow: an existing user reaching Iron later, once their calibration window elapses, via `TierTransitionUseCase.activateIron` (already built and tested). Building this screen's content is still real work, but building it alone won't make it reachable — that also needs the separate "Tier Selection outside onboarding" flow, which doesn't exist yet in any nav graph. Worth deciding whether that flow is in-scope for this batch or its own follow-up. Whenever it's built, must frame the 10-day calibration window as "protecting the parameters that will govern Iron," not as the system doubting the user — same behavior-vs-identity principle as Warden Voice, applied to system copy. |
 | 2.6 | Core Data Consent | **Written, not yet CI-confirmed (this pass).** States plainly that local storage is required (Mission enforcement is core function, must work offline), plus a plain-language local-first + optional-cloud-sync explanation, both per Architecture doc §3.1. One forward action only, no decline path — nothing to decline into, since the app's core function can't run without this consent. **Also closes a gap `TierSelectionFragment`/`TierConfirmationFragment` left open on purpose:** both screens write a placeholder `onboardingConsentVersion` value (their `selectInitialTier` call requires a non-null argument, and this screen didn't exist with real content yet when they run, earlier in the flow) — this screen now overwrites that placeholder with a real version (`CoreDataConsentFragment.CONSENT_VERSION`, `"v1"`) the moment the user actually reaches and agrees to real consent copy. |
-| 2.7 | Unsupervised Reliability Opt-In | **Must be its own screen**, not bundled into 2.6 — explicit PRD §13.4 requirement, no "agree to everything" screen. Must state: measurement only, never enforcement, separately deletable anytime, only covers §2.2's flagged categories. Previews the monthly Brief Self-Control Scale self-report by name. **Instrument completion/drop-off from day one** — the PRD itself flags this rate as an open question. |
+| 2.7 | Unsupervised Reliability Opt-In | **Written, not yet CI-confirmed (this session, branch `onboarding-unsupervised-reliability-opt-in`).** Genuinely optional — Enable and Skip both route to the identical next destination, matching PRD §13.4's "declining does not gate access to any other feature." States measurement-only/no-enforcement, scope limited to §2.2's flagged categories, separately-deletable, and previews the monthly Brief Self-Control Scale by name (§13.2.1). Writes the previously-unused `User.unsupervisedReliabilityOptIn`/`unsupervisedReliabilityOptInAt` fields (both already existed on the entity, unused until this pass). **Completion/drop-off instrumentation, the spec's own explicit ask, is wired**: new `OnboardingScreenEvent` entity/DAO (DB v6→v7) logs VIEWED on screen entry and ACCEPTED/DECLINED on the two real exit paths — see that entity's kdoc for why this is a narrow, screen-scoped log rather than a general analytics system, and for the "VIEWED with no matching outcome row = drop-off" query shape this is meant to support. Has a DAO round-trip test file (`UnsupervisedReliabilityOptInFragmentTest.kt`). |
 | 2.8 | Mission Profile Setup | Already built (schema v4), not yet CI-confirmed per `STATUS.md`. Should default suggestions from §2.2's flagged categories — **this is currently blocked by 2.2 not existing yet**, so building 2.2 unblocks 2.8's stated requirement even though 2.8's screen itself already has code. |
 | 2.9 | First Mission Scheduling | Closes onboarding. Schedule-vs-start-now choice here is the first Self-Initiation Trend data point (measurement-only, doesn't change this screen's design). |
 
@@ -161,7 +161,7 @@ sequencing to unblock 2.8's stated gap early):
 4. 2.5 Iron Calibration Gate — exercises the currently-untested Iron path through 2.4a
 5. 2.6 Core Data Consent — Mission Profile Setup's nav action already points here per
    `STATUS.md`
-6. 2.7 Unsupervised Reliability Opt-In
+6. 2.7 Unsupervised Reliability Opt-In — **done this session**, see table above
 7. 2.9 First Mission Scheduling
 8. Revisit 2.8 to wire in 2.2's default suggestions
 
@@ -169,8 +169,9 @@ sequencing to unblock 2.8's stated gap early):
 - [ ] CI green
 - [ ] On-device confirmed (per `STATUS.md`'s legend: 🟡 written → 🟢 CI-green → ✅ on-device)
 - [ ] DAO round-trip test exists and passes
-- [ ] For 2.7 specifically: completion/drop-off instrumentation actually wired, not just
-      planned
+- [x] For 2.7 specifically: completion/drop-off instrumentation actually wired, not just
+      planned — `OnboardingScreenEvent` + `OnboardingEventDao`, still needs CI/on-device to
+      move past written
 
 ---
 

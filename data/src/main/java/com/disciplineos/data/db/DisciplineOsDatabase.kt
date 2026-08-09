@@ -7,11 +7,13 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.disciplineos.data.dao.MissionDao
 import com.disciplineos.data.dao.MissionProfileDao
+import com.disciplineos.data.dao.OnboardingEventDao
 import com.disciplineos.data.dao.TierDao
 import com.disciplineos.data.dao.UserDao
 import com.disciplineos.data.dao.ViolationDao
 import com.disciplineos.data.entity.Mission
 import com.disciplineos.data.entity.MissionProfile
+import com.disciplineos.data.entity.OnboardingScreenEvent
 import com.disciplineos.data.entity.OutputArtifact
 import com.disciplineos.data.entity.TierEvent
 import com.disciplineos.data.entity.User
@@ -44,6 +46,7 @@ import net.sqlcipher.database.SupportFactory
         OutputArtifact::class,
         TierEvent::class,
         MissionProfile::class,
+        OnboardingScreenEvent::class,
     ],
     // v2 (Phase 1): LedgerEntry.pausedAt added for §26.4 dispute-pause semantics.
     // v3 (Phase 1, TierTransitionUseCase): TierEvent table added; User gained
@@ -66,7 +69,14 @@ import net.sqlcipher.database.SupportFactory
     // from the same v4 base): User gained flaggedCategories + 4 nullable tier fields — see
     // User.kt. Same fallbackToDestructiveMigration reasoning applies unchanged; still no real
     // installed base.
-    version = 6,
+    // v7 (Batch B, Unsupervised Reliability Opt-In, §2.7): onboarding_screen_events table
+    // added — see OnboardingScreenEvent.kt kdoc for why this is its own narrow table rather
+    // than reusing TierEvent or a general-purpose analytics scheme. No User schema change
+    // this bump: unsupervisedReliabilityOptIn / unsupervisedReliabilityOptInAt already existed
+    // on User (added in an earlier phase, unused until this pass wires a real screen to
+    // write them — see User.kt). Same fallbackToDestructiveMigration reasoning applies
+    // unchanged; still no real installed base.
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -77,6 +87,7 @@ abstract class DisciplineOsDatabase : RoomDatabase() {
     abstract fun ledgerDao(): LedgerDao
     abstract fun tierDao(): TierDao
     abstract fun missionProfileDao(): MissionProfileDao
+    abstract fun onboardingEventDao(): OnboardingEventDao
 
     companion object {
         private const val DB_NAME = "disciplineos_core.db"

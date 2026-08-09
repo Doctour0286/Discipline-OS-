@@ -8,6 +8,8 @@ import com.disciplineos.data.entity.DisputeStatus
 import com.disciplineos.data.entity.Mission
 import com.disciplineos.data.entity.MissionProfile
 import com.disciplineos.data.entity.MissionStatus
+import com.disciplineos.data.entity.OnboardingScreenEvent
+import com.disciplineos.data.entity.OnboardingScreenEventOutcome
 import com.disciplineos.data.entity.OutputArtifact
 import com.disciplineos.data.entity.TierEvent
 import com.disciplineos.data.entity.TierEventKind
@@ -73,6 +75,31 @@ interface TierDao {
         """
     )
     suspend fun mostRecentEventOfKind(userId: UUID, kind: TierEventKind): TierEvent?
+}
+
+/**
+ * Backs [OnboardingScreenEvent] — see that file's kdoc for why this is its own narrow `@Dao`
+ * rather than folded into [UserDao] or [TierDao]: write-only UX instrumentation, not
+ * domain-behavioral state any other DAO's existing query shape fits.
+ */
+@Dao
+interface OnboardingEventDao {
+    @Insert
+    suspend fun insert(event: OnboardingScreenEvent)
+
+    /**
+     * Backs the completion/drop-off measurement §2.7 itself asks for — a simple count of
+     * how many [OnboardingScreenEvent] rows exist for a given [screenId]/[outcome] pair,
+     * e.g. "how many VIEWED vs. how many ACCEPTED" to derive a completion rate. Not scoped to
+     * a single [userId] — this is meant to answer a product/instrumentation question across
+     * the whole install base, not "did this one user complete this screen" (callers wanting
+     * that narrower answer should query row-by-row via a future per-user method once a real
+     * call site needs it, per this project's stated preference for adding query shapes when a
+     * real second call site shows up, not preemptively — see [MissionProfileDao]'s "no
+     * `@Update` yet" note for the identical reasoning applied elsewhere).
+     */
+    @Query("SELECT COUNT(*) FROM onboarding_screen_events WHERE screenId = :screenId AND outcome = :outcome")
+    suspend fun countByOutcome(screenId: String, outcome: OnboardingScreenEventOutcome): Int
 }
 
 @Dao

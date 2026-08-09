@@ -23,6 +23,11 @@
     replacement unchanged, since other Fragments will navigate by action ID, not by re-deriving
     the sequence each time.
 
+    **As of this pass:** unsupervisedReliabilityOptInFragment also has real content now
+    (UnsupervisedReliabilityOptInFragment) — see that destination's own comment below. Only
+    ironCalibrationGateFragment and firstMissionSchedulingFragment remain
+    OnboardingPlaceholderFragment.
+
     **Iron branch status, updated:** the "known simplification" this comment used to describe
     (Tier Selection had no real tier-choice logic, so neither action from it was ever truly
     conditional) is now only half true. TierSelectionFragment's Iron RadioButton is disabled
@@ -172,14 +177,17 @@
 
     <!-- 7. Unsupervised Reliability Opt-In — §2.7, "separate screen, genuinely optional".
          PRD §13.4 hard rule: must never be bundled into Core Data Consent above — kept as its
-         own distinct destination for exactly that reason, not merged for convenience. -->
+         own distinct destination for exactly that reason, not merged for convenience. Real
+         content as of this pass: UnsupervisedReliabilityOptInFragment replaces
+         OnboardingPlaceholderFragment here. No title/stepNumber/totalSteps arguments, same
+         reasoning as every other real-content destination in this graph — this Fragment has
+         real layout content instead of the placeholder's generic step-progress mechanism.
+         Both Enable and Skip resolve to the same single outgoing action below, matching PRD
+         §13.4's "declining does not gate access to any other feature." -->
     <fragment
         android:id="@+id/unsupervisedReliabilityOptInFragment"
-        android:name="com.disciplineos.app.onboarding.OnboardingPlaceholderFragment"
+        android:name="com.disciplineos.app.onboarding.UnsupervisedReliabilityOptInFragment"
         android:label="Unsupervised Reliability Opt-In">
-        <argument android:name="title" app:argType="string" android:defaultValue="Unsupervised Reliability Opt-In" />
-        <argument android:name="stepNumber" app:argType="integer" android:defaultValue="7" />
-        <argument android:name="totalSteps" app:argType="integer" android:defaultValue="8" />
         <action
             android:id="@+id/action_unsupervisedReliabilityOptIn_to_firstMissionScheduling"
             app:destination="@id/firstMissionSchedulingFragment" />
