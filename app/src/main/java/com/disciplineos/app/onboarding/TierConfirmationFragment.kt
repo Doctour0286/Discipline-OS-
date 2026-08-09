@@ -70,7 +70,11 @@ class TierConfirmationFragment : Fragment(R.layout.fragment_tier_confirmation) {
         /** Nav-graph argument name — see [fragment_tier_confirmation]'s `<argument>`. */
         const val ARG_TIER = "tier"
 
-        /** See [TierSelectionFragment.ONBOARDING_CONSENT_VERSION]'s kdoc — same placeholder. */
+        /**
+         * See [TierSelectionFragment.ONBOARDING_CONSENT_VERSION]'s kdoc — same placeholder,
+         * now overwritten with a real version by [CoreDataConsentFragment] once the user
+         * reaches that screen later in the same flow.
+         */
         private const val ONBOARDING_CONSENT_VERSION = "unversioned-pre-consent-copy"
     }
 }

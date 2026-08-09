@@ -157,14 +157,14 @@
             app:destination="@id/coreDataConsentFragment" />
     </fragment>
 
-    <!-- 6. Core Data Consent — §2.6, required (not optional like the next screen) -->
+    <!-- 6. Core Data Consent — §2.6, required (not optional like the next screen). Real
+         content as of this pass: CoreDataConsentFragment replaces OnboardingPlaceholderFragment
+         here. No title/stepNumber/totalSteps arguments, same reasoning as every other
+         real-content destination in this graph. -->
     <fragment
         android:id="@+id/coreDataConsentFragment"
-        android:name="com.disciplineos.app.onboarding.OnboardingPlaceholderFragment"
+        android:name="com.disciplineos.app.onboarding.CoreDataConsentFragment"
         android:label="Core Data Consent">
-        <argument android:name="title" app:argType="string" android:defaultValue="Core Data Consent" />
-        <argument android:name="stepNumber" app:argType="integer" android:defaultValue="6" />
-        <argument android:name="totalSteps" app:argType="integer" android:defaultValue="8" />
         <action
             android:id="@+id/action_coreDataConsent_to_unsupervisedReliabilityOptIn"
             app:destination="@id/unsupervisedReliabilityOptInFragment" />

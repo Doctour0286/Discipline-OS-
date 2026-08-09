@@ -251,4 +251,33 @@
 
     <string name="tier_explanation_continue">Continue to Tier Selection</string>
 
+    <!--
+        §2.6 Core Data Consent — spec's own framing: "required — local storage, Mission
+        enforcement," not an optional data use. Two content requirements, each its own
+        paragraph below:
+        - core_data_consent_required_body: states plainly that local storage is required to
+          use the app at all, since Mission enforcement (the app's core function) depends on
+          it — matches Architecture doc §3.1's "Mission enforcement must work fully offline,"
+          so this paragraph describes a real technical dependency, not a policy choice framed
+          as a requirement.
+        - core_data_consent_local_first_body: plain-language local-first + optional
+          cloud-sync explanation (Architecture doc §3.1 again) — states the on-device
+          encrypted store is the source of truth and cloud sync, if it ever exists, would be
+          opt-in and additive on top of that, never a replacement for local storage working
+          on its own.
+        - core_data_consent_delete_body: not one of §2.6's two named requirements, but
+          included per Architecture doc §3.2's rescoped-for-personal-use section, which
+          singles out "a basic delete-my-data action... still worth having" as the one
+          concrete user-facing consequence of that rescoping — mentioning the affordance
+          exists (Settings, not this screen — no delete control lives here) is a one-sentence
+          honesty cost worth paying while this screen is already talking about what's stored
+          locally and why.
+    -->
+    <string name="core_data_consent_step_progress">Step 6 of 8</string>
+    <string name="core_data_consent_title">How your data is stored</string>
+    <string name="core_data_consent_required_body">This app stores your Missions, Profiles, and progress in an encrypted database on your device. That storage is required to use the app — Mission enforcement is the core function, and it has to work even when you\'re offline, so there\'s no lighter-weight mode that skips this.</string>
+    <string name="core_data_consent_local_first_body">Your device is the source of truth. Nothing is sent anywhere by default. If cloud sync is ever added, it would be an opt-in addition on top of local storage, not a replacement for it.</string>
+    <string name="core_data_consent_delete_body">You can wipe your local data at any time from Settings if you decide to stop using the app — that\'s a plain local delete, not a request that has to be sent anywhere or waited on.</string>
+    <string name="core_data_consent_continue">Agree and continue</string>
+
 </resources>
