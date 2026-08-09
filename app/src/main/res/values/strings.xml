@@ -147,4 +147,18 @@
     <string name="mission_profile_setup_empty_ok_note">Both lists are optional here — you can leave them empty and fill them in later.</string>
     <string name="mission_profile_setup_continue">Continue</string>
 
+    <!-- §2.2 Goal Definition. "Link visible" requirement (spec's own phrase) is
+         goal_definition_link_note below — must state plainly that these are the *only*
+         categories ever looked at outside a Mission, not just imply it. -->
+    <string name="goal_definition_step_progress">Step 2 of 8</string>
+    <string name="goal_definition_title">What are you protecting time for?</string>
+    <string name="goal_definition_intro">Tell us what matters, in your own words, and flag any categories you consider high-value or high-risk. This shapes your first Mission Profile suggestions later.</string>
+    <string name="goal_definition_freetext_label">In your own words</string>
+    <string name="goal_definition_freetext_hint">e.g. Finishing my thesis without getting pulled into social feeds</string>
+    <string name="goal_definition_categories_label">Flag categories (optional)</string>
+    <string name="goal_definition_categories_hint_body">One category per line — e.g. \"social media\", \"news\", \"games\". These are just labels you choose; nothing is scanned or inferred automatically.</string>
+    <string name="goal_definition_categories_hint">social media</string>
+    <string name="goal_definition_link_note">The categories you flag here are the only ones we\'ll ever look at outside your Missions — see Unsupervised Reliability later in setup.</string>
+    <string name="goal_definition_continue">Continue</string>
+
 </resources>

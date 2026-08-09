@@ -127,21 +127,36 @@ class MissionInterceptionActivity : ComponentActivity() {
                 finish()
                 return@launch
             }
+            // This screen only ever runs during an active Mission, which requires onboarding
+            // (specifically, tier selection at Onboarding §2.4/§2.4a) to have already
+            // completed — a Mission cannot exist without a MissionProfile, which cannot exist
+            // without a User row past Tier Confirmation (see MissionProfileSetupFragment's
+            // reachability). So user.currentTier being null here means a real invariant this
+            // screen depends on was violated somewhere upstream — worth a loud crash to
+            // surface that immediately (Batch B, BUILD_PLAN.md — User.currentTier became
+            // nullable to support GoalDefinitionFragment's earlier draft-row creation; this is
+            // one of the four call sites checked and fixed when that change was made), not a
+            // silent finish() that would hide a real bug behind what looks like a normal exit.
+            val currentTier = requireNotNull(user.currentTier) {
+                "MissionInterceptionActivity reached for user $userId with no currentTier — " +
+                    "should be structurally impossible once a Mission/MissionProfile exist " +
+                    "(User.kt kdoc, Batch B)"
+            }
 
             val ctrl = InterceptionController(
                 mission = mission,
-                tier = user.currentTier,
+                tier = currentTier,
                 attemptNumber = attemptNumber,
                 recordViolationUseCase = AppContainer.recordViolationUseCase(applicationContext),
                 tierTransitionUseCase = AppContainer.tierTransitionUseCase(applicationContext),
                 wardenVoiceProvider = AppContainer.wardenVoiceProvider(NoOpWardenVoiceGenerator),
             )
             controller = ctrl
-            tier = user.currentTier
+            tier = currentTier
 
-            renderVoiceLine(ctrl, user.currentTier)
+            renderVoiceLine(ctrl, currentTier)
             renderStabilityControl(ctrl, userId)
-            wireButtons(ctrl, mission, user.currentTier)
+            wireButtons(ctrl, mission, currentTier)
             startCountdown(ctrl)
         }
     }

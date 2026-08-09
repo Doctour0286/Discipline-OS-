@@ -46,13 +46,17 @@ class TierConfirmationFragment : Fragment(R.layout.fragment_tier_confirmation) {
                 val useCase = AppContainer.tierTransitionUseCase(context)
 
                 // Same re-entry guard as TierSelectionFragment.submitInitialTier() — see that
-                // method's comment for the full reasoning. This screen has the identical risk:
-                // Back-then-Confirm-again, or a slow double-tap, would otherwise call
-                // selectInitialTier() twice with two different random UUIDs against a DAO
-                // insert with no conflict strategy.
-                if (database.userDao().getSingleLocalUser() == null) {
+                // method's comment for the full, corrected reasoning (Batch B, BUILD_PLAN.md):
+                // the real condition is "has a tier already been selected"
+                // (existingUser.currentTier != null), not "does any row exist," since
+                // GoalDefinitionFragment now creates a draft row earlier in the flow. Also
+                // reuses the draft row's own id rather than generating a fresh one, so
+                // selectInitialTier() updates that row in place instead of creating a second,
+                // disconnected one.
+                val existingUser = database.userDao().getSingleLocalUser()
+                if (existingUser == null || existingUser.currentTier == null) {
                     useCase.selectInitialTier(
-                        userId = UUID.randomUUID(),
+                        userId = existingUser?.id ?: UUID.randomUUID(),
                         tier = tier,
                         onboardingConsentVersion = ONBOARDING_CONSENT_VERSION,
                     )

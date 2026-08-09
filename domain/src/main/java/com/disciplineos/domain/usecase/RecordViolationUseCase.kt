@@ -69,6 +69,17 @@ class RecordViolationUseCase(
         val user = requireNotNull(userDao.get(mission.userId)) {
             "Mission ${mission.id} references missing User ${mission.userId}"
         }
+        // A Mission requires a MissionProfile (Mission.missionProfileId), which requires a
+        // fully-onboarded User past Tier Confirmation (MissionProfileSetupFragment's
+        // reachability) — same invariant as MissionInterceptionActivity's identical check.
+        // user.currentTier being null here means that invariant was violated upstream; a
+        // loud crash surfaces that immediately rather than silently misbehaving (Batch B,
+        // BUILD_PLAN.md — see User.kt kdoc for why this field became nullable at all).
+        val currentTier = requireNotNull(user.currentTier) {
+            "RecordViolationUseCase reached for user ${user.id} with no currentTier — " +
+                "should be structurally impossible once a Mission/MissionProfile exist " +
+                "(User.kt kdoc, Batch B)"
+        }
 
         violationDao.insert(violation)
 
@@ -91,11 +102,11 @@ class RecordViolationUseCase(
             clusterAlreadyHasActiveEntry(clusterId, violation.id, LedgerMetric.REPUTATION)
 
         val debtEntry = if (debtBlocked) null else {
-            val delta = consequencePolicy.debtPenalty(user.currentTier, violation.type)
+            val delta = consequencePolicy.debtPenalty(currentTier, violation.type)
             writeEntry(user.id, violation.id, LedgerMetric.DEBT, delta)
         }
         val reputationEntry = if (reputationBlocked) null else {
-            val delta = consequencePolicy.reputationPenalty(user.currentTier, violation.type)
+            val delta = consequencePolicy.reputationPenalty(currentTier, violation.type)
             writeEntry(user.id, violation.id, LedgerMetric.REPUTATION, delta)
         }
 

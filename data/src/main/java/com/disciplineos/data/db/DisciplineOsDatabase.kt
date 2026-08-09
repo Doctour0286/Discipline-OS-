@@ -57,7 +57,10 @@ import net.sqlcipher.database.SupportFactory
     // MissionProfile.kt kdoc for the full account; logged ROADMAP.md §5). No migration
     // written, same v3 reasoning applies unchanged — still pre-launch, still no real
     // installed base whose data fallbackToDestructiveMigration() would put at risk.
-    version = 4,
+    // v5 (Batch B): User gained flaggedCategories + 4 nullable tier fields — see User.kt.
+    // MERGE HAZARD: implement-decided-follow-ups branch also bumps to v5, independently.
+    // Whichever merges second needs v6 + manual rebase, not an automatic merge.
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
