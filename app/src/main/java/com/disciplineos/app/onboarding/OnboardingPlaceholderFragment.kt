@@ -95,21 +95,20 @@ class OnboardingPlaceholderFragment : Fragment(R.layout.fragment_onboarding_plac
         // isn't in use in this project (no libs.versions.toml / Safe Args plugin anywhere in
         // settings.gradle.kts or app/build.gradle.kts as of this session).
         //
-        // tierSelectionFragment, tierConfirmationFragment, missionProfileSetupFragment, and
-        // (this session) goalDefinitionFragment are deliberately absent from this map — all
-        // four destinations now run their own real Fragment classes (TierSelectionFragment /
-        // TierConfirmationFragment / MissionProfileSetupFragment / GoalDefinitionFragment),
-        // not this placeholder class, so their branches here would be dead code:
-        // findNavController().currentDestination?.id can never actually equal any of those
-        // four IDs while this placeholder's own onViewCreated is running, since a different
-        // Fragment class is what's hosted at those destinations now. Removed rather than left
-        // in as unreachable scaffolding — leaving a mapping for a destination this class no
-        // longer serves is the same category of drift ROADMAP.md's own conventions ask to
-        // flag, just one step removed from §5.20's stale-argument case (a mapping nothing can
-        // ever hit, instead of an argument nothing reads).
+        // tierSelectionFragment, tierConfirmationFragment, missionProfileSetupFragment,
+        // goalDefinitionFragment, welcomeFragment, and tierExplanationFragment are
+        // deliberately absent from this map — all six destinations now run their own real
+        // Fragment classes (TierSelectionFragment / TierConfirmationFragment /
+        // MissionProfileSetupFragment / GoalDefinitionFragment / WelcomeFragment /
+        // TierExplanationFragment), not this placeholder class, so their branches here would
+        // be dead code: findNavController().currentDestination?.id can never actually equal
+        // any of those six IDs while this placeholder's own onViewCreated is running, since a
+        // different Fragment class is what's hosted at those destinations now. Removed rather
+        // than left in as unreachable scaffolding — leaving a mapping for a destination this
+        // class no longer serves is the same category of drift ROADMAP.md's own conventions
+        // ask to flag, just one step removed from §5.20's stale-argument case (a mapping
+        // nothing can ever hit, instead of an argument nothing reads).
         val nextActionId = when (findNavController().currentDestination?.id) {
-            R.id.welcomeFragment -> R.id.action_welcome_to_goalDefinition
-            R.id.tierExplanationFragment -> R.id.action_tierExplanation_to_tierSelection
             R.id.ironCalibrationGateFragment -> R.id.action_ironCalibrationGate_to_missionProfileSetup
             R.id.coreDataConsentFragment -> R.id.action_coreDataConsent_to_unsupervisedReliabilityOptIn
             R.id.unsupervisedReliabilityOptInFragment -> R.id.action_unsupervisedReliabilityOptIn_to_firstMissionScheduling
