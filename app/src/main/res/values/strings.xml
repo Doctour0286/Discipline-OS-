@@ -280,4 +280,37 @@
     <string name="core_data_consent_delete_body">You can wipe your local data at any time from Settings if you decide to stop using the app — that\'s a plain local delete, not a request that has to be sent anywhere or waited on.</string>
     <string name="core_data_consent_continue">Agree and continue</string>
 
+    <!--
+        §2.7 Unsupervised Reliability Opt-In — spec's own framing: "separate screen, genuinely
+        optional," a real choice with its own value proposition, not core-consent's forced
+        agree-to-continue. Four content requirements from the spec, one paragraph each below:
+        - unsupervised_reliability_measurement_only_body: measurement only, no enforcement ever
+          (PRD §13.3/§13.4 — no scoring pressure, cannot trigger debt/Recovery Mode/Tribunal).
+        - unsupervised_reliability_scope_body: scope is limited to categories flagged at Goal
+          Definition (§2.2) specifically — not blanket device activity. References that
+          screen's own flaggedCategories by name so the link stays visible to the user, same
+          reasoning goal_definition_link_note already established in the other direction.
+        - unsupervised_reliability_deletable_body: separately deletable at any time, distinct
+          from Mission/Score data (Architecture doc §3.2/§3.1's "separately deletable" data
+          category framing).
+        - unsupervised_reliability_self_report_preview_body: names and previews the monthly
+          Brief Self-Control Scale self-report (PRD §13.2.1) up front, rather than surfacing it
+          unannounced a month later.
+        unsupervised_reliability_intro_body is the value-proposition paragraph §2.7 asks for
+        ("why this data helps the user, not just the product") — framed around the co-primary
+        KPI reasoning in PRD §5.1 (behavior can revert while capacity holds, or both can
+        revert; this signal is what lets the two be told apart), in plain language, not KPI
+        jargon.
+    -->
+    <string name="unsupervised_reliability_step_progress">Step 7 of 8</string>
+    <string name="unsupervised_reliability_title">Track your reliability outside Missions?</string>
+    <string name="unsupervised_reliability_intro_body">This is optional, and separate from everything else you\'ve agreed to so far. If you turn it on, the app can tell the difference between \"I did fine because a Mission was blocking things\" and \"I did fine on my own\" — which is useful to know about yourself, not just useful to us.</string>
+    <string name="unsupervised_reliability_measurement_only_body">Measurement only. This never enforces anything, never blocks anything, and never affects your Discipline Debt, Reputation, Tier, or any consequence path in the app — full stop.</string>
+    <string name="unsupervised_reliability_scope_body">It only looks at the categories you flagged on the Goal Definition screen earlier — nothing else on your device is ever included.</string>
+    <string name="unsupervised_reliability_deletable_body">This data is stored separately from your Mission history and can be deleted on its own, at any time, without touching anything else.</string>
+    <string name="unsupervised_reliability_self_report_preview_body">If you opt in, you\'ll also see a short monthly check-in (the Brief Self-Control Scale, a handful of quick questions) alongside your Monthly Intelligence Report — so it\'s not a surprise the first time it shows up.</string>
+    <string name="unsupervised_reliability_switch_label">Enable Unsupervised Reliability tracking</string>
+    <string name="unsupervised_reliability_enable_button">Enable and continue</string>
+    <string name="unsupervised_reliability_skip_button">Skip for now</string>
+
 </resources>

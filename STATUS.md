@@ -68,7 +68,7 @@ check.
 | 0.5 — Real Build Verification (CI) | ✅ | Gradle/CI pipeline itself confirmed working. |
 | 1 — Domain / Use-Case Layer | 🟢 | Functionally complete. §5.9's tier-floor gap resolved (see MVP table below) — no open spec gaps remain. |
 | 2 — Core Enforcement Loop | ✅ | Interception loop confirmed on-device via `DebugSeeder` (no real Mission-creation UI yet, so seeding is still required to trigger it). |
-| 3 — Onboarding & Core UI | 🟡 | See screen-by-screen table below. Welcome, Goal Definition, Tier Explanation, Tier Selection/Confirmation, Mission Profile Setup, and Core Data Consent all have real content and are merged to `main` (or, for Core Data Consent, written this session — see `ROADMAP.md` §5.23). Iron Calibration Gate, Unsupervised Reliability Opt-In, and First Mission Scheduling remain placeholders. |
+| 3 — Onboarding & Core UI | 🟡 | See screen-by-screen table below. Welcome, Goal Definition, Tier Explanation, Tier Selection/Confirmation, Mission Profile Setup, Core Data Consent, and Unsupervised Reliability Opt-In all have real content — merged to `main`, except Core Data Consent and Unsupervised Reliability Opt-In, both written but not yet merged (see `ROADMAP.md` §5.23 and this session's entry). Iron Calibration Gate and First Mission Scheduling remain placeholders. |
 | 4 — Behavioral Fingerprint / Predictive Failure (F1–F5) | ⬜ | Not started. Depends on Phase 3's alert-card pattern existing to render into. |
 | 5 — Pilot & Hypothesis Resolution | ⬜ | Not started. No new app code — this is "use it, gather data, resolve `[HYPOTHESIS]` constants." |
 
@@ -94,8 +94,8 @@ and `git log main --oneline -5` for ground truth rather than trusting this note 
 | 4b | ↳ Iron Calibration Gate | ⬜ | **Corrected 2026-08-09** (previous note was wrong): not simply "unrouted" — Iron's RadioButton is disabled at Tier Selection itself, so Iron cannot be chosen at first-time onboarding at all, by design. The gate destination/action exist for a different, currently unmodeled flow (an existing user reaching Iron later via `TierTransitionUseCase.activateIron`), not for anything reachable in the current onboarding sequence. See `BUILD_PLAN.md` Batch B for detail. |
 | 5 | Mission Profile Setup | 🟡 | Merged to `main`, has a test file (`MissionProfileSetupFragmentTest.kt`) — CI status on `main` itself not independently re-confirmed by this correction pass; verify before assuming green. |
 | 6 | Core Data Consent | 🟡 | Written this session, not yet CI-confirmed (no compiler in this authoring sandbox — verified via static/manual review only, see the PR). Also overwrites the placeholder `onboardingConsentVersion` written earlier at Tier Selection/Confirmation with a real version (`CoreDataConsentFragment.CONSENT_VERSION`, `"v1"`) — see that Fragment's kdoc. |
-| 7 | Unsupervised Reliability Opt-In | ⬜ | Placeholder — next real screen to build |
-| 8 | First Mission Scheduling | ⬜ | Placeholder |
+| 7 | Unsupervised Reliability Opt-In | 🟡 | Written this session (branch `onboarding-unsupervised-reliability-opt-in`), not yet CI-confirmed (no compiler in this authoring sandbox — verified via static/manual review only, see the PR). Genuinely optional per §2.7/PRD §13.4 — Enable and Skip both route to the same next screen. Writes the previously-unused `User.unsupervisedReliabilityOptIn`/`optInAt` fields. New `OnboardingScreenEvent` table (DB v6→v7) instruments completion/drop-off per the spec's own explicit ask — see `OnboardingScreenEvent.kt` kdoc for why this is a narrow, screen-scoped log rather than general analytics. Has a test file (`UnsupervisedReliabilityOptInFragmentTest.kt`). |
+| 8 | First Mission Scheduling | ⬜ | Placeholder — next real screen to build |
 
 **Other Phase 3 screens (not in the onboarding sequence):**
 
@@ -124,7 +124,7 @@ and `git log main --oneline -5` for ground truth rather than trusting this note 
 | Discipline Score | ✂️ | Deliberately cut from MVP (Data Model doc §3.1) — not a gap |
 | AI Accountability (Warden + Recalibration Voice) | 🟡 | Gating logic + fallback bank exist; only `NoOpWardenVoiceGenerator` wired, no real cloud call |
 | Behavioral Fingerprint + Predictive Failure Alerts | ⬜ | Phase 4, not started |
-| Unsupervised Reliability (opt-in tracking) | ⬜ | Schema isolated (Phase 0); no capture/opt-in flow |
+| Unsupervised Reliability (opt-in tracking) | 🟡 | Schema isolated (Phase 0); opt-in flow now written this session (`UnsupervisedReliabilityOptInFragment`, §2.7), not yet CI-confirmed or merged — writes `User.unsupervisedReliabilityOptIn`/`optInAt`. No capture pipeline (actual passive signal collection into `UnsupervisedSignalDao`) built yet — this pass is the consent/opt-in screen only, not the measurement pipeline itself. |
 | Daily / Weekly Reports | ⬜ | Not started |
 
 ---
@@ -181,5 +181,8 @@ position (Operator's floor = INCONSISTENT, Warden's = RELIABLE, Iron's = DISCIPL
 1. Merge `onboarding-tier-selection` into `main` (or open/land its PR) — `main` is currently stale relative to real progress.
 2. Confirm Mission Profile Setup's CI status on that branch.
 3. On-device verify Mission Profile Setup the same way Tier Selection was verified.
-4. Build Core Data Consent (§2.6) — Mission Profile Setup's nav action already points there.
-5. Separately: build Goal Definition (§2.2) — it's the actual blocker for Mission Profile Setup's missing "default suggestions" behavior, not strictly ordered before/after #4.
+4. Build Core Data Consent (§2.6) — Mission Profile Setup's nav action already points there. **Done** (written, PR #11, merged).
+5. Separately: build Goal Definition (§2.2) — it's the actual blocker for Mission Profile Setup's missing "default suggestions" behavior, not strictly ordered before/after #4. **Done** (written, merged).
+6. Build Unsupervised Reliability Opt-In (§2.7) — Core Data Consent's nav action already points there. **Done this session** (branch `onboarding-unsupervised-reliability-opt-in`, not yet merged — see PR).
+7. Build First Mission Scheduling (§2.9) — closes onboarding. The one remaining real screen in Batch B's sequence besides Iron Calibration Gate (§2.5, blocked on the separate "Tier Selection outside onboarding" flow not existing yet — see row 4b above).
+8. Revisit Mission Profile Setup (§2.8) to actually wire in Goal Definition's flagged-categories default suggestions — the requirement is unblocked (step 5) but not yet consumed.

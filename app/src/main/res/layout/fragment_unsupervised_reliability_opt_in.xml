@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Onboarding, Consent & Interaction Spec §2.7 (Unsupervised Reliability Opt-In) — real
+    content, replacing OnboardingPlaceholderFragment at the unsupervisedReliabilityOptInFragment
+    destination.
+
+    §2.7's own framing, "separate screen, genuinely optional" — the load-bearing difference from
+    fragment_core_data_consent.xml one screen earlier, which has exactly one forward action
+    because there's nothing to decline into. This screen has two, deliberately unequal in
+    visual weight only insofar as Enable is the primary action a well-designed opt-in usually
+    leads with — but Skip is a first-class, equally reachable action, not a fine-print link a
+    user has to hunt for. PRD §13.4's own text is explicit: "Declining does not gate access to
+    any other feature" — both buttons below navigate to the identical next destination.
+
+    Four required content statements (§2.7's own bullet list), one paragraph each:
+    - measurement only, no enforcement ever
+    - separately deletable at any time
+    - scope limited to §2.2's flagged categories specifically, not blanket device activity
+    - the monthly Brief Self-Control Scale self-report, named and previewed, not sprung on the
+      user a month later (PRD §13.2.1)
+
+    A live Switch reflects the pending choice before either button is pressed, purely as a
+    visual preview of what "Enable" would turn on — the actual persisted opt-in value is
+    written by whichever button is actually pressed (see UnsupervisedReliabilityOptInFragment),
+    not by the Switch's state at press time, so an unpressed Switch left toggled has no
+    persistence consequence on its own.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textColor="@android:color/darker_gray"
+            android:text="@string/unsupervised_reliability_step_progress" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="20dp"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:text="@string/unsupervised_reliability_title" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:textSize="15sp"
+            android:text="@string/unsupervised_reliability_intro_body" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:textSize="15sp"
+            android:text="@string/unsupervised_reliability_measurement_only_body" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:textSize="15sp"
+            android:text="@string/unsupervised_reliability_scope_body" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:textSize="15sp"
+            android:text="@string/unsupervised_reliability_deletable_body" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:textSize="15sp"
+            android:text="@string/unsupervised_reliability_self_report_preview_body" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="28dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:text="@string/unsupervised_reliability_switch_label" />
+
+            <Switch
+                android:id="@+id/unsupervisedReliabilityOptInSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/unsupervisedReliabilityBackButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:text="@string/onboarding_placeholder_back" />
+
+        <Button
+            android:id="@+id/unsupervisedReliabilityEnableButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:text="@string/unsupervised_reliability_enable_button" />
+
+        <Button
+            android:id="@+id/unsupervisedReliabilitySkipButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/unsupervised_reliability_skip_button" />
+
+    </LinearLayout>
+
+</ScrollView>
