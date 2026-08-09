@@ -121,6 +121,11 @@ class TierTransitionUseCase(
     suspend fun explicitDowngrade(userId: UUID, toTier: Tier, now: Instant = Instant.now()): TierEvent {
         return database.withTransaction {
             val user = requireUser(userId)
+            val currentTier = requireNotNull(user.currentTier) {
+                "explicitDowngrade called for user $userId with no tier set — " +
+                    "selectInitialTier must complete before any tier-transition method runs " +
+                    "(User.kt kdoc, Batch B)"
+            }
             val lastUse = user.lastExplicitDowngradeAt
             if (lastUse != null) {
                 val elapsed = Duration.between(lastUse, now)
@@ -144,7 +149,7 @@ class TierTransitionUseCase(
                         "cooldown ${explicitDowngradeCooldown.toHours()}h (ROADMAP.md §5.15)"
                 }
             }
-            val event = writeEvent(userId, user.currentTier, toTier, TierEventKind.EXPLICIT_DOWNGRADE, reasonNote = null, now)
+            val event = writeEvent(userId, currentTier, toTier, TierEventKind.EXPLICIT_DOWNGRADE, reasonNote = null, now)
             userDao.update(user.copy(currentTier = toTier, lastExplicitDowngradeAt = now))
             event
         }
