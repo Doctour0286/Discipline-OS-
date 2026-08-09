@@ -214,6 +214,66 @@ class RecordViolationUseCaseTest {
         assertTrue(db.violationDao().get(violation.id) != null)
     }
 
+    @Test
+    fun `shared-cause guard does not block a sibling outside the 3-day window`() = runTest {
+        seedUserAndMission()
+        val clusterId = UUID.randomUUID()
+        val now = Instant.now()
+
+        val first = Violation(
+            id = UUID.randomUUID(),
+            missionId = missionId,
+            detectedAt = now.minus(java.time.Duration.ofDays(4)),
+            type = ViolationType.EARLY_EXIT,
+            rootCauseClusterId = clusterId,
+        )
+        val second = Violation(
+            id = UUID.randomUUID(),
+            missionId = missionId,
+            detectedAt = now,
+            type = ViolationType.BLOCKLIST_ACCESS,
+            rootCauseClusterId = clusterId,
+        )
+
+        useCase.execute(first)
+        val secondResult = useCase.execute(second)
+
+        // 4 days apart, outside the 3-day window — the guard must not treat this as the
+        // same incident, so the second violation applies its own penalty.
+        assertTrue(secondResult.debtEntry != null)
+        assertTrue(secondResult.reputationEntry != null)
+        assertNull(secondResult.skippedReason)
+    }
+
+    @Test
+    fun `shared-cause guard blocks a sibling just inside the 3-day window`() = runTest {
+        seedUserAndMission()
+        val clusterId = UUID.randomUUID()
+        val now = Instant.now()
+
+        val first = Violation(
+            id = UUID.randomUUID(),
+            missionId = missionId,
+            detectedAt = now.minus(java.time.Duration.ofDays(3)).plusSeconds(60),
+            type = ViolationType.EARLY_EXIT,
+            rootCauseClusterId = clusterId,
+        )
+        val second = Violation(
+            id = UUID.randomUUID(),
+            missionId = missionId,
+            detectedAt = now,
+            type = ViolationType.BLOCKLIST_ACCESS,
+            rootCauseClusterId = clusterId,
+        )
+
+        useCase.execute(first)
+        val secondResult = useCase.execute(second)
+
+        assertNull(secondResult.debtEntry)
+        assertNull(secondResult.reputationEntry)
+        assertEquals(RecordViolationUseCase.SkipReason.SHARED_CAUSE_GUARD_BOTH, secondResult.skippedReason)
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun `a crisis-exit mission must not go through this use-case`() = runTest {
         seedUserAndMission(missionStatus = MissionStatus.ABORTED_CRISIS_EXIT)

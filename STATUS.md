@@ -44,7 +44,7 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-09 (through §5.5/§5.9/§5.10/§5.15 resolution)
+**Last synced to ROADMAP.md:** 2026-08-09 (through §5.5/§5.9/§5.10/§5.15 resolution and implementation)
 
 ---
 
@@ -111,7 +111,7 @@ current-state-of-truth until it's merged, not `main` alone.
 | Feature | Status | Notes |
 |---|---|---|
 | Discipline Debt + Ceiling, tier decay | ✅ | Formulas + Ledger + shared-cause guard |
-| Reputation w/ decay-based demotion | 🟢 | `demotion_triggered` fully specified (§5.9, resolved: 7 tier bands + N=3, `[HYPOTHESIS]`) — not yet re-verified by CI/device since the resolution |
+| Reputation w/ decay-based demotion | 🟡 | `demotion_triggered` implemented (§5.9: 7 tier bands + N=3, `[HYPOTHESIS]`) — written, not yet CI/device-verified (no compiler in authoring sandbox) |
 | Four-Tier Enforcement + transitions | 🟢 | Upgrade/downgrade logic done; Iron path unexercised on-device |
 | Mission Enforcement (lock/allowlist loop) | ✅ | Verified via `DebugSeeder`, not yet via real UI-created Missions |
 | Distraction Interception | ✅ | |
@@ -139,8 +139,27 @@ Full rationale for each lives in `ROADMAP.md` §5; not duplicated here.
 | 5.10 | Reputation decay pauses during crisis-stabilization too, same as Debt accrual |
 | 5.15 | Explicit Downgrade: one tier down, 24h rolling cooldown between uses |
 
-**New follow-up task from this session (not yet built):** §5.15's 24h cooldown needs real
-implementation in `TierTransitionUseCase.explicitDowngrade` — currently decided, not coded.
+**Implemented, this session** — §5.5, §5.9, and §5.15 are now coded, not just decided:
+`RecordViolationUseCase` (3-day window), `ApplyReputationDecayUseCase` + `ReputationDecayPolicy`
++ `User.consecutiveDaysBelowFloor` (tier bands + demotion_triggered), `TierTransitionUseCase`
++ `User.lastExplicitDowngradeAt` (24h cooldown). DB bumped v4→v5 for the two new `User` fields.
+Written but **not yet run through a real compiler** — no Gradle/Android toolchain reachable
+from the authoring sandbox (same standing gap noted elsewhere in this file). Run
+`./gradlew :domain:test :data:test` before merging.
+
+**Reviewed and corrected before merge (separate session, same day):** two issues found by
+manually tracing the code against its own tests before applying — (1) a real inverted-boolean
+bug in the §5.15 cooldown check that would have blocked available attempts and allowed
+mid-cooldown ones, now fixed; (2) §5.9's demotion firing bypassed `TierTransitionUseCase`
+instead of reusing it, now fixed to call `standardDowngrade` properly. Full detail in
+`ROADMAP.md`'s matching entry. Neither issue would have been caught without this review step —
+worth remembering for every future patch, not just this one.
+
+**One open judgment call from this work, flagged for sign-off before Phase 5:** §5.9's bands
+describe Reputation *value* ranges, not tiers — nothing in the PRD/Data Model doc states which
+band each tier's "floor" is. Implementation assumes tier rank position maps to band rank
+position (Operator's floor = INCONSISTENT, Warden's = RELIABLE, Iron's = DISCIPLINED). See
+`ApplyReputationDecayUseCase`'s kdoc for the full reasoning — confirm or correct this mapping.
 
 ---
 
