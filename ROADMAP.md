@@ -686,10 +686,11 @@ one-time lesson from Phase 0.5.
 
 ```
 Phase 0 — Data Layer            █████████████████████  100% (code done, real CI green)
-Phase 1 — Domain/Use-Cases      ████████████████████░  ~95% (4 of 4 use-cases written and
+Phase 1 — Domain/Use-Cases      ████████████████████░  ~97% (4 of 4 use-cases written and
                                                         passing on real CI; demotion_triggered
-                                                        rank-band VALUES decided §5.9 (2026-08-09)
-                                                        but firing logic not yet coded/CI-verified)
+                                                        rank-band values AND firing logic now
+                                                        implemented §5.9 (2026-08-09) — written,
+                                                        not yet CI/device-verified)
 Phase 2 — Enforcement Loop      ██████████████████░░░  ~85% (all logic, resources, manifest,
                                                         and tests written, self-consistent,
                                                         AND now confirmed compiling,
@@ -768,9 +769,18 @@ verification either.
 **Updated 2026-08-09 — §5.5, §5.9, §5.10, and §5.15 are now all RESOLVED** (product owner
 sign-off session). See each section for the actual decisions. Historical item 4 below, which
 lists them as open, is superseded — left as a record of what was outstanding at the time, not
-current status. One new follow-up task exists from this session: §5.15's 24h cooldown logic
-is decided but not yet implemented in `TierTransitionUseCase.explicitDowngrade` — see §5.15
-for what's still needed.
+current status.
+
+**Updated 2026-08-09 (later same day) — §5.5, §5.9, and §5.15 are now also IMPLEMENTED**, not
+just decided: `RecordViolationUseCase` (3-day window), `ApplyReputationDecayUseCase` +
+`ReputationDecayPolicy` + `User.consecutiveDaysBelowFloor` (tier bands + demotion_triggered),
+`TierTransitionUseCase` + `User.lastExplicitDowngradeAt` (24h cooldown). DB bumped v4→v5.
+Written but not yet run through a real compiler (no Gradle/Android toolchain reachable from
+the authoring sandbox) — run `./gradlew :domain:test :data:test` before merging. One open
+judgment call from this pass, needs sign-off before Phase 5: which Reputation band each tier's
+"floor" corresponds to isn't spec-stated; implementation assumes tier rank ↔ band rank
+(Operator↔INCONSISTENT, Warden↔RELIABLE, Iron↔DISCIPLINED) — see
+`ApplyReputationDecayUseCase`'s kdoc.
 
 **Updated 2026-08-08 (§5.22) — items 2–6 below predate Tier Selection/Confirmation's
 CI+device confirmation and Mission Profile Setup's construction; left as history, not

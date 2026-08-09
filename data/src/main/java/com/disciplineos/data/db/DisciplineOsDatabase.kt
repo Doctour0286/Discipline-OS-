@@ -57,7 +57,12 @@ import net.sqlcipher.database.SupportFactory
     // MissionProfile.kt kdoc for the full account; logged ROADMAP.md §5). No migration
     // written, same v3 reasoning applies unchanged — still pre-launch, still no real
     // installed base whose data fallbackToDestructiveMigration() would put at risk.
-    version = 4,
+    // v5 (§5.5/§5.9/§5.15 implementation): no schema change for §5.5 (window is computed
+    // from existing Violation.detectedAt, nothing new stored). User gained
+    // consecutiveDaysBelowFloor (§5.9 demotion tracking) and lastExplicitDowngradeAt (§5.15
+    // cooldown tracking) — see User.kt kdoc for both. Same v3/v4 fallbackToDestructiveMigration
+    // reasoning applies unchanged.
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

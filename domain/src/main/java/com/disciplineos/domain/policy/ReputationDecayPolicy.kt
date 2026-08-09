@@ -25,6 +25,33 @@ interface ReputationDecayPolicy {
 
     /** Reputation-rank points gained per completed Mission (Data Model §3.5's `recovery_per_completed_mission`). Always >= 0. */
     fun recoveryPerCompletedMission(): Double
+
+    /** Reputation-rank band [value] falls in — see [ReputationBand]. */
+    fun bandFor(value: Double): ReputationBand
+
+    /** Consecutive days below a rank's floor required before `demotion_triggered` fires. */
+    fun consecutiveDaysBelowFloorForDemotion(): Int
+}
+
+/**
+ * ROADMAP.md §5.9, resolved 2026-08-09, `[HYPOTHESIS]` pending Phase 5 pilot data. Seven
+ * bands spanning the full 0–100 Reputation range, each with a floor (the value at/above
+ * which a user is considered "in" that band or higher).
+ */
+enum class ReputationBand(val floor: Double) {
+    UNDISCIPLINED(0.0),
+    INCONSISTENT(21.0),
+    RELIABLE(41.0),
+    DISCIPLINED(55.0),
+    RELENTLESS(70.0),
+    ELITE(85.0),
+    IRON_WILL(95.0),
+    ;
+
+    companion object {
+        /** Bands ordered highest floor first, so [bandFor]-style lookups can short-circuit on the first match. */
+        val DESCENDING = entries.sortedByDescending { it.floor }
+    }
 }
 
 /**
@@ -44,4 +71,19 @@ class HypothesisReputationDecayPolicy : ReputationDecayPolicy {
     // sliding" — a design intuition, not a validated number. Flagged exactly as such.
     override fun decayPerMissedDay(): Double = 1.0
     override fun recoveryPerCompletedMission(): Double = 1.5
+
+    /**
+     * §5.9 sign-off: bands are 0–20 / 21–40 / 41–54 / 55–69 / 70–84 / 85–94 / 95–100.
+     * [ReputationBand.DESCENDING] walk finds the highest band whose floor [value] clears —
+     * e.g. value=54 matches RELIABLE (floor 41), not DISCIPLINED (floor 55), which is exactly
+     * the 41–54 band boundary the sign-off specified. Values below 0 (shouldn't happen given
+     * the Ledger formula, but not contractually impossible) fall back to the lowest band
+     * rather than throwing, since a band lookup being asked to classify an out-of-spec value
+     * should degrade gracefully, not crash a decay run.
+     */
+    override fun bandFor(value: Double): ReputationBand =
+        ReputationBand.DESCENDING.firstOrNull { value >= it.floor } ?: ReputationBand.UNDISCIPLINED
+
+    // §5.9 sign-off: N = 3 consecutive days below a rank's floor before demotion_triggered.
+    override fun consecutiveDaysBelowFloorForDemotion(): Int = 3
 }
