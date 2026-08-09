@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Onboarding, Consent & Interaction Spec §2.4: "requires an explicit secondary confirmation
+    step for Warden/Iron specifically... a deliberate friction point, proportionate to what's
+    being agreed to." Iron never reaches this screen (rejected earlier, at Tier Selection
+    itself — §12.6, no exception path); this screen exists for Warden only, in this pass.
+
+    Deliberately plain, not alarming — §2.1's "no urgency/scarcity dark patterns" instruction
+    and §22.1's behavior-vs-identity framing apply to this static copy too (Onboarding §4:
+    every user-facing string gets that review, not just Warden Voice's generated output). The
+    friction here is a real confirmation step, not a manufactured, dramatized one.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:text="@string/tier_confirmation_title" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="40dp"
+        android:textSize="15sp"
+        android:gravity="center"
+        android:text="@string/tier_confirmation_body" />
+
+    <Button
+        android:id="@+id/tierConfirmationConfirmButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:text="@string/tier_confirmation_confirm" />
+
+    <Button
+        android:id="@+id/tierConfirmationBackButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/onboarding_placeholder_back" />
+
+</LinearLayout>

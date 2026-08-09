@@ -108,10 +108,11 @@ dependencies {
     // assertFailsWith), so this gap was specific to :app and only surfaced once CI actually
     // ran :app:compileDebugUnitTestKotlin for the first time (see §5.16's own addendum on why
     // that task wasn't wired into CI until this same pass).
-    testImplementation("androidx.fragment:fragment-testing:1.8.2") // FragmentScenario, for
-    // OnboardingPlaceholderFragmentTest (ROADMAP.md Phase 3) — launches a Fragment in
-    // isolation under Robolectric without needing a real hosting Activity/nav graph, matching
-    // this project's existing Robolectric-based approach to Android-framework-dependent tests
-    // (InterceptionControllerTest) rather than requiring an instrumented on-device test for
-    // logic this simple.
+    // fragment-testing (androidx.fragment:fragment-testing) was removed here — it was added
+    // solely to support OnboardingPlaceholderFragmentTest, which was described across several
+    // sessions but never actually written (see ROADMAP.md §3, "Known gap"). A dependency
+    // justified by a test that doesn't exist is the wrong resting state; removed rather than
+    // left as unexplained scaffolding. If real onboarding-screen tests are written later
+    // (against the actual Tier Selection UI below, not the placeholder), re-add this then,
+    // pointed at that real test.
 }

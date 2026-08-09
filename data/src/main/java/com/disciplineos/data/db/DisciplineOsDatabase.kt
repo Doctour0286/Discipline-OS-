@@ -6,10 +6,12 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.disciplineos.data.dao.MissionDao
+import com.disciplineos.data.dao.MissionProfileDao
 import com.disciplineos.data.dao.TierDao
 import com.disciplineos.data.dao.UserDao
 import com.disciplineos.data.dao.ViolationDao
 import com.disciplineos.data.entity.Mission
+import com.disciplineos.data.entity.MissionProfile
 import com.disciplineos.data.entity.OutputArtifact
 import com.disciplineos.data.entity.TierEvent
 import com.disciplineos.data.entity.User
@@ -41,6 +43,7 @@ import net.sqlcipher.database.SupportFactory
         LedgerEntry::class,
         OutputArtifact::class,
         TierEvent::class,
+        MissionProfile::class,
     ],
     // v2 (Phase 1): LedgerEntry.pausedAt added for §26.4 dispute-pause semantics.
     // v3 (Phase 1, TierTransitionUseCase): TierEvent table added; User gained
@@ -49,7 +52,12 @@ import net.sqlcipher.database.SupportFactory
     // bump inherits unchanged: the app has never shipped to a real user, so
     // fallbackToDestructiveMigration() below is the decision that item asked for, made
     // explicitly rather than left open a second time.
-    version = 3,
+    // v4 (Phase 3, Mission Profile Setup): MissionProfile table added — closes the
+    // pre-existing gap where Mission.missionProfileId referenced nothing real (see
+    // MissionProfile.kt kdoc for the full account; logged ROADMAP.md §5). No migration
+    // written, same v3 reasoning applies unchanged — still pre-launch, still no real
+    // installed base whose data fallbackToDestructiveMigration() would put at risk.
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -59,6 +67,7 @@ abstract class DisciplineOsDatabase : RoomDatabase() {
     abstract fun violationDao(): ViolationDao
     abstract fun ledgerDao(): LedgerDao
     abstract fun tierDao(): TierDao
+    abstract fun missionProfileDao(): MissionProfileDao
 
     companion object {
         private const val DB_NAME = "disciplineos_core.db"

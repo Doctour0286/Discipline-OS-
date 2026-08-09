@@ -31,8 +31,22 @@ import java.util.UUID
  * signal drove a Standard Downgrade) — optional, since several kinds (Explicit Downgrade,
  * Iron Crisis Exit) are honored "with no reason entry" per PRD §12.4.2/§12.4.4 and forcing
  * one here would reintroduce friction the PRD explicitly rules out for those paths.
+ *
+ * [Kind.INITIAL_SELECTION] — added when Tier Selection (Onboarding doc §2.4) got real
+ * content instead of placeholder navigation. Every other [Kind] here is a *transition*
+ * between two tiers an existing [com.disciplineos.data.entity.User] already has. Onboarding's
+ * first tier choice isn't a transition — there is no existing [User] row yet, so there's no
+ * `fromTier` in any meaningful sense. Rather than force this into [UPGRADE_ACCEPTED] (which
+ * §12.3's kdoc scopes to "the user accepted an already-presented recommendation" — not true
+ * of a first-ever choice with no prior tier to be recommended *from*) or invent a `fromTier`
+ * value with no referent, this is its own [Kind]. `fromTier` on the resulting [TierEvent] is
+ * set equal to `toTier` for this kind specifically (documented on [TierTransitionUseCase
+ * .selectInitialTier]) rather than left null, since [TierEvent.fromTier] is non-nullable and
+ * every other [Kind] populates it meaningfully — a real "no prior tier" sentinel would need a
+ * schema change (nullable `fromTier`) this fix doesn't take on.
  */
 enum class TierEventKind {
+    INITIAL_SELECTION,     // Onboarding §2.4 — first-ever tier choice, no prior User row exists
     UPGRADE_RECOMMENDED,  // §12.3 — recommendation only, not yet accepted
     UPGRADE_ACCEPTED,
     STANDARD_DOWNGRADE,   // §12.4.1 — sustained depletion signal
