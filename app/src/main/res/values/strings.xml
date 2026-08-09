@@ -161,4 +161,28 @@
     <string name="goal_definition_link_note">The categories you flag here are the only ones we\'ll ever look at outside your Missions — see Unsupervised Reliability later in setup.</string>
     <string name="goal_definition_continue">Continue</string>
 
+    <!--
+        §2.1 Welcome / Product Philosophy. Spec's own framing: "not a screen to sell the
+        product, it's a screen to filter for the right user." Three content requirements,
+        each with its own string below:
+        - welcome_restricts_body: states plainly that Missions restrict phone functionality
+        - welcome_tone_body: states that higher tiers include confrontational language by
+          design and that it's a choice, not a default — matches FallbackVoiceBank's own
+          scoping (Warden Voice used at Operator/Warden/Iron, never Recruit; see that file's
+          kdoc), so "a choice, not a default" is accurate to what the app actually does, not
+          aspirational copy
+        - No urgency/scarcity language anywhere on this screen (explicit anti-pattern,
+          Architecture doc §4.1's "deceptive/manipulative design patterns" app-review risk) —
+          reviewed against that same behavior-vs-identity-adjacent standard as every other
+          user-facing string in this file: describes what the product does, states a
+          filtering purpose plainly, never pressures or implies the reader is being tested by
+          continuing.
+    -->
+    <string name="welcome_step_progress">Step 1 of 8</string>
+    <string name="welcome_title">Before you start</string>
+    <string name="welcome_restricts_body">This app restricts what your phone can do while a Mission is running — apps you\'ve chosen to block are actually blocked, not just discouraged.</string>
+    <string name="welcome_tone_body">Higher tiers (Operator, Warden, Iron) give you direct, evidence-based feedback when you break a commitment — that tone is a choice you make by picking a tier, not something every setup gets by default. Recruit stays lower-pressure throughout.</string>
+    <string name="welcome_fit_body">If that sounds like more structure than you want right now, that\'s useful to know before you set anything up — you can always start at a lighter tier and move up later.</string>
+    <string name="welcome_continue">Continue</string>
+
 </resources>

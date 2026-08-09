@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Onboarding, Consent & Interaction Spec §2.1 (Welcome / Product Philosophy) — real content,
+    replacing OnboardingPlaceholderFragment at the welcomeFragment destination (the onboarding
+    graph's start destination).
+
+    Three content requirements, one paragraph each, in the order the spec lists them: states
+    Missions restrict phone functionality, states higher tiers include confrontational
+    language by choice, and — per this screen's own stated purpose ("a screen to filter for
+    the right user," not to sell) — an honest acknowledgment that this may be more structure
+    than some readers want, framed as useful information rather than a dare to continue past.
+    No stepper/progress emphasis beyond the plain "Step 1 of 8" line already used by every
+    other real screen in this flow (goal_definition_step_progress, tier_selection_step_progress,
+    etc.) — nothing on this screen should read as urgency, per §2.1's explicit anti-pattern.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textColor="@android:color/darker_gray"
+            android:text="@string/welcome_step_progress" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="20dp"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:text="@string/welcome_title" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:textSize="15sp"
+            android:text="@string/welcome_restricts_body" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:textSize="15sp"
+            android:text="@string/welcome_tone_body" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="28dp"
+            android:textSize="15sp"
+            android:text="@string/welcome_fit_body" />
+
+        <Button
+            android:id="@+id/welcomeContinueButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/welcome_continue" />
+
+        <!--
+            No Back button — this is the onboarding graph's start destination
+            (app:startDestination="@id/welcomeFragment" in onboarding_nav_graph.xml), so
+            there is nowhere for Back to go. Every other real screen in this flow
+            (GoalDefinitionFragment, TierSelectionFragment, etc.) includes a Back button
+            precisely because they're not the start destination — omitting it here isn't an
+            oversight, it matches that same "only show controls that do something real"
+            convention rather than wiring Back to a no-op or to app-exit behavior neither the
+            spec nor any other screen in this flow defines.
+        -->
+
+    </LinearLayout>
+
+</ScrollView>
