@@ -11,6 +11,7 @@ import com.disciplineos.data.ledger.LedgerDao
 import com.disciplineos.data.ledger.LedgerEntry
 import com.disciplineos.data.ledger.LedgerMetric
 import com.disciplineos.domain.policy.ConsequencePolicy
+import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 
@@ -86,9 +87,9 @@ class RecordViolationUseCase(
 
         val clusterId = violation.rootCauseClusterId
         val debtBlocked = clusterId != null &&
-            clusterAlreadyHasActiveEntry(clusterId, violation.id, LedgerMetric.DEBT)
+            clusterAlreadyHasActiveEntry(clusterId, violation.id, violation.detectedAt, LedgerMetric.DEBT)
         val reputationBlocked = clusterId != null &&
-            clusterAlreadyHasActiveEntry(clusterId, violation.id, LedgerMetric.REPUTATION)
+            clusterAlreadyHasActiveEntry(clusterId, violation.id, violation.detectedAt, LedgerMetric.REPUTATION)
 
         val debtEntry = if (debtBlocked) null else {
             val delta = consequencePolicy.debtPenalty(user.currentTier, violation.type)
@@ -115,32 +116,40 @@ class RecordViolationUseCase(
     }
 
     /**
-     * §3.5 shared-cause guard: true if some *other* Violation sharing [clusterId] already
-     * has an active (non-reversed) [metric] entry.
+     * §3.5 shared-cause guard: true if some *other* Violation sharing [clusterId], detected
+     * within [WINDOW] of [newViolationDetectedAt], already has an active (non-reversed,
+     * non-paused) [metric] entry.
      *
-     * **Window value decided (2026-08-09, ROADMAP.md §5.5) but NOT YET IMPLEMENTED here.**
-     * Product-owner sign-off: **3-day rolling window**, `[HYPOTHESIS]` pending Phase 5 pilot
-     * data — a same-cluster entry only counts as "already active" for guard purposes if it
-     * falls within 3 days of the new Violation; outside that window, treat it as a new,
-     * independently-real pattern rather than a duplicate.
-     *
-     * This method currently still checks unconditionally (any active same-cluster entry,
-     * regardless of age) — the 3-day cutoff itself is not yet coded. Do not treat this as
-     * "done" for §5.5 purposes until the window check exists here and is CI-verified. See
-     * ROADMAP.md §5.5 for full rationale.
+     * ROADMAP.md §5.5, resolved 2026-08-09: 3-day rolling window, `[HYPOTHESIS]` pending
+     * Phase 5 pilot data. A same-cluster entry only counts as "already active" for guard
+     * purposes if the *sibling Violation it belongs to* was detected within [WINDOW] of this
+     * new Violation; outside that window, treat it as a new, independently-real pattern
+     * rather than a duplicate. The window is measured against `Violation.detectedAt` (the
+     * fact being deduplicated), not `LedgerEntry.appliedAt` (when the penalty was written) —
+     * those are normally close together but are conceptually different timestamps, and the
+     * guard is about "is this the same real-world incident," which is a property of the
+     * Violations, not of when their ledger writes happened to land.
      */
     private suspend fun clusterAlreadyHasActiveEntry(
         clusterId: UUID,
         excludingViolationId: UUID,
+        newViolationDetectedAt: Instant,
         metric: LedgerMetric,
     ): Boolean {
-        val siblingIds = violationDao.forRootCauseCluster(clusterId)
-            .asSequence()
-            .map { it.id }
-            .filter { it != excludingViolationId }
-            .toList()
-        if (siblingIds.isEmpty()) return false
+        val siblings = violationDao.forRootCauseCluster(clusterId)
+            .filter { it.id != excludingViolationId }
+            .filter { sibling ->
+                val gap = Duration.between(sibling.detectedAt, newViolationDetectedAt).abs()
+                gap <= WINDOW
+            }
+        if (siblings.isEmpty()) return false
+        val siblingIds = siblings.map { it.id }
         return ledgerDao.activeEntriesForViolations(siblingIds, metric).isNotEmpty()
+    }
+
+    private companion object {
+        /** §5.5: 3-day rolling window, `[HYPOTHESIS]`. */
+        val WINDOW: Duration = Duration.ofDays(3)
     }
 
     data class Result(
