@@ -26,6 +26,15 @@ jobs:
           java-version: "17"
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+      - name: Check STATUS.md is in sync with ROADMAP.md
+        # STATUS.md is a derived summary of ROADMAP.md meant to make current state a fast
+        # read (see STATUS.md's own header). A derived doc that silently falls behind its
+        # source is worse than no derived doc — same failure class as a zip round-trip
+        # silently dropping files. This only catches "STATUS.md wasn't touched at all," not
+        # whether its content is still accurate; see scripts/check_status_sync.sh for exactly
+        # what it does and doesn't check. Runs first, before any Gradle/Android SDK work,
+        # since it's cheap and unrelated to compilation.
+        run: bash scripts/check_status_sync.sh
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
       - name: Run :data unit tests
