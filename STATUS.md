@@ -1,5 +1,33 @@
 # DisciplineOS — Status at a Glance
 
+## Handoff — read this first, every session
+
+**If you're an AI assistant (or anyone) picking this project up cold, do this before
+anything else:**
+
+1. Clone `main` (or whatever branch you're told to use — but default to `main`).
+2. Read this file top to bottom. It's short on purpose.
+3. If anything here is ambiguous or seems stale, cross-check `ROADMAP.md` directly — it's
+   the authoritative source, this file just summarizes it.
+4. Run `bash scripts/check_status_sync.sh` from repo root. If it fails, this file is known
+   stale — go read `ROADMAP.md`'s recent entries yourself before trusting anything below.
+5. State what you think the current task/next-step is *before* starting work, so a human can
+   correct a wrong read before time is spent on it, not after.
+
+**What the human should provide at handoff, if not already obvious from the repo:**
+- The actual task for this session (e.g. "build Core Data Consent," "resolve §5.9").
+- Nothing else should be necessary. If you find yourself needing the human to re-explain
+  project history, current state, or what's built — that's a bug in this file or in
+  `ROADMAP.md`, not a normal handoff requirement. Flag it and fix the doc, don't just proceed
+  on verbally-provided context that won't survive to the next session.
+
+**What NOT to do:** don't ask for a zip of the project, don't ask the human to re-describe
+what's been built. Both of those were the old workflow and are exactly what this file and
+git history replaced. If a repo clone plus this file isn't enough to orient, that's a real
+gap — say so, don't route around it by asking for a manual re-brief.
+
+---
+
 **This file is a derived view, not a source of truth.** `ROADMAP.md` is still the
 authoritative record — its prose, decision log (§5), and reasoning are not duplicated here.
 This file exists so "what's actually built and verified" is a 10-second read instead of a
