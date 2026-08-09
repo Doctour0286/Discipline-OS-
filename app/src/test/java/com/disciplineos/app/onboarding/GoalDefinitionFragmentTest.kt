@@ -16,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 /**
@@ -122,7 +123,12 @@ class GoalDefinitionFragmentTest {
         // changed to constructing a fresh User() instead of existingUser.copy(...), this is
         // exactly what would silently break.
         val userId = UUID.randomUUID()
-        val tierSelectedAt = Instant.now()
+        // Truncated to millis up front: Converters.fromInstant/toInstant round-trips
+        // Instant through epochMilli (a Long), so any sub-millisecond precision in a raw
+        // Instant.now() would not survive the insert/read cycle below and could make this
+        // assertion flaky depending on clock resolution. Truncating here means we're
+        // comparing against the same precision the DB actually persists.
+        val tierSelectedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS)
         db.userDao().insert(
             User(
                 id = userId,
