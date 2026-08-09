@@ -371,4 +371,76 @@ class TierTransitionUseCaseTest {
         assertEquals(2, events.size)
         assertTrue(events[0].occurredAt <= events[1].occurredAt)
     }
+
+    // --- Batch B (BUILD_PLAN.md): selectInitialTier now updates a pre-existing "draft" User
+    // row in place, rather than always inserting a fresh one. This is new coverage, not a
+    // rename/adjustment of an existing test — the two tests above
+    // ("...creates the user...", "...accepts Recruit, Operator, and Warden") already cover the
+    // pre-existing "no row exists yet" branch and were left unchanged; these two cover the new
+    // branch specifically. See User.kt kdoc and TierTransitionUseCase.selectInitialTier's kdoc
+    // for the full account of why a draft row can now exist before this method ever runs
+    // (GoalDefinitionFragment, Onboarding §2.2, creates one to durably store flagged
+    // categories before any tier is known).
+
+    @Test
+    fun `select initial tier updates a pre-existing draft row rather than inserting a second one`() = runTest {
+        // Simulates GoalDefinitionFragment having already created a draft row for this
+        // userId, with tier fields null and flaggedCategories already set — exactly the
+        // shape GoalDefinitionFragment's insert() branch produces.
+        db.userDao().insert(
+            User(
+                id = userId,
+                createdAt = Instant.now(),
+                currentTier = null,
+                tierSelectedAt = null,
+                tierActivationAt = null,
+                onboardingConsentVersion = null,
+                flaggedCategories = listOf("social media", "news"),
+            )
+        )
+
+        val event = useCase.selectInitialTier(userId, Tier.WARDEN, onboardingConsentVersion = "v1")
+
+        assertEquals(TierEventKind.INITIAL_SELECTION, event.kind)
+        assertEquals(Tier.WARDEN, event.fromTier)
+        assertEquals(Tier.WARDEN, event.toTier)
+
+        val user = db.userDao().get(userId)!!
+        assertEquals(Tier.WARDEN, user.currentTier)
+        assertEquals("v1", user.onboardingConsentVersion)
+        assertNotNull(user.tierSelectedAt)
+        // The real point of this test: flaggedCategories, written by the "draft row" phase
+        // before this method ever ran, must survive selectInitialTier's update untouched —
+        // if this method's User.copy(...) call ever regresses to constructing a fresh User()
+        // instead of copying the existing row, this assertion is what would catch it, since a
+        // fresh User() would silently reset flaggedCategories back to its default (empty).
+        assertEquals(listOf("social media", "news"), user.flaggedCategories)
+    }
+
+    @Test
+    fun `select initial tier on a draft row does not create a second user row`() = runTest {
+        db.userDao().insert(
+            User(
+                id = userId,
+                createdAt = Instant.now(),
+                currentTier = null,
+                tierSelectedAt = null,
+                tierActivationAt = null,
+                onboardingConsentVersion = null,
+            )
+        )
+
+        useCase.selectInitialTier(userId, Tier.RECRUIT, onboardingConsentVersion = "v1")
+
+        // getSingleLocalUser() (LIMIT 1) returning the one, correctly-updated row is the
+        // real-world symptom that would surface if this regressed to a second INSERT with a
+        // primary-key conflict (a crash) or, worse, a silently-accepted second row under a
+        // different id that getSingleLocalUser() would then pick between unpredictably. This
+        // assertion checks the id is the SAME one the draft row was created under, not just
+        // that "a" user with the right tier exists somewhere.
+        val user = db.userDao().getSingleLocalUser()
+        assertNotNull(user)
+        assertEquals(userId, user!!.id)
+        assertEquals(Tier.RECRUIT, user.currentTier)
+    }
 }

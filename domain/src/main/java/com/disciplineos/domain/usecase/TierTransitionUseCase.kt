@@ -121,6 +121,11 @@ class TierTransitionUseCase(
     suspend fun explicitDowngrade(userId: UUID, toTier: Tier, now: Instant = Instant.now()): TierEvent {
         return database.withTransaction {
             val user = requireUser(userId)
+            val currentTier = requireNotNull(user.currentTier) {
+                "explicitDowngrade called for user $userId with no tier set — " +
+                    "selectInitialTier must complete before any tier-transition method runs " +
+                    "(User.kt kdoc, Batch B)"
+            }
             val lastUse = user.lastExplicitDowngradeAt
             if (lastUse != null) {
                 val elapsed = Duration.between(lastUse, now)
@@ -144,7 +149,7 @@ class TierTransitionUseCase(
                         "cooldown ${explicitDowngradeCooldown.toHours()}h (ROADMAP.md §5.15)"
                 }
             }
-            val event = writeEvent(userId, user.currentTier, toTier, TierEventKind.EXPLICIT_DOWNGRADE, reasonNote = null, now)
+            val event = writeEvent(userId, currentTier, toTier, TierEventKind.EXPLICIT_DOWNGRADE, reasonNote = null, now)
             userDao.update(user.copy(currentTier = toTier, lastExplicitDowngradeAt = now))
             event
         }
@@ -165,7 +170,12 @@ class TierTransitionUseCase(
     suspend fun crisisDowngrade(userId: UUID, triggerReason: String, now: Instant = Instant.now()): TierEvent {
         return database.withTransaction {
             val user = requireUser(userId)
-            val event = writeEvent(userId, user.currentTier, Tier.RECRUIT, TierEventKind.CRISIS_DOWNGRADE, triggerReason, now)
+            val currentTier = requireNotNull(user.currentTier) {
+                "crisisDowngrade called for user $userId with no currentTier — " +
+                    "selectInitialTier must complete before any tier-transition method runs " +
+                    "(User.kt kdoc, Batch B)"
+            }
+            val event = writeEvent(userId, currentTier, Tier.RECRUIT, TierEventKind.CRISIS_DOWNGRADE, triggerReason, now)
             userDao.update(
                 user.copy(
                     currentTier = Tier.RECRUIT,
@@ -202,8 +212,9 @@ class TierTransitionUseCase(
     suspend fun ironCrisisExit(userId: UUID, missionId: UUID, now: Instant = Instant.now()): TierEvent {
         return database.withTransaction {
             val user = requireUser(userId)
-            require(user.currentTier == Tier.IRON) {
-                "ironCrisisExit called for user $userId at tier ${user.currentTier} — " +
+            val currentTier = user.currentTier
+            require(currentTier == Tier.IRON) {
+                "ironCrisisExit called for user $userId at tier $currentTier — " +
                     "this control only exists on the Iron-tier interception screen (PRD §12.4.4)"
             }
             val mission = requireNotNull(missionDao.get(missionId)) {
@@ -216,7 +227,7 @@ class TierTransitionUseCase(
             missionDao.update(mission.copy(status = MissionStatus.ABORTED_CRISIS_EXIT, actualEnd = now))
 
             val event = writeEvent(
-                userId, user.currentTier, Tier.RECRUIT, TierEventKind.IRON_CRISIS_EXIT,
+                userId, currentTier, Tier.RECRUIT, TierEventKind.IRON_CRISIS_EXIT,
                 reasonNote = null, occurredAt = now,
             )
             userDao.update(
@@ -273,7 +284,27 @@ class TierTransitionUseCase(
                 "once the calibration window has elapsed."
         }
         return database.withTransaction {
-            val user = User(
+            // Batch B (BUILD_PLAN.md), User.kt kdoc: a "draft" User row may already exist by
+            // the time this runs — GoalDefinitionFragment (onboarding screen 2, before this
+            // method's caller at screen 4a) now creates the row early so its own data has
+            // somewhere durable to be written, well before a tier is known. That draft row
+            // has currentTier/tierSelectedAt/tierActivationAt/onboardingConsentVersion all
+            // null and everything else (flaggedCategories, etc.) already meaningfully set.
+            // UPDATE that row in place rather than unconditionally INSERT — an unconditional
+            // insert here would throw on the primary key conflict once a draft row exists,
+            // and even if it didn't conflict, a fresh User() would silently discard whatever
+            // Goal Definition already wrote. Fall back to a real INSERT only if no row exists
+            // at all yet (e.g. a future flow reaches tier selection without going through
+            // Goal Definition first — not how onboarding_nav_graph.xml is currently wired,
+            // but this method shouldn't assume its caller's nav graph is the only possible
+            // caller).
+            val existing = userDao.get(userId)
+            val user = existing?.copy(
+                currentTier = tier,
+                tierSelectedAt = now,
+                tierActivationAt = now,
+                onboardingConsentVersion = onboardingConsentVersion,
+            ) ?: User(
                 id = userId,
                 createdAt = now,
                 currentTier = tier,
@@ -281,7 +312,7 @@ class TierTransitionUseCase(
                 tierActivationAt = now,
                 onboardingConsentVersion = onboardingConsentVersion,
             )
-            userDao.insert(user)
+            if (existing != null) userDao.update(user) else userDao.insert(user)
             writeEvent(userId, fromTier = tier, toTier = tier, TierEventKind.INITIAL_SELECTION, reasonNote = null, now)
         }
     }
@@ -326,19 +357,28 @@ class TierTransitionUseCase(
     suspend fun activateIron(userId: UUID, now: Instant = Instant.now()): TierEvent {
         return database.withTransaction {
             val user = requireUser(userId)
+            val currentTier = requireNotNull(user.currentTier) {
+                "activateIron called for user $userId with no currentTier — " +
+                    "selectInitialTier must complete before any tier-transition method runs " +
+                    "(User.kt kdoc, Batch B)"
+            }
+            val tierSelectedAt = requireNotNull(user.tierSelectedAt) {
+                "activateIron called for user $userId with no tierSelectedAt — same " +
+                    "precondition as currentTier above, set together by selectInitialTier"
+            }
             check(
                 ironCalibrationSatisfied(
                     tier = Tier.IRON,
-                    tierSelectedAtEpochMilli = user.tierSelectedAt.toEpochMilli(),
+                    tierSelectedAtEpochMilli = tierSelectedAt.toEpochMilli(),
                     calibrationWindowDays = user.calibrationWindowDays,
                     nowEpochMilli = now.toEpochMilli(),
                 )
             ) {
                 "Iron calibration gate not satisfied for user $userId: selected at " +
-                    "${user.tierSelectedAt}, window ${user.calibrationWindowDays} days, now $now " +
+                    "$tierSelectedAt, window ${user.calibrationWindowDays} days, now $now " +
                     "(PRD §12.6 — no exception path)"
             }
-            val event = writeEvent(userId, user.currentTier, Tier.IRON, TierEventKind.UPGRADE_ACCEPTED, reasonNote = null, now)
+            val event = writeEvent(userId, currentTier, Tier.IRON, TierEventKind.UPGRADE_ACCEPTED, reasonNote = null, now)
             userDao.update(user.copy(currentTier = Tier.IRON, tierActivationAt = now))
             event
         }
@@ -355,7 +395,12 @@ class TierTransitionUseCase(
     ): TierEvent {
         return database.withTransaction {
             val user = requireUser(userId)
-            val event = writeEvent(userId, user.currentTier, toTier, kind, reasonNote, now)
+            val currentTier = requireNotNull(user.currentTier) {
+                "transition called for user $userId with no currentTier — " +
+                    "selectInitialTier must complete before any tier-transition method runs " +
+                    "(User.kt kdoc, Batch B)"
+            }
+            val event = writeEvent(userId, currentTier, toTier, kind, reasonNote, now)
             userDao.update(user.copy(currentTier = toTier))
             event
         }
@@ -382,6 +427,24 @@ class TierTransitionUseCase(
         return event
     }
 
+    /**
+     * Every public method in this class transitions an *existing* tier to a new one — none of
+     * them are the "no tier chosen yet" case, which is [selectInitialTier]'s job alone (and
+     * that method deliberately doesn't call this helper — see its own body). Does NOT assert
+     * [User.currentTier] non-null here, even though every caller needs that to be true: Kotlin
+     * smart-casts from a null-check don't survive across a function boundary — asserting inside
+     * this function would not change what type `requireUser(...)`'s *return value* is seen as
+     * by callers, so it would be a no-op fix that looks like it works but doesn't (caught before
+     * merge; see BUILD_PLAN.md Batch B note — this is a second concrete example, after
+     * TierTransitionUseCase.explicitDowngrade's inverted-boolean bug, of exactly why nothing in
+     * this authoring pipeline gets trusted without being checked here, since no compiler is
+     * reachable to catch a mistake like this automatically). Each of this class's public methods
+     * asserts `user.currentTier` non-null itself, right where it's used — see e.g.
+     * [ironCrisisExit]'s existing `require(user.currentTier == Tier.IRON)`, which already
+     * happened to do this correctly by coincidence (it needs the *value*, not just non-null,
+     * so it was never at risk of this mistake) — the other methods needed the same treatment
+     * added deliberately.
+     */
     private suspend fun requireUser(userId: UUID): User =
         requireNotNull(userDao.get(userId)) { "No User found for id $userId" }
 }

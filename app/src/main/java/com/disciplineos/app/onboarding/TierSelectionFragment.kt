@@ -103,18 +103,26 @@ class TierSelectionFragment : Fragment(R.layout.fragment_tier_selection) {
 
             // Guard against re-entry: this screen's Back button (or a slow double-tap on
             // Continue before navigation completes) can bring the user here a second time
-            // after a User row already exists. UserDao.insert() has no onConflict strategy
-            // (defaults to ABORT), so a second selectInitialTier() call for a fresh random
-            // UUID would either crash outright or — if it somehow succeeded — leave two User
-            // rows behind that getSingleLocalUser()'s `LIMIT 1` would pick between
-            // unpredictably (see that method's kdoc: "single local user" is an assumption
-            // this project relies on everywhere downstream, not something this screen can
-            // quietly violate). If a local user already exists, onboarding's tier choice has
-            // already been recorded once — treat re-arriving here as "already done" and just
-            // continue forward, rather than attempting a second insert.
-            if (database.userDao().getSingleLocalUser() == null) {
+            // after tier selection already happened once.
+            //
+            // CORRECTED (Batch B, BUILD_PLAN.md) — this guard used to be "does a User row
+            // exist at all," which was correct back when the only way a User row could exist
+            // was via this exact call. That stopped being true once GoalDefinitionFragment
+            // (screen 2, earlier in the same flow) started creating a *draft* row with
+            // currentTier == null, purely to have somewhere durable to write flagged
+            // categories. The real re-entry condition now is "has a tier already been
+            // selected" (currentTier != null), not "does any row exist."
+            //
+            // Also: this must reuse the draft row's existing id, not generate a fresh
+            // UUID.randomUUID() unconditionally — TierTransitionUseCase.selectInitialTier()
+            // now updates-in-place if a row for the given userId already exists (see that
+            // method's kdoc), but only if called with the SAME id the draft row was created
+            // under. Generating a new random id here would miss the draft entirely and create
+            // a second, disconnected row — silently losing whatever Goal Definition wrote.
+            val existingUser = database.userDao().getSingleLocalUser()
+            if (existingUser == null || existingUser.currentTier == null) {
                 useCase.selectInitialTier(
-                    userId = UUID.randomUUID(),
+                    userId = existingUser?.id ?: UUID.randomUUID(),
                     tier = tier,
                     onboardingConsentVersion = ONBOARDING_CONSENT_VERSION,
                 )

@@ -91,8 +91,19 @@ this writing — check `git branch -r` / the repo's Pull Requests tab for curren
 - `TierTransitionUseCase.explicitDowngrade`: 24h rolling cooldown, `User.lastExplicitDowngradeAt`
   (§5.15)
 - DB bumped v4→v5 for two new `User` fields — **only true on the `implement-decided-follow-ups`
-  branch, not yet on `main`** as of this document's writing (`main` is still at v4). Confirm
-  which is current before assuming v5 exists when starting Batch B or later.
+  branch, not yet on `main`** as of this document's original writing (`main` is still at v4).
+
+**UPDATE 2026-08-09, escalating this from a two-way to a THREE-way v5 collision:** the
+`batch-b-onboarding-screens` branch (this session, Goal Definition) *also* bumps v4→v5,
+independently, for a completely different reason — `User.currentTier`/`tierSelectedAt`/
+`tierActivationAt`/`onboardingConsentVersion` becoming nullable (see this document's Batch B
+table, §2.2 row, for the full account of why). None of these three v5s agree with each other.
+Whichever of `implement-decided-follow-ups` / `batch-b-onboarding-screens` merges to `main`
+second (in either order) WILL need a manual v6 bump and a real rebase-and-review, not a
+mechanical merge-tool resolution — the two schema changes are both real and both needed, they
+just can't both claim v5. Flagging this loudly, here, before it's discovered as a surprise
+merge conflict: whoever handles that merge should re-read both branches' `User.kt`/
+`DisciplineOsDatabase.kt` diffs together, not just take "theirs" or "ours."
 
 **Reviewed before merge** (a real inverted-boolean bug in the cooldown check, and a
 design-quality fix to stop bypassing `TierTransitionUseCase`) — see `ROADMAP.md`'s
@@ -124,7 +135,7 @@ pass before Phase 5, but doesn't block any batch below.
 | # | Screen | Real requirement, not just a placeholder to fill |
 |---|---|---|
 | 2.1 | Welcome / Product Philosophy | Must state plainly that Missions restrict phone function and that higher tiers include confrontational language by design. Explicitly **no urgency/dark-pattern copy** — flagged as an app-review risk elsewhere in the specs, and this is the one screen every user sees regardless of tier choice. |
-| 2.2 | Goal Definition | Free-text + structured tags for high-value/high-risk categories. This output is a **hard input** to §2.7's Unsupervised Reliability scope later — UI must make that link visible to the user, not just store it silently. |
+| 2.2 | Goal Definition | **Written, not yet CI-confirmed (2026-08-09).** Free-text + structured tags for high-value/high-risk categories. This output is a **hard input** to §2.7's Unsupervised Reliability scope later — UI must make that link visible to the user (done, `goal_definition_link_note`). **Real sequencing bug found and fixed while building this screen:** this screen runs before any `User` row exists (previously only created at Tier Confirmation, screen 4a) — so its data had nowhere to persist. Fixed by having this screen create a "draft" `User` row itself; `User.currentTier`/`tierSelectedAt`/`tierActivationAt`/`onboardingConsentVersion` are now nullable to represent that pre-tier-selection state honestly (DB v4→v5 on this branch — see the merge-hazard note in Batch A.5 above, now a THREE-way v5 collision across three unmerged branches, not two). `TierTransitionUseCase.selectInitialTier` updates that draft row in place rather than always inserting; `TierSelectionFragment`/`TierConfirmationFragment`'s re-entry guards corrected to match (was "does a row exist," now "has a tier been selected"). |
 | 2.3 | Tier Explanation | All four tiers shown **side by side**, not sequentially funneled. Must state Warden/Iron's no-casual-exit design explicitly — spec calls this "the single most important disclosure in the whole flow." Explicit anti-pattern: do not visually code Iron as "the serious choice" and Recruit as "for beginners." |
 | 2.4 | Tier Selection | Already built (`onboarding-tier-selection`, merged). Listed here only for flow completeness. |
 | 2.4a | Tier Confirmation | Already built, merged. Warden path confirmed on-device; **Iron path still unexercised** — worth a real on-device pass once 2.5 exists, since Iron routes through it. |

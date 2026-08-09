@@ -62,7 +62,11 @@ import net.sqlcipher.database.SupportFactory
     // consecutiveDaysBelowFloor (§5.9 demotion tracking) and lastExplicitDowngradeAt (§5.15
     // cooldown tracking) — see User.kt kdoc for both. Same v3/v4 fallbackToDestructiveMigration
     // reasoning applies unchanged.
-    version = 5,
+    // v6 (Batch B, resolving merge conflict with the v5 above — both bumped independently
+    // from the same v4 base): User gained flaggedCategories + 4 nullable tier fields — see
+    // User.kt. Same fallbackToDestructiveMigration reasoning applies unchanged; still no real
+    // installed base.
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

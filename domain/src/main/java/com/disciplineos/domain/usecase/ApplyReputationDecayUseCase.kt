@@ -150,14 +150,23 @@ class ApplyReputationDecayUseCase(
             // the non-demoting branches is safely persisted.
             val currentValue = ledgerDao.currentValue(userId, LedgerMetric.REPUTATION)
             val currentBand = policy.bandFor(currentValue)
-            val floorBand = tierFloorBand(user.currentTier)
+            // currentTier is nullable on User (Batch B: it doesn't exist until Tier
+            // Confirmation, screen 4a, during onboarding) but this use case only ever runs
+            // post-onboarding, on an already-tiered user — see User.kt kdoc's "every
+            // non-test call site reading these four fields was checked" note, which
+            // predates this file and should be extended to cover it too.
+            val currentTier = requireNotNull(user.currentTier) {
+                "ApplyReputationDecayUseCase ran for user $userId with no tier set — " +
+                    "decay/demotion should never run before onboarding completes"
+            }
+            val floorBand = tierFloorBand(currentTier)
 
             var pendingDemotion: PendingDemotion? = null
 
             if (floorBand != null && currentBand < floorBand) {
                 val daysBelow = user.consecutiveDaysBelowFloor + 1
                 if (daysBelow >= policy.consecutiveDaysBelowFloorForDemotion()) {
-                    val toTier = oneTierDown(user.currentTier)
+                    val toTier = oneTierDown(currentTier)
                     if (toTier != null) {
                         // Reset the counter now and persist it, since standardDowngrade
                         // below will re-fetch this User row and must see the reset counter,
