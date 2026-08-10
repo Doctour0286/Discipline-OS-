@@ -2300,3 +2300,54 @@ deferred:**
    its own `DisciplineOsTheme { ... }` wrapper independently. Worth revisiting once most/all
    onboarding screens are migrated, to theme once at the Activity level instead of per-screen —
    not done here to keep this pass's diff minimal and screen-scoped.
+
+---
+
+### 5.27 — CONFIRMED — remaining 8 onboarding screens migrated to Compose (PR #16) and, together
+with First Mission Scheduling, confirmed CI **and** on-device
+
+**Closes the follow-up §5.26 itself flagged as item 1: "next sessions should migrate them
+incrementally."** This entry is that migration, done in one PR rather than several smaller ones
+— the eight screens share one established pattern (ComposeView +
+`DisposeOnViewTreeLifecycleDestroyed`, `DisciplineOsTheme` wrapper per Fragment, business logic
+left untouched in the Fragment) that First Mission Scheduling's proof-of-concept already proved
+out, so splitting further would have meant re-reviewing the same pattern eight times rather than
+once. Migrated: Welcome (§2.1), Goal Definition (§2.2), Tier Explanation (§2.3), Tier Selection
+(§2.4), Tier Confirmation (§2.4 Warden path), Mission Profile Setup (§2.8), Core Data Consent
+(§2.6), Unsupervised Reliability Opt-In (§2.7).
+
+**Verification method, stated plainly since it differs from most prior entries in this file:**
+this branch's own author (the AI assistant that wrote the migration) had no reachable Android
+compiler in its sandbox — same standing gap as §5.26 and every entry before it. Static checks
+were run (XML well-formedness, Kotlin brace balance, every `R.string.*`/`R.id.*` reference
+cross-checked against `strings.xml`/`onboarding_nav_graph.xml`, and old-vs-new business-logic
+function names diffed 1:1 to confirm nothing was dropped in the rewrite), but none of that is a
+substitute for a real compile. **The person then built the branch through real CI and confirmed
+it on-device themselves** — that confirmation, not the static checks, is what this entry
+actually records. Recorded exactly that way rather than letting the static-check language imply
+more than it does.
+
+**One correction to how this session started:** a prior session's own transcript claimed this
+same 8-screen migration was finished, verified, and ready to push — it was not. `git log
+origin/main` showed no trace of any of it; everything from that session had stayed in an
+ephemeral sandbox and was lost when it ended. This entry's work started over from the person's
+uploaded files (the one surviving artifact of that prior session), not from an assumption that
+the transcript's summary was accurate. Worth remembering generally: a session's own closing
+summary is not itself evidence a push happened — check `git log`/`git branch -r` directly, the
+same standing advice this file and `STATUS.md`'s branch notes have repeated after being burned
+by exactly this before (see the branch-note corrections earlier in this file and in
+`STATUS.md`).
+
+**Practical effect:** every onboarding screen (1–3, 5–8, per `STATUS.md`'s numbering) plus First
+Mission Scheduling (8) graduates to ✅ (CI + on-device confirmed) in `STATUS.md`'s tables this
+same pass — the first time the *entire* onboarding sequence has reached that mark together,
+not just CI-green. Only Iron Calibration Gate (row 4b) remains a placeholder, deliberately.
+
+**What this does not resolve:** the two `[HYPOTHESIS]` judgment calls §5.24 flagged for First
+Mission Scheduling (default Mission duration; reusing `ACTIVE` for a scheduled-but-not-started
+Mission) are unaffected by this migration or its confirmation — device testing exercised the
+happy path of an already-decided implementation, it didn't revisit either open judgment call.
+Also unresolved: the 9 now-dead XML layouts this migration (and §5.26 before it) leaves marked
+UNREFERENCED but not deleted, and `DisciplineOsTheme` still being applied per-Fragment rather
+than once at the Activity level — both explicitly deferred, tracked as their own follow-up items
+in `STATUS.md`'s "what's actually next," not silently dropped.
