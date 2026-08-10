@@ -11,7 +11,10 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
+import com.disciplineos.app.applist.InstalledAppsProvider
 import com.disciplineos.app.di.AppContainer
+import com.disciplineos.app.ui.onboarding.AppPickerScreen
+import com.disciplineos.app.ui.onboarding.AppSelectionEntry
 import com.disciplineos.app.ui.onboarding.MissionProfileSetupScreen
 import com.disciplineos.app.ui.theme.themedComposeView
 import com.disciplineos.data.entity.MissionProfile
@@ -23,9 +26,9 @@ import java.util.UUID
  * Onboarding, Consent & Interaction Spec §2.8 (Mission Profile Setup) — real content,
  * replacing [OnboardingPlaceholderFragment] at this one destination.
  *
- * **What this screen does:** collects a name plus an allowlist/blocklist (one package id per
- * line, free text — see the layout's own kdoc for why this is plain `EditText` rather than an
- * installed-app picker) and writes the first [MissionProfile] row for the local user, via
+ * **What this screen does:** collects a name plus an allowlist/blocklist, each chosen via an
+ * installed-app picker (see [AppPickerScreen]'s kdoc for why this replaced free-typed package
+ * ids), and writes the first [MissionProfile] row for the local user, via
  * [MissionProfileDao][com.disciplineos.data.dao.MissionProfileDao].insert directly — no
  * `:domain` use-case wraps this (unlike [TierSelectionFragment]'s
  * `TierTransitionUseCase.selectInitialTier`), because there is no transactional or
@@ -41,35 +44,34 @@ import java.util.UUID
  * either the code or the Data Model doc. This screen is what finally gives that id something
  * real to point at.
  *
- * **Default-suggestions wiring (ROADMAP.md §5.30 — closes the gap this class's own kdoc used
- * to flag):** §2.8 asks for the blocklist to "default to suggestions drawn from §2.2's flagged
- * categories rather than a blank list, to reduce first-session abandonment." That data exists
- * now (Goal Definition, §2.2, has real content as of an earlier pass) — [onCreateView] kicks
- * off an async read of [com.disciplineos.data.entity.User.flaggedCategories] and pushes the
- * result into [suggestedBlocklist], a Compose [androidx.compose.runtime.State] this Fragment
- * owns, once it resolves.
+ * **Single Compose host, two "screens."** [MissionProfileSetupScreen] and [AppPickerScreen]
+ * are both hosted from this one [onCreateView] via a local [pickerTarget] state, rather than
+ * two separate nav-graph destinations — the picker is a modal-like sub-step of this screen,
+ * not an independently navigable one (nothing else in the graph would ever link to it), so a
+ * second `fragment`/`action` pair in `onboarding_nav_graph.xml` would be structure this screen
+ * doesn't need. [installedApps] is loaded once per Fragment instance (a synchronous
+ * [android.content.pm.PackageManager] query — see [InstalledAppsProvider]'s kdoc for why no
+ * async/loading state is needed here) and shared by both allowlist and blocklist picker
+ * invocations.
  *
- * **Blocklist, not allowlist — and not both.** §2.2's own text calls flagged categories
- * "high-value" *and* "high-risk" apps/categories in the same undifferentiated free-text field
- * ([GoalDefinitionScreen][com.disciplineos.app.ui.onboarding.GoalDefinitionScreen] never asked
- * the user to say which is which, and `User.flaggedCategories` is a single `List<String>` with
- * no field distinguishing the two) — so there is no real signal in this codebase's data for
- * which flagged category the user meant as "protect this" versus "restrict this." Blindly
- * splitting the same list into both allowlist and blocklist would misrepresent high-value
- * entries as things to block. The categories field's own hint text and this app's whole
- * premise (restricting distractions during a Mission) both point the same direction: what a
- * user flags here reads as "things I'm tempted by," not "things I want unrestricted access
- * to" — so blocklist is the honest target, allowlist stays untouched (empty by default, same
- * as before this pass), rather than inventing a heuristic split the data doesn't support.
- *
- * **Still just a starting point.** `MissionProfileSetupScreen`'s own kdoc covers this in more
- * detail: the suggestion pre-fills the blocklist field's initial text, fully editable, not a
- * locked default — a user can clear or change it exactly like any hand-typed content.
+ * **No more auto-suggested blocklist (this pass — was present, based on free text, before
+ * it).** §2.2's flagged categories
+ * ([com.disciplineos.data.entity.User.flaggedCategories]) are free-typed category names like
+ * "social media" or "news," not package identifiers — there was never a real mapping from
+ * that data to specific installed packages; the prior free-text version only *appeared* to
+ * pre-fill correctly because it copied category names directly into a text field that never
+ * actually validated they were package ids either. Now that the blocklist is a real picker
+ * backed by actual installed packages, carrying that same category-name text over would just
+ * be invalid pre-selections. Rather than inventing a fuzzy category→package matching heuristic
+ * (a new and unvalidated piece of logic, out of scope for this pass), the blocklist starts
+ * empty like the allowlist; [suggestedBlocklistNote] is passed as `false` accordingly. A real
+ * category→installed-app suggestion feature, if wanted later, should be its own scoped and
+ * tested piece of work, not a byproduct of this one.
  *
  * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
- * [MissionProfileSetupScreen], hosted via [themedComposeView] (ROADMAP.md §5.29 — replaces the
- * inline `ComposeView(requireContext()).apply { ... }` boilerplate every onboarding Fragment
- * previously repeated). `parseLines`, the insert, and its re-entry guard are unchanged.
+ * [MissionProfileSetupScreen]/[AppPickerScreen], hosted via [themedComposeView] (ROADMAP.md
+ * §5.29 — replaces the inline `ComposeView(requireContext()).apply { ... }` boilerplate every
+ * onboarding Fragment previously repeated). The insert and its re-entry guard are unchanged.
  */
 class MissionProfileSetupFragment : Fragment() {
 
@@ -78,57 +80,68 @@ class MissionProfileSetupFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?,
     ): View {
-        var suggestedBlocklist by mutableStateOf("")
+        val installedApps = InstalledAppsProvider.loadLaunchableApps(requireContext())
+        val labelsByPackage = installedApps.associate { it.packageName to it.label }
 
-        loadSuggestedBlocklist { suggestion -> suggestedBlocklist = suggestion }
+        var allowlistPackages by mutableStateOf<Set<String>>(emptySet())
+        var blocklistPackages by mutableStateOf<Set<String>>(emptySet())
+        var pickerTarget by mutableStateOf<PickerTarget?>(null)
+
+        fun selectionFor(packages: Set<String>): List<AppSelectionEntry> =
+            packages
+                .map { packageName ->
+                    AppSelectionEntry(
+                        packageName = packageName,
+                        label = labelsByPackage[packageName] ?: packageName,
+                    )
+                }
+                .sortedBy { it.label.lowercase() }
 
         return themedComposeView {
-            MissionProfileSetupScreen(
-                onContinue = { rawName, allowlistRaw, blocklistRaw ->
-                    val name = rawName.trim().let {
-                        if (it.isEmpty()) DEFAULT_PROFILE_NAME else it
-                    }
-                    submitProfile(name, parseLines(allowlistRaw), parseLines(blocklistRaw))
-                },
-                onBack = { findNavController().popBackStack() },
-                suggestedBlocklist = suggestedBlocklist,
-            )
+            when (pickerTarget) {
+                null -> MissionProfileSetupScreen(
+                    onContinue = { rawName ->
+                        val name = rawName.trim().let {
+                            if (it.isEmpty()) DEFAULT_PROFILE_NAME else it
+                        }
+                        submitProfile(
+                            name,
+                            allowlistPackages.toList(),
+                            blocklistPackages.toList(),
+                        )
+                    },
+                    onBack = { findNavController().popBackStack() },
+                    onAllowlistPickerRequested = { pickerTarget = PickerTarget.ALLOWLIST },
+                    onBlocklistPickerRequested = { pickerTarget = PickerTarget.BLOCKLIST },
+                    allowlistSelection = selectionFor(allowlistPackages),
+                    blocklistSelection = selectionFor(blocklistPackages),
+                )
+                PickerTarget.ALLOWLIST -> AppPickerScreen(
+                    title = getString(R.string.mission_profile_setup_allowlist_label),
+                    apps = installedApps,
+                    selectedPackages = allowlistPackages,
+                    onToggle = { packageName ->
+                        allowlistPackages = allowlistPackages.toggle(packageName)
+                    },
+                    onDone = { pickerTarget = null },
+                    onBack = { pickerTarget = null },
+                )
+                PickerTarget.BLOCKLIST -> AppPickerScreen(
+                    title = getString(R.string.mission_profile_setup_blocklist_label),
+                    apps = installedApps,
+                    selectedPackages = blocklistPackages,
+                    onToggle = { packageName ->
+                        blocklistPackages = blocklistPackages.toggle(packageName)
+                    },
+                    onDone = { pickerTarget = null },
+                    onBack = { pickerTarget = null },
+                )
+            }
         }
     }
 
-    /**
-     * One category per line, same convention [GoalDefinitionFragment.parseLines] already
-     * established for the source data itself — blank entries dropped, not preserved as
-     * empty-string lines, matching [parseLines]'s own reasoning for why that matters
-     * downstream. Reads [com.disciplineos.data.entity.User.flaggedCategories] directly; an
-     * empty or missing list (no categories flagged, or no `User` row yet — shouldn't be
-     * reachable via this screen's own nav-graph position, but handled the same defensive way
-     * every other screen in this package treats its own "should be impossible" case) resolves
-     * to an empty string, which [MissionProfileSetupScreen] already treats as "no suggestion,"
-     * matching its pre-this-pass behavior exactly.
-     */
-    private fun loadSuggestedBlocklist(onLoaded: (String) -> Unit) {
-        lifecycleScope.launch {
-            val context = requireContext().applicationContext
-            val database = AppContainer.database(context)
-            val categories = database.userDao().getSingleLocalUser()?.flaggedCategories.orEmpty()
-            onLoaded(categories.joinToString(separator = "\n"))
-        }
-    }
-
-    /**
-     * One package id per line; blank lines and surrounding whitespace are dropped rather than
-     * stored as empty-string entries — a blank line is almost certainly incidental (trailing
-     * newline, accidental double-Enter), not a package id the user meant to add, and storing
-     * it would silently corrupt every downstream consumer of this list (e.g.
-     * `InterceptionController`'s blocklist-membership check, which has no reason to expect or
-     * handle an empty-string entry).
-     */
-    private fun parseLines(raw: String?): List<String> =
-        raw.orEmpty()
-            .lines()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
+    private fun Set<String>.toggle(value: String): Set<String> =
+        if (contains(value)) this - value else this + value
 
     private fun submitProfile(name: String, allowlist: List<String>, blocklist: List<String>) {
         lifecycleScope.launch {
@@ -164,6 +177,8 @@ class MissionProfileSetupFragment : Fragment() {
             findNavController().navigate(R.id.action_missionProfileSetup_to_coreDataConsent)
         }
     }
+
+    private enum class PickerTarget { ALLOWLIST, BLOCKLIST }
 
     companion object {
         private const val DEFAULT_PROFILE_NAME = "Default"

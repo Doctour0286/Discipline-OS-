@@ -24,12 +24,18 @@ import java.util.UUID
  * ROADMAP.md's own decision log for that removal: "a dependency justified by a nonexistent
  * test is the wrong resting state," referring to the never-written
  * `OnboardingPlaceholderFragmentTest`). Rather than re-adding that dependency for one new
- * screen, this test covers the two things [MissionProfileSetupFragment] actually depends on
- * for correctness at the data layer: [MissionProfile]/[com.disciplineos.data.dao
+ * screen, this test covers what [MissionProfileSetupFragment] actually depends on for
+ * correctness at the data layer: [MissionProfile]/[com.disciplineos.data.dao
  * .MissionProfileDao]'s round-trip and re-entry-guard behavior, which is exactly the same
  * DAO-level testing strategy [com.disciplineos.app.debug.DebugSeederTest] already uses for
- * comparable idempotency risk. [parseLinesForTest] separately covers the Fragment's own
- * pure `parseLines` line-parsing logic without needing a live Fragment/View at all.
+ * comparable idempotency risk.
+ *
+ * **No more `parseLines` coverage (as of the app-picker pass).** The Fragment used to
+ * hand-parse newline-separated free text into a package-id list; now that allow/blocklists
+ * come from [com.disciplineos.app.ui.onboarding.AppPickerScreen] as already-validated
+ * installed package names, there is no text-parsing step left in the Fragment to test — the
+ * DAO round-trip tests below already cover that a `List<String>` of package ids persists
+ * correctly, which is the only invariant that survived this change.
  *
  * Same in-memory (unencrypted) Room-under-Robolectric setup as every other `:app`-module DB
  * test in this project — see [com.disciplineos.app.debug.DebugSeederTest]'s kdoc for why.
@@ -130,29 +136,5 @@ class MissionProfileSetupFragmentTest {
         val found = db.missionProfileDao().mostRecentFor(userId)
         assertNotNull(found)
         assertEquals(profile.id, found!!.id)
-    }
-
-    // --- MissionProfileSetupFragment.parseLines, exercised directly as a pure function ---
-    // Duplicated here rather than reflectively invoking the private method on a live Fragment
-    // instance (which fragment-testing's absence makes impractical anyway) — see this file's
-    // class kdoc. Kept intentionally identical to the Fragment's own implementation; if the
-    // two ever drift, that's a signal this logic should be extracted to a shared, directly
-    // testable function rather than living only in the Fragment.
-    private fun parseLinesForTest(raw: String?): List<String> =
-        raw.orEmpty()
-            .lines()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-
-    @Test
-    fun `parseLines drops blank lines and surrounding whitespace`() {
-        val result = parseLinesForTest("  com.example.a  \n\ncom.example.b\n   \n")
-        assertEquals(listOf("com.example.a", "com.example.b"), result)
-    }
-
-    @Test
-    fun `parseLines returns an empty list for null or blank input`() {
-        assertEquals(emptyList<String>(), parseLinesForTest(null))
-        assertEquals(emptyList<String>(), parseLinesForTest("   \n  \n"))
     }
 }
