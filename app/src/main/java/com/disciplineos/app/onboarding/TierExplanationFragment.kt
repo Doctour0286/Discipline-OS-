@@ -38,10 +38,14 @@ import com.disciplineos.app.ui.theme.DisciplineOsTheme
  *   be skimmed past inside a longer block of text.
  *
  * **Anti-pattern compliance (§2.3's explicit requirement) is structural, not just a copy
- * choice:** [R.layout.fragment_tier_explanation] gives every tier's card one identical
- * template — same section order, same text sizes, same spacing, no per-tier color or
- * emphasis — so no tier can end up visually coded as "the serious choice" independent of
- * what any individual string says. See that layout file's own comment for the full reasoning.
+ * choice:** [com.disciplineos.app.ui.onboarding.TierExplanationScreen] gives every tier's card
+ * one identical `TierCard` composable — same section order, same text sizes, same spacing, no
+ * per-tier color or emphasis — so no tier can end up visually coded as "the serious choice"
+ * independent of what any individual string says. See that Screen file's own kdoc for the full
+ * reasoning (previously enforced the same way by `fragment_tier_explanation.xml`'s identical
+ * per-card `<include>` structure, before the Compose migration — see ROADMAP.md §5.27 for that
+ * migration, and STATUS.md's "known standing gaps" note on why the XML file was kept marked
+ * unreferenced for a period before deletion rather than removed in the same pass).
  *
  * **No DAO round-trip test file for this screen, deliberately** — no persistence, no DAO
  * call, no branch logic here to regress-test (same reasoning
