@@ -332,4 +332,29 @@
     <string name="first_mission_scheduling_invalid_time">That doesn\'t look like a valid date/time. Use the format shown above.</string>
     <string name="first_mission_scheduling_no_profile">No Mission Profile was found to start from. Go back and finish Mission Profile Setup first.</string>
 
+    <!--
+        Post-onboarding Home shell — did not exist before this pass. See HomeScreen.kt's kdoc:
+        minimal, not a full dashboard. Iron eligibility card only shows for a non-Iron user.
+    -->
+    <string name="home_title">DisciplineOS</string>
+    <string name="home_iron_card_title">Iron</string>
+    <string name="home_iron_card_body_eligible">Your calibration window has elapsed. Iron is available whenever you\'re ready.</string>
+    <string name="home_iron_card_body_waiting">Iron becomes available in %d day(s), once your calibration window elapses.</string>
+    <string name="home_iron_card_button_eligible">Review Iron calibration</string>
+    <string name="home_iron_card_button_waiting">View calibration status</string>
+
+    <!--
+        Iron Calibration — PRD §12.6 / Data Model §5. The real destination for an existing
+        user reaching Iron after their calibrationWindowDays window elapses, via
+        TierTransitionUseCase.activateIron(). Distinct from the onboarding-time-only
+        ironCalibrationGateFragment placeholder, which stays unreachable by design (Iron is
+        not selectable at first-time onboarding, no exception path — see onboarding_nav_graph.xml).
+    -->
+    <string name="iron_calibration_title">Iron Calibration</string>
+    <string name="iron_calibration_body">Iron removes the casual exit from every Mission. There is no downgrade path back once activated except a Crisis Exit (§12.4.4) — this is a deliberate, one-way step, not a setting you flip back and forth.</string>
+    <string name="iron_calibration_activate_button">Activate Iron</string>
+    <string name="iron_calibration_success_body">Iron is now active. Every Mission from this point on has no casual exit.</string>
+    <string name="iron_calibration_gate_not_satisfied_body">Your calibration window hasn\'t elapsed yet — %d day(s) remaining. There\'s no way to skip this; check back once it has.</string>
+    <string name="iron_calibration_done_button">Done</string>
+
 </resources>

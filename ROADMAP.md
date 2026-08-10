@@ -2523,3 +2523,96 @@ touched `.kt` files, `strings.xml` well-formedness. Push, let CI confirm, then o
 before this note graduates the same way prior entries have — the `LaunchedEffect` timing in
 particular is worth confirming visually (does the suggestion actually appear, and does the
 note only show when it should) since it's this codebase's first use of that API.
+
+---
+
+### 5.31 — RESOLVED 2026-08-10, written this session, not yet CI-confirmed — Post-onboarding
+Home shell + real Iron Calibration flow (`TierTransitionUseCase.activateIron` finally has a
+call site)
+
+**What this closes:** STATUS.md's "what's actually next" item 2 — "Build the Iron Calibration
+Gate's real destination flow... not the onboarding-time placeholder (correctly unreachable by
+design), but the actual 'existing user reaches Iron later via `TierTransitionUseCase.activateIron`'
+flow." Tracing that item surfaced a bigger, previously-undocumented gap: there was no
+post-onboarding destination of *any* kind. `firstMissionSchedulingFragment` (onboarding's last
+screen) declared no outgoing `<action>` at all, and `MainActivity` only ever ran
+`onboarding_nav_graph.xml` — a user who finished onboarding had nowhere to land. Confirmed via
+`onboarding_nav_graph.xml`'s pre-this-pass content directly, not inferred.
+
+**Scope decision, made explicitly rather than assumed:** given that finding, "build the Iron
+Calibration Gate's real destination" is really two things — (a) a minimal post-onboarding home
+shell to land on at all, and (b) the Iron Calibration screen hosted in it. Confirmed with the
+product owner to build both, not just (b) with a bare nav stub — see this session's own
+back-and-forth before any code was written.
+
+**Four new files, all in the same session:**
+- `ui/home/HomeScreen.kt` / `home/HomeFragment.kt` — the minimum post-onboarding shell. Shows
+  current tier; if the user isn't already Iron, an "Iron" card shows either a days-remaining
+  countdown or an "eligible now" call to action, computed via
+  [`ironCalibrationSatisfied`][com.disciplineos.data.metrics.ironCalibrationSatisfied] — the
+  same pure function `activateIron()` itself gates on, reused rather than re-derived, so the
+  two can't drift. Deliberately *not* a full dashboard — Daily/Weekly Reports, Reliability
+  Index reporting UI, etc. all stay `⬜` per STATUS.md; this is only the entry point the Iron
+  flow needed to exist somewhere.
+- `ui/home/IronCalibrationScreen.kt` / `home/IronCalibrationFragment.kt` — calls
+  `TierTransitionUseCase.activateIron()` directly. Its `IllegalStateException` (gate not yet
+  satisfied — a real, expected outcome per that method's own kdoc's "no exception path"
+  language, not a bug) is caught and rendered as a real UI state with a freshly-recomputed
+  days-remaining figure, not swallowed or left to crash.
+
+**Nav graph changes:** `onboarding_nav_graph.xml` gains `homeFragment` and
+`ironCalibrationFragment` destinations, plus a new outgoing `action_firstMissionScheduling_to_home`
+from onboarding's last screen — with `popUpTo`/`popUpToInclusive` clearing the entire onboarding
+back-stack on arrival, since Back from Home returning into a finished onboarding sequence would
+be wrong. Deliberately still one graph, one `NavHostFragment` — no second graph or Activity
+introduced, matching this project's existing single-NavHost pattern rather than adding
+structure the app doesn't need yet.
+
+**`ironCalibrationGateFragment` (the onboarding-time placeholder) is untouched, on purpose.**
+It stays unreachable by design (Iron's RadioButton is disabled at Tier Selection itself, §12.6)
+— this pass builds the *different* flow that destination's own long-standing comment already
+said didn't exist yet ("that flow is a Tier Selection outside onboarding, which this graph
+doesn't model at all"), rather than repurposing the placeholder destination itself. Both the
+graph's top-of-file comment and that destination's own comment are updated to say so explicitly,
+so a future reader doesn't have to re-derive which of the two "Iron Calibration"-named things is
+which.
+
+**Stale kdoc corrected in the same pass, not left to rot further:** `MainActivity.kt` and
+`activity_main.xml`'s comments still described every onboarding destination as
+`OnboardingPlaceholderFragment` — untrue since PR #16 (per STATUS.md), and now additionally
+missing the new Home/Iron Calibration destinations. Both corrected in place, with an explicit
+"Corrected, this pass" marker in `MainActivity.kt` so a future reader isn't left to wonder
+whether the correction itself is current.
+
+**A real bug caught and fixed before this entry was written, not after:** the nav-graph action
+was added first, but `FirstMissionSchedulingFragment.createMissionAndFinish` was never actually
+updated to call `findNavController().navigate(...)` — an action that exists in the graph but
+that no code fires is exactly as dead as no action at all. Caught by re-reading the Fragment
+after wiring the graph, not by a compiler (none reachable here) — worth noting as a concrete
+example of why this file's standing "no compiler in this sandbox" caveat matters in practice,
+not just as a disclaimer.
+
+**Tests:** `HomeFragmentTest.kt` — pure-function coverage of `computeHomeState` (null user,
+already-Iron, no-tier-selected-yet, mid-window, window-elapsed, exact-boundary cases), no
+Robolectric needed since the function takes plain `User?`/`Instant` and returns a plain data
+class. `IronCalibrationFragmentTest.kt` — DAO-level coverage of the Fragment's wrapper logic
+specifically (the `activateIron()` catch branch and days-remaining recomputation), same
+Robolectric-plus-in-memory-Room strategy as `TierTransitionUseCaseTest`; deliberately does not
+re-assert what that use-case-level test file already covers for `activateIron()`'s own gate
+logic in isolation.
+
+**Files touched:** `ui/home/HomeScreen.kt`, `home/HomeFragment.kt`, `ui/home/IronCalibrationScreen.kt`,
+`home/IronCalibrationFragment.kt` (all new), `onboarding_nav_graph.xml` (new destinations +
+actions, updated top comment), `FirstMissionSchedulingFragment.kt` (navigates onward now,
+corrected kdoc), `MainActivity.kt` / `activity_main.xml` (corrected stale comments),
+`strings.xml` (13 new strings), `HomeFragmentTest.kt` / `IronCalibrationFragmentTest.kt` (new).
+
+**Same standing verification caveat as every other entry in this file:** no Android/Kotlin
+compiler reachable in this authoring sandbox. Verified manually this pass: every new
+`R.string`/`R.id` reference cross-checked against `strings.xml`/`onboarding_nav_graph.xml`
+directly (not assumed), nav-graph XML confirmed well-formed via `xml.dom.minidom`, `User`
+constructor field names in both new test files cross-checked against `User.kt` directly. Push,
+let CI confirm, then on-device check before this note graduates — the Iron path in particular
+has never been on-device exercised at all before this pass (STATUS.md's Phase 1 row already
+flags "Iron path unexercised on-device"), so that on-device check is a meaningfully higher-value
+one than most of onboarding's own screens got.

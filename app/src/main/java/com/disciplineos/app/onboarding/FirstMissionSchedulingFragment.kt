@@ -25,9 +25,13 @@ import java.util.UUID
 /**
  * Onboarding, Consent & Interaction Spec §2.9 (First Mission Scheduling) — real content,
  * replacing [OnboardingPlaceholderFragment] at the firstMissionSchedulingFragment destination.
- * Closes onboarding — see onboarding_nav_graph.xml's own comment on why this destination
- * declares no outgoing `<action>`; there is no real "onboarding complete" hand-off screen yet,
- * and this Fragment does not invent one.
+ * Closes the onboarding *sequence* — but, as of this pass, no longer dead-ends the app: on
+ * success this Fragment navigates to the new `homeFragment` destination (see
+ * `action_firstMissionScheduling_to_home` in onboarding_nav_graph.xml, and
+ * [com.disciplineos.app.home.HomeFragment]'s own kdoc for what that screen is and isn't). This
+ * kdoc previously said "there is no real 'onboarding complete' hand-off screen yet, and this
+ * Fragment does not invent one" — that was accurate until this pass; STATUS.md's "what's
+ * actually next" item 2 named the missing hand-off as a real gap, and it's closed here.
  *
  * **What this screen does:** creates the first real [Mission] row for the local user, from the
  * [com.disciplineos.data.entity.MissionProfile] Mission Profile Setup (§2.8) already wrote —
@@ -185,8 +189,13 @@ class FirstMissionSchedulingFragment : Fragment() {
                 )
             )
 
-            // Onboarding ends here — no outgoing <action> exists from this destination (see
-            // nav graph's own comment). Nothing further to navigate to in this pass.
+            // Onboarding ends here and hands off to the new post-onboarding Home screen —
+            // added this pass. Previously this comment said "nothing further to navigate to";
+            // that was true until action_firstMissionScheduling_to_home was added to the nav
+            // graph this same pass (see that action's own comment for why: onboarding
+            // previously had no real "complete" hand-off, which STATUS.md's "what's actually
+            // next" item 2 named as a real gap, not a documentation nicety).
+            findNavController().navigate(R.id.action_firstMissionScheduling_to_home)
         }
     }
 
