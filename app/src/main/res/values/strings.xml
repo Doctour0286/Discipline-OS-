@@ -330,10 +330,9 @@
     <string name="first_mission_scheduling_intro_body">You can jump in right now, or schedule your first Mission for a specific time. Either way, it\'ll use the Mission Profile you just set up.</string>
     <string name="first_mission_scheduling_start_now_button">Start now</string>
     <string name="first_mission_scheduling_schedule_label">Or schedule it for later</string>
-    <string name="first_mission_scheduling_schedule_hint">e.g. 2026-08-10 09:00</string>
-    <string name="first_mission_scheduling_schedule_format_note">Enter a date and time as yyyy-MM-dd HH:mm, in your device\'s local time.</string>
+    <string name="first_mission_scheduling_schedule_unset">No date or time picked yet</string>
+    <string name="first_mission_scheduling_pick_date_time">Pick date &amp; time</string>
     <string name="first_mission_scheduling_schedule_button">Schedule Mission</string>
-    <string name="first_mission_scheduling_invalid_time">That doesn\'t look like a valid date/time. Use the format shown above.</string>
     <string name="first_mission_scheduling_no_profile">No Mission Profile was found to start from. Go back and finish Mission Profile Setup first.</string>
 
     <!--
