@@ -44,9 +44,8 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-10 (through §5.27 — remaining 8 onboarding screens
-migrated to Compose (PR #16) and, together with First Mission Scheduling, confirmed CI **and**
-on-device)
+**Last synced to ROADMAP.md:** 2026-08-10 (through §5.28 — 9 now-dead onboarding XML layouts
+deleted, cleared by §5.27's CI + on-device confirmation)
 
 ---
 
@@ -181,13 +180,6 @@ position (Operator's floor = INCONSISTENT, Warden's = RELIABLE, Iron's = DISCIPL
 - `androidx.security:security-crypto:1.1.0-alpha06` is an alpha version, pinned to match existing code rather than independently vetted.
 - The `Documents/` directory (PRD, data model, architecture, onboarding spec, crisis-boundary spec) referenced throughout `ROADMAP.md` §1 is **not checked into this repo** — only `docs/PHASE2_DEVICE_VERIFICATION.md` exists under version control. Worth deciding deliberately whether specs should be tracked here too, or intentionally kept elsewhere.
 - No compiler in the authoring sandbox this file may be edited from — every new file ships as "manually cross-checked, not compiled" until CI confirms it.
-- **9 now-dead XML layouts** (`fragment_welcome.xml`, `fragment_goal_definition.xml`,
-  `fragment_tier_explanation.xml`, `fragment_tier_selection.xml`,
-  `fragment_tier_confirmation.xml`, `fragment_mission_profile_setup.xml`,
-  `fragment_core_data_consent.xml`, `fragment_unsupervised_reliability_opt_in.xml`,
-  `fragment_first_mission_scheduling.xml`) are marked UNREFERENCED in their own top comments but
-  not yet deleted — every onboarding Fragment now hosts Compose instead. Deletion is queued as
-  its own small PR (see "what's actually next" below), not bundled into this doc-sync pass.
 - **`DisciplineOsTheme` is applied per-Fragment**, not once at the Activity level — each of the 9
   migrated screens independently wraps its own `ComposeView` content in `DisciplineOsTheme { }`.
   Functionally fine (all 9 confirmed on-device with this exact structure), but means 9 places to
@@ -209,30 +201,26 @@ is closed; what's left below is cleanup and the next phase, not more onboarding 
 
 Real remaining items, in rough priority order:
 
-1. **Delete the 9 now-dead XML layouts**, now that every screen they were marked unreferenced
-   against is CI + on-device confirmed on Compose. Small, mechanical, low-risk PR — this is the
-   natural point to do it (§5.26/§5.27 both deferred it exactly until confirmation landed, and it
-   now has). See "known standing gaps" above for the file list.
-2. **Move `DisciplineOsTheme` to the Activity level** (`MainActivity`), replacing
+1. **Move `DisciplineOsTheme` to the Activity level** (`MainActivity`), replacing
    `@android:style/Theme.NoTitleBar.Fullscreen`, instead of each of the 9 Fragments wrapping its
-   own `ComposeView` content in the theme independently. Also flagged in §5.26 as deferred until
-   most/all onboarding screens were migrated — that's now true. Slightly more involved than item
-   1 (touches `MainActivity`/`activity_main.xml`, needs its own on-device check afterward since
-   it changes how every onboarding screen is themed, not just one), so worth its own PR rather
-   than bundling with the XML deletion above.
-3. **Revisit Mission Profile Setup (§2.8)** to wire in Goal Definition's flagged-categories
+   own `ComposeView` content in the theme independently. Flagged in §5.26 as deferred until
+   most/all onboarding screens were migrated — that's now true, and the dead-XML cleanup above is
+   done, so this is next. Touches `MainActivity`/`activity_main.xml` and every onboarding
+   Fragment's `setContent { }` block; needs its own on-device check afterward since it changes how
+   every onboarding screen is themed, not just one.
+2. **Revisit Mission Profile Setup (§2.8)** to wire in Goal Definition's flagged-categories
    default suggestions — unblocked since Goal Definition merged, but still not consumed.
-4. **Resolve the two `[HYPOTHESIS]` items §5.24 flagged**: a hardcoded default Mission
+3. **Resolve the two `[HYPOTHESIS]` items §5.24 flagged**: a hardcoded default Mission
    duration with no spec source, and reusing `ACTIVE` status for a scheduled-but-not-yet-
    started Mission (no dedicated status exists for that state). Neither blocks anything, but
    both are open judgment calls a product-owner sign-off pass (like the one that closed
    §5.5/§5.9/§5.10/§5.15) could resolve properly instead of leaving as engineering defaults.
-5. **Build the Iron Calibration Gate's real destination flow** — not the onboarding-time
+4. **Build the Iron Calibration Gate's real destination flow** — not the onboarding-time
    placeholder (which is correctly unreachable by design, row 4b), but the actual "existing
    user reaches Iron later via `TierTransitionUseCase.activateIron`" flow that destination
    exists for. This is a real, currently-unbuilt UI surface, not a documentation gap.
-6. **Phase 4 (Behavioral Fingerprint / Predictive Failure)** — the next full *phase*, not a
+5. **Phase 4 (Behavioral Fingerprint / Predictive Failure)** — the next full *phase*, not a
    screen-level item. Depends on Phase 3's alert-card pattern (§3.5 of the Onboarding spec
    already defines the pattern in full) existing to render into, which nothing above blocks
-   structurally. This is the largest genuinely new chunk of work once items 1–5 settle, and the
-   natural "what's next" once onboarding cleanup (1–2) and its two open loose ends (3–4) close.
+   structurally. This is the largest genuinely new chunk of work once items 1–4 settle, and the
+   natural "what's next" once onboarding cleanup (1) and its two open loose ends (2–3) close.

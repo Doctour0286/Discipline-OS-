@@ -2351,3 +2351,49 @@ Also unresolved: the 9 now-dead XML layouts this migration (and §5.26 before it
 UNREFERENCED but not deleted, and `DisciplineOsTheme` still being applied per-Fragment rather
 than once at the Activity level — both explicitly deferred, tracked as their own follow-up items
 in `STATUS.md`'s "what's actually next," not silently dropped.
+
+---
+
+### 5.28 — RESOLVED — 9 now-dead onboarding XML layouts deleted
+
+**Closes STATUS.md's "what's actually next" item 1, queued in §5.27 pending confirmation.**
+§5.27's own confirmation (CI + on-device, all 9 onboarding screens on Compose) is exactly the
+condition that entry set for doing this — so this pass deletes rather than defers further:
+
+- `fragment_welcome.xml`
+- `fragment_goal_definition.xml`
+- `fragment_tier_explanation.xml`
+- `fragment_tier_selection.xml`
+- `fragment_tier_confirmation.xml`
+- `fragment_mission_profile_setup.xml`
+- `fragment_core_data_consent.xml`
+- `fragment_unsupervised_reliability_opt_in.xml`
+- `fragment_first_mission_scheduling.xml`
+
+Each had been left in place through §5.26/§5.27, marked UNREFERENCED in its own top comment,
+specifically so the Compose migration's diff stayed easy to review without interleaving unrelated
+deletions — see either entry's own reasoning. That reason no longer applies once the migration
+itself is fully confirmed, so keeping the files around any longer would just be dead weight, not
+a real safety margin.
+
+**Checked before deleting, not assumed:** grepped the full tree for `R.layout.<name>`,
+`layout/<name>.xml`, and `@layout/<name>` references across every `.kt`/`.xml` file. Found one
+live reference — `TierExplanationFragment.kt`'s own kdoc still pointed at
+`[R.layout.fragment_tier_explanation]` as the place enforcing §2.3's anti-severity-coding
+structural guarantee, stale since that screen's own §5.27 migration moved the actual guarantee
+into `TierExplanationScreen.kt`'s shared `TierCard` composable. Updated that kdoc to point at the
+real current source rather than leaving a dangling reference to a file this entry deletes.
+`fragment_onboarding_placeholder.xml` was deliberately left alone — still live, still backing
+`OnboardingPlaceholderFragment` at the one destination that hasn't been given real content
+(Iron Calibration Gate, row 4b), not part of this cleanup.
+
+**Not touched:** `strings.xml`. All string resources the deleted layouts once referenced (via
+`android:text="@string/..."`) are still actively read by the Compose screens that replaced them
+(via `stringResource(R.string....)`), so nothing here is orphaned — confirmed by the same
+string-resolution check §5.27 already ran, re-run against the post-deletion tree.
+
+**Same standing verification caveat as every other entry in this file:** no Android/Kotlin
+compiler reachable in this authoring sandbox. Layout XML across the tree re-verified well-formed
+via Python's `xml.etree.ElementTree` after deletion; the one kdoc edit above is prose, not a
+code change, and doesn't affect compilation either way. Push, let CI confirm, then this note
+graduates the same way prior entries have.
