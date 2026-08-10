@@ -9,7 +9,6 @@ import com.disciplineos.data.ledger.LedgerDao
 import com.disciplineos.data.ledger.LedgerMetric
 import com.disciplineos.data.metrics.clampToDebtCeiling
 import com.disciplineos.data.metrics.debtCeiling
-import com.disciplineos.data.metrics.ironCalibrationSatisfied
 import com.disciplineos.domain.policy.BehavioralFingerprintPolicy
 import java.time.Instant
 import java.time.ZoneOffset
@@ -39,18 +38,20 @@ import java.util.UUID
  *
  * **Calibration-window gate — a judgment call, not directly spec-stated.** Neither the
  * Fingerprint doc nor the Onboarding/Interaction Spec says predictive alerts should be
- * suppressed during a user's Iron calibration window. This implementation treats it as a
- * reasonable reading anyway: calibration is explicitly a "just keep using the app normally,
- * we're just watching" window (Data Model §5 / PRD §12.6), and surfacing a "here's a pattern
- * in your behavior" alert during a window whose entire premise is *not* editorializing about
- * behavior yet would sit against that framing — same posture as [ApplyReputationDecayUseCase]'s
- * "Crisis stabilization pause" judgment call, flagged explicitly rather than silently assumed.
- * Reuses [ironCalibrationSatisfied] (the same pure function [HomeFragment.computeHomeState] and
- * [TierTransitionUseCase.activateIron] already gate on) rather than re-deriving the window
- * threshold a second time. If the user has no tier selected yet (shouldn't happen — this
- * use-case is only ever called post-onboarding, same assumption [ApplyReputationDecayUseCase]
- * makes), the gate defaults to "satisfied" so a null/pre-onboarding user doesn't spuriously
- * suppress everything either.
+ * suppressed during a user's post-tier-selection calibration window. This implementation
+ * treats it as a reasonable reading anyway: calibration is explicitly a "just keep using the
+ * app normally, we're just watching" window (Data Model §5 / PRD §12.6), and surfacing a
+ * "here's a pattern in your behavior" alert during a window whose entire premise is *not*
+ * editorializing about behavior yet would sit against that framing — same posture as
+ * [ApplyReputationDecayUseCase]'s "Crisis stabilization pause" judgment call, flagged
+ * explicitly rather than silently assumed. **Deliberately does NOT reuse [com.disciplineos.data.metrics.ironCalibrationSatisfied]**
+ * — that function is Iron-specific by its own kdoc ("gate only applies to Iron"; every other
+ * tier returns `true`/satisfied unconditionally), so calling it for an Operator/Warden user
+ * would silently never gate anything for them, which is wrong for this use-case's purpose (a
+ * fingerprint alert during *any* tier's fresh calibration window is premature, not just
+ * Iron's). [tierCalibrationWindowElapsed] below is this use-case's own general version of the
+ * same "has [User.calibrationWindowDays] elapsed since [User.tierSelectedAt]" check, applied
+ * uniformly across tiers rather than gated to one.
  *
  * **Dismissal suppression — Fingerprint doc §5 / Onboarding §3.5.** A rule whose most recent
  * dismissal (any outcome — "Not accurate" and "Got it" both suppress equally; Spec §3.5 doesn't
@@ -76,21 +77,16 @@ class ComputeBehavioralFingerprintUseCase(
     suspend fun execute(userId: UUID, now: Instant): BehavioralFingerprintResult {
         val user = userDao.get(userId)
 
-        // Calibration gate — see class kdoc. Defaults to "satisfied" (i.e. don't suppress)
-        // for a null/untiered user, since that's an already-defensive "shouldn't be
-        // reachable" case elsewhere in this codebase, not a real calibration window.
+        // Calibration gate — see class kdoc's "Deliberately does NOT reuse
+        // ironCalibrationSatisfied" note. Defaults to "elapsed" (i.e. don't suppress) for a
+        // null/untiered user, since that's an already-defensive "shouldn't be reachable" case
+        // elsewhere in this codebase, not a real calibration window.
         val calibrationSatisfied = user?.let { u ->
             val tierSelectedAt = u.tierSelectedAt ?: return@let true
-            val tier = u.currentTier ?: return@let true
-            ironCalibrationSatisfied(
-                tier = tier,
-                tierSelectedAtEpochMilli = tierSelectedAt.toEpochMilli(),
-                calibrationWindowDays = u.calibrationWindowDays,
-                nowEpochMilli = now.toEpochMilli(),
-            )
+            tierCalibrationWindowElapsed(tierSelectedAt, u.calibrationWindowDays, now)
         } ?: true
 
-        val f1 = computeF1(userId, now)
+        val f1 = computeF1(userId)
         val f2 = computeF2(userId, now)
         val f3 = computeF3(userId, now)
         val f4 = computeF4()
@@ -153,7 +149,7 @@ class ComputeBehavioralFingerprintUseCase(
      * 21:00-23:00 vs 21:30-23:30 should both count as the same cluster if 3+ violations fall
      * in either).
      */
-    private suspend fun computeF1(userId: UUID, now: Instant): FingerprintSignal {
+    private suspend fun computeF1(userId: UUID): FingerprintSignal {
         val missionIds = missionDao.missionIdsWithAnyViolation(userId, policy.f1MissionWindow())
         if (missionIds.isEmpty()) {
             return FingerprintSignal(FingerprintRule.F1, triggered = false, confidence = FingerprintConfidence.NONE, sampleSize = 0, value = null)
@@ -409,5 +405,17 @@ class ComputeBehavioralFingerprintUseCase(
         FingerprintRule.F3 -> policy.f3WindowDays()
         FingerprintRule.F4 -> 0 // never surfaced — value unused
         FingerprintRule.F5 -> policy.f5WindowDays()
+    }
+
+    /**
+     * This use-case's own tier-agnostic calibration check — see class kdoc's "Deliberately
+     * does NOT reuse [com.disciplineos.data.metrics.ironCalibrationSatisfied]" note for why that Iron-only function isn't
+     * used here. Same arithmetic that function applies (elapsed time since [tierSelectedAt]
+     * against [calibrationWindowDays]), just without the `tier != Tier.IRON -> true`
+     * short-circuit that makes it a no-op for every other tier.
+     */
+    private fun tierCalibrationWindowElapsed(tierSelectedAt: Instant, calibrationWindowDays: Int, now: Instant): Boolean {
+        val windowMillis = calibrationWindowDays * 24L * 60 * 60 * 1000
+        return now.toEpochMilli() >= tierSelectedAt.toEpochMilli() + windowMillis
     }
 }
