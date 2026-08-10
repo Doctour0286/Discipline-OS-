@@ -2178,3 +2178,125 @@ own.
 Mission duration; reusing `ACTIVE` for a scheduled-but-not-started Mission) are still open —
 CI confirms the code compiles and its own tests pass, not that either judgment call is the
 right one. Those remain real open items, not closed by this entry.
+
+### 5.26 — RESOLVED, written this session, not yet CI-confirmed — Design system (Color/Type/Theme,
+Compose scaffolding) + First Mission Scheduling migrated to Compose as proof-of-concept
+
+**Written concurrently with, and rebased onto, §5.25's CI-confirmation entry above** — this
+entry was authored in a session that branched from `main` before PR #13 (§2.9) had gone through
+its own CI-confirmation pass, so it inherits §5.25's confirmation for everything up through
+First Mission Scheduling's original (pre-Compose) content. The Compose migration below is new
+code on top of that already-confirmed baseline, and is itself not yet CI-confirmed — same
+standing caveat as every entry before §5.25 graduated.
+
+**Why now, not "a follow-on doc" indefinitely:** Onboarding spec §5 explicitly defers "visual
+design system, color, typography" as a follow-on, not blocking engineering. It was never blocked
+— it just hadn't been done. Separately, and more forcingly: Google announced at I/O 2026 that the
+Views-based UI toolkit (`android.widget`, including MDC-Android specifically) is now in
+maintenance mode, with the platform officially Compose-first going forward — verified this
+session against developer.android.com directly (not secondhand), not just the MDC-Android repo's
+own README. This project's existing plain-View screens (`activity_mission_interception.xml`'s own
+comment: "no Compose dependency exists yet... no framework not already justified") were a
+reasonable choice at the time; that comment is now stale, not wrong for when it was written —
+recorded honestly rather than silently contradicted.
+
+**Decision: adopt Compose, migrate incrementally, scope to onboarding only.** Considered and
+rejected: (a) staying on Views + Material Components indefinitely — still technically works
+("maintenance mode" means no new features, not broken — bugs still get fixed), but every future
+onboarding screen built on it is debt paid down later on a pre-launch app with zero real users,
+which is exactly when migration cost is lowest; (b) a full rewrite of the whole app in one pass —
+rejected as too large a single change, and Phase 2 (interception/accessibility-service screens)
+is meaningfully gnarlier to move than onboarding's plain Fragment+DAO screens. Landed on: Compose
+for onboarding going forward, migrated one screen at a time via `ComposeView` hosted inside the
+existing Fragment/Jetpack-Navigation shell — the officially recommended incremental strategy
+(developer.android.com/develop/ui/compose/migrate/strategy, checked this session), not a
+big-bang rewrite. Phase 2 stays on plain Views, untouched by this pass, migrated later as its own
+deliberate decision if ever.
+
+**Version pinning, checked against real compatibility docs, not assumed:** this project stays on
+Kotlin 1.9.24 / AGP 8.5.2 / compileSdk 34 (no bump bundled into this design-system change). Compose
+Compiler pinned to `1.5.14` — verified via Google's own release notes ("this compiler release is
+targeting Kotlin 1.9.24") rather than guessed, using the legacy `composeOptions {
+kotlinCompilerExtensionVersion }` approach since Kotlin < 2.0 predates the newer Compose Compiler
+Gradle plugin model. Compose BOM pinned to `2024.09.00` — the BOM current when compileSdk 34 was
+the norm; later BOMs (1.12.0/2026.04+) require compileSdk 37+, which this pass deliberately does
+not force.
+
+**Color.kt / Type.kt / Theme.kt** (`app/src/main/java/com/disciplineos/app/ui/theme/`) — the
+actual design system, grounded in spec text checked directly this session, not paraphrased from
+a prior summary:
+- Onboarding spec §2.3's explicit anti-pattern ("do not visually code Iron as the real/serious
+  choice and Recruit as for beginners") and §3.5's explicit rejection of red/yellow severity
+  coding across Predictive Failure Alerts drove a hard rule: no tier/severity color-coding
+  anywhere in this palette, one deliberate accent color total, no red/yellow/green role at all
+  (`Error` is a desaturated terracotta, reserved for genuine destructive/validation-failure UI
+  states, never for coding a Mission/tier/violation as more or less serious).
+- The single accent (`#B08D57`, muted brass/ochre) is deliberately low-saturation — reads as an
+  instrument-panel dial, not a brand color or gamified "tap here" CTA — consistent with §3.4's
+  "progress-toward-a-boundary, not gamified reward-progress" language for Debt Ceiling markers,
+  and with the PRD's own stated identity ("exactly as strict as the person needs, no stricter
+  than consented to"). Re-reading the actual onboarding copy (`welcome_tone_body` etc.) this
+  session confirmed the app's dominant voice is calm and plain-spoken even when disclosing
+  confrontational higher-tier behavior — the visual identity should be restrained by default to
+  match, not aggressive-by-default the way a naive "discipline enforcer" reading might suggest.
+- M3's tone-based `surfaceContainer*` ladder used throughout (not a single flat "card background"
+  color) — current M3 guidance (verified this session) replaced M2's opacity-based elevation
+  overlays with this model.
+- Every text-on-fill color pairing checked against the real WCAG 2 contrast formula (relative
+  luminance), computed with a standalone script this session rather than eyeballed or asserted —
+  see Color.kt's kdoc table for the actual ratios. One real finding from that check: the initial
+  `Outline` color (`#5B5F68`) measured 2.93:1 against `Background`, short of the 3:1 UI-component
+  threshold — bumped to `#6B6F78` (4.12:1) before use, not shipped at the failing value.
+- Two system fonts only (`FontFamily.Monospace` for numeric/instrument-style content — tier
+  labels, step counters; `FontFamily.SansSerif` for everything else) — zero bundled font files,
+  a deliberate v1 simplification noted as such, not a silently skipped step.
+- Dark-only for this pass, no dynamic color (Material You wallpaper-derived theming) — both
+  logged as deliberate scope limits in Theme.kt's kdoc, not silent gaps: a light palette would
+  need its own contrast pass, and dynamic color could inject an arbitrary wallpaper-derived hue
+  that undermines the anti-severity-coding constraint above.
+
+**FirstMissionSchedulingFragment/Screen migrated as the proof-of-concept.** Chosen because it's
+onboarding's newest, most isolated screen (§5.24, same session line of work) — no deep nav
+dependents, no shared cross-screen state. `FirstMissionSchedulingScreen.kt`
+(`ui/onboarding/`) is presentation only; every line of actual business logic (`parseScheduledTime`,
+`createMissionAndFinish`, the Mission-creation semantics §5.24 already reasoned through) stays in
+the Fragment, completely unchanged — this migration swaps the rendering layer, not what the
+screen does. Fragment now hosts the composable via a single `ComposeView` +
+`ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed` (the officially documented pattern
+for ComposeView-in-Fragment, verified this session) rather than inflating XML. §2.9's "doesn't
+affect this screen's design" requirement carried over unchanged: Start Now and Schedule Mission
+are both `Button` (equal visual weight), neither demoted to a lower-emphasis style, so neither
+reads as the recommended path.
+
+`fragment_first_mission_scheduling.xml` is left in place, marked unreferenced in its own top
+comment, rather than deleted in this same commit — cleanup of now-dead XML layouts left behind by
+the Compose migration is tracked as its own future step (see STATUS.md's known standing gaps), so
+it doesn't get interleaved with this migration's own diff.
+
+**Same standing caveat as every other new file in this project until it's been through real CI:**
+manually cross-checked this session — every touched/added XML file re-verified well-formed via
+Python's `xml.etree.ElementTree`, every new/edited Kotlin file brace/paren-balance-checked, every
+`R.string.*` reference in the new Compose screen confirmed to resolve against `strings.xml`'s
+actual declarations, `darkColorScheme()`'s parameter names (including the newer
+`surfaceContainerLowest`/`surfaceContainerLow`/etc. roles) checked against current API
+documentation rather than assumed from memory. No Android/Kotlin compiler reachable in this
+authoring sandbox (`./gradlew --version` still fails: `services.gradle.org` isn't on this
+sandbox's allowed network egress list, same standing gap noted throughout this file) — push, let
+CI confirm, then this note graduates the same way prior entries have.
+
+**Real follow-up work this pass deliberately did not attempt, flagged rather than silently
+deferred:**
+1. Only one screen (First Mission Scheduling) migrated. The other seven onboarding screens still
+   render their existing XML layouts unchanged — next sessions should migrate them incrementally,
+   a few at a time, verified at each step, matching this project's own established "small,
+   reviewable, one-concern-per-PR" convention (see §5's own prior entries on Batch B screens).
+2. `fragment_first_mission_scheduling.xml` (and, as more screens migrate, their XML layouts) is
+   dead code, marked but not removed — a real, tracked cleanup gap, not an oversight.
+3. No light theme, no dynamic color — both explicit scope cuts, not gaps, per Theme.kt's kdoc;
+   revisit only on a deliberate future ask.
+4. `MainActivity`/`activity_main.xml` (the `NavHostFragment` container) was not touched — it stays
+   a plain Activity theme (`@android:style/Theme.NoTitleBar.Fullscreen`, unchanged); nothing in
+   this pass wires `DisciplineOsTheme` at the Activity level, since each migrated Fragment applies
+   its own `DisciplineOsTheme { ... }` wrapper independently. Worth revisiting once most/all
+   onboarding screens are migrated, to theme once at the Activity level instead of per-screen —
+   not done here to keep this pass's diff minimal and screen-scoped.
