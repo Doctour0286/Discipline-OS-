@@ -367,8 +367,8 @@
         explicitly internal-only for MVP, "no UI surface at all until promoted."
     -->
     <string name="predictive_alert_f1_observation">Your last several violations happened in the evening — want to review your evening Mission Profile?</string>
-    <string name="predictive_alert_f2_observation">Several recent Missions ended in the first few minutes — is the scope or allowlist right for what you\\'re trying to do?</string>
-    <string name="predictive_alert_f3_observation">You\\'re trending toward your Debt Ceiling this week.</string>
+    <string name="predictive_alert_f2_observation">Several recent Missions ended in the first few minutes — is the scope or allowlist right for what you\'re trying to do?</string>
+    <string name="predictive_alert_f3_observation">You\'re trending toward your Debt Ceiling this week.</string>
     <string name="predictive_alert_f5_observation">This Mission Profile may no longer fit your goals.</string>
 
     <string name="predictive_alert_action_review_evening_profile">Review evening Mission Profile</string>
