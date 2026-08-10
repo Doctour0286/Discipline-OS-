@@ -2,8 +2,11 @@ package com.disciplineos.app.di
 
 import android.content.Context
 import com.disciplineos.data.db.DisciplineOsDatabase
+import com.disciplineos.domain.policy.BehavioralFingerprintPolicy
 import com.disciplineos.domain.policy.ConsequencePolicy
+import com.disciplineos.domain.policy.HypothesisBehavioralFingerprintPolicy
 import com.disciplineos.domain.policy.HypothesisConsequencePolicy
+import com.disciplineos.domain.usecase.ComputeBehavioralFingerprintUseCase
 import com.disciplineos.domain.usecase.RecordViolationUseCase
 import com.disciplineos.domain.usecase.TierTransitionUseCase
 import com.disciplineos.domain.voice.WardenVoiceGenerator
@@ -65,6 +68,25 @@ object AppContainer {
             userDao = db.userDao(),
             tierDao = db.tierDao(),
             missionDao = db.missionDao(),
+        )
+    }
+
+    /**
+     * [HYPOTHESIS]: `HypothesisBehavioralFingerprintPolicy` — same posture as
+     * [consequencePolicy] above, see that policy's own kdoc for the full reasoning restated.
+     */
+    fun behavioralFingerprintPolicy(): BehavioralFingerprintPolicy = HypothesisBehavioralFingerprintPolicy()
+
+    /** ROADMAP.md Phase 4 — F1–F5 rule implementations, wired the same manual-DI way as every other use-case in this file. */
+    fun computeBehavioralFingerprintUseCase(context: Context): ComputeBehavioralFingerprintUseCase {
+        val db = database(context)
+        return ComputeBehavioralFingerprintUseCase(
+            missionDao = db.missionDao(),
+            violationDao = db.violationDao(),
+            ledgerDao = db.ledgerDao(),
+            userDao = db.userDao(),
+            dismissalDao = db.predictiveFailureAlertDismissalDao(),
+            policy = behavioralFingerprintPolicy(),
         )
     }
 
