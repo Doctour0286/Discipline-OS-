@@ -139,14 +139,18 @@
     <string name="mission_profile_setup_name_label">Profile name</string>
     <string name="mission_profile_setup_name_hint">e.g. Deep Work</string>
     <string name="mission_profile_setup_allowlist_label">Allowed apps</string>
-    <string name="mission_profile_setup_allowlist_hint_body">One app per line. Leave blank if you\'d rather define this by what\'s blocked.</string>
-    <string name="mission_profile_setup_allowlist_hint">com.example.notes</string>
+    <string name="mission_profile_setup_allowlist_hint_body">Pick apps to allow. Leave empty if you\'d rather define this by what\'s blocked.</string>
     <string name="mission_profile_setup_blocklist_label">Blocked apps</string>
-    <string name="mission_profile_setup_blocklist_hint_body">One app per line. These are off-limits for the duration of a Mission using this Profile.</string>
-    <string name="mission_profile_setup_blocklist_hint">com.example.socialapp</string>
+    <string name="mission_profile_setup_blocklist_hint_body">Pick apps to block. These are off-limits for the duration of a Mission using this Profile.</string>
     <string name="mission_profile_setup_blocklist_suggested_note">Pre-filled from the categories you flagged earlier — edit or clear freely.</string>
     <string name="mission_profile_setup_empty_ok_note">Both lists are optional here — you can leave them empty and fill them in later.</string>
     <string name="mission_profile_setup_continue">Continue</string>
+    <string name="mission_profile_setup_selection_empty">None selected</string>
+    <string name="mission_profile_setup_choose_apps">Choose apps\u2026</string>
+    <string name="app_picker_selected_count">%1$d selected</string>
+    <string name="app_picker_search_hint">Search apps</string>
+    <string name="app_picker_empty">No apps found.</string>
+    <string name="app_picker_done">Done</string>
 
     <!-- §2.2 Goal Definition. "Link visible" requirement (spec's own phrase) is
          goal_definition_link_note below — must state plainly that these are the *only*
