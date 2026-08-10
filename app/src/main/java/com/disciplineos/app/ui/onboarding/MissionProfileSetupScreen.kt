@@ -14,6 +14,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,16 +31,43 @@ import com.disciplineos.app.R
  * default-name fallback all stay in
  * [com.disciplineos.app.onboarding.MissionProfileSetupFragment], whose kdoc explains why no
  * `:domain` use-case wraps this single unconditional insert.
+ *
+ * **[suggestedBlocklist] (ROADMAP.md §5.30):** §2.8's own text — "should default to
+ * suggestions drawn from §2.2's flagged categories rather than a blank list, to reduce
+ * first-session abandonment" — pre-fills the blocklist field's initial value only; the
+ * allowlist starts empty regardless. See [MissionProfileSetupFragment]'s kdoc for why
+ * blocklist, not allowlist, is the correct target given what this codebase's flagged-category
+ * data actually is. Still freely editable — this is a starting point, not a locked default;
+ * the user can clear or change it like any other field content before continuing.
+ *
+ * **Arrives asynchronously, applied exactly once.** [MissionProfileSetupFragment] can't await
+ * its DB read before `onCreateView` returns a `View` synchronously, so this composable starts
+ * with `suggestedBlocklist = ""` and the Fragment supplies the real value once its query
+ * resolves (almost always within one recomposition in practice, but not guaranteed). Applying
+ * it via [LaunchedEffect] keyed on [suggestedBlocklist] — rather than seeding
+ * `remember { mutableStateOf(suggestedBlocklist) }` directly — means a late-arriving value
+ * still reaches the field; a `hasAppliedSuggestion` guard stops that same effect from
+ * re-firing and clobbering the user's own edits if [suggestedBlocklist] happens to recompute
+ * again later (e.g. Fragment recreation) after the user already changed the field by hand.
  */
 @Composable
 fun MissionProfileSetupScreen(
     onContinue: (name: String, allowlistRaw: String, blocklistRaw: String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    suggestedBlocklist: String = "",
 ) {
     var name by remember { mutableStateOf("") }
     var allowlist by remember { mutableStateOf("") }
     var blocklist by remember { mutableStateOf("") }
+    var hasAppliedSuggestion by remember { mutableStateOf(false) }
+
+    LaunchedEffect(suggestedBlocklist) {
+        if (!hasAppliedSuggestion && suggestedBlocklist.isNotEmpty()) {
+            blocklist = suggestedBlocklist
+            hasAppliedSuggestion = true
+        }
+    }
 
     Scaffold(modifier = modifier.fillMaxSize()) { contentPadding ->
         Column(
@@ -118,6 +146,14 @@ fun MissionProfileSetupScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
+            if (hasAppliedSuggestion) {
+                Text(
+                    text = stringResource(R.string.mission_profile_setup_blocklist_suggested_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
             OutlinedTextField(
                 value = blocklist,
                 onValueChange = { blocklist = it },
