@@ -4,15 +4,13 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
 import com.disciplineos.app.ui.onboarding.TierConfirmationScreen
-import com.disciplineos.app.ui.theme.DisciplineOsTheme
+import com.disciplineos.app.ui.theme.themedComposeView
 import com.disciplineos.data.entity.Tier
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -30,8 +28,10 @@ import java.util.UUID
  * on *this* screen, not the moment they tapped a RadioButton on the previous one.
  *
  * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
- * [TierConfirmationScreen], hosted via a single [ComposeView]. The `selectInitialTier()` call,
- * its re-entry guard, and the [ARG_TIER] nav-argument handling are all unchanged.
+ * [TierConfirmationScreen], hosted via [themedComposeView] (ROADMAP.md §5.29 — replaces the
+ * inline `ComposeView(requireContext()).apply { ... }` boilerplate every onboarding Fragment
+ * previously repeated). The `selectInitialTier()` call, its re-entry guard, and the [ARG_TIER]
+ * nav-argument handling are all unchanged.
  */
 class TierConfirmationFragment : Fragment() {
 
@@ -39,18 +39,11 @@ class TierConfirmationFragment : Fragment() {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?,
-    ): View {
-        return ComposeView(requireContext()).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                DisciplineOsTheme {
-                    TierConfirmationScreen(
-                        onConfirm = { confirmTierAndContinue() },
-                        onBack = { findNavController().popBackStack() },
-                    )
-                }
-            }
-        }
+    ): View = themedComposeView {
+        TierConfirmationScreen(
+            onConfirm = { confirmTierAndContinue() },
+            onBack = { findNavController().popBackStack() },
+        )
     }
 
     private fun confirmTierAndContinue() {

@@ -4,15 +4,13 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
 import com.disciplineos.app.ui.onboarding.MissionProfileSetupScreen
-import com.disciplineos.app.ui.theme.DisciplineOsTheme
+import com.disciplineos.app.ui.theme.themedComposeView
 import com.disciplineos.data.entity.MissionProfile
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -47,8 +45,9 @@ import java.util.UUID
  * Flagged in ROADMAP.md §5, not silently worked around.
  *
  * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
- * [MissionProfileSetupScreen], hosted via a single [ComposeView]. `parseLines`, the insert,
- * and its re-entry guard are unchanged.
+ * [MissionProfileSetupScreen], hosted via [themedComposeView] (ROADMAP.md §5.29 — replaces the
+ * inline `ComposeView(requireContext()).apply { ... }` boilerplate every onboarding Fragment
+ * previously repeated). `parseLines`, the insert, and its re-entry guard are unchanged.
  */
 class MissionProfileSetupFragment : Fragment() {
 
@@ -56,23 +55,16 @@ class MissionProfileSetupFragment : Fragment() {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?,
-    ): View {
-        return ComposeView(requireContext()).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                DisciplineOsTheme {
-                    MissionProfileSetupScreen(
-                        onContinue = { rawName, allowlistRaw, blocklistRaw ->
-                            val name = rawName.trim().let {
-                                if (it.isEmpty()) DEFAULT_PROFILE_NAME else it
-                            }
-                            submitProfile(name, parseLines(allowlistRaw), parseLines(blocklistRaw))
-                        },
-                        onBack = { findNavController().popBackStack() },
-                    )
+    ): View = themedComposeView {
+        MissionProfileSetupScreen(
+            onContinue = { rawName, allowlistRaw, blocklistRaw ->
+                val name = rawName.trim().let {
+                    if (it.isEmpty()) DEFAULT_PROFILE_NAME else it
                 }
-            }
-        }
+                submitProfile(name, parseLines(allowlistRaw), parseLines(blocklistRaw))
+            },
+            onBack = { findNavController().popBackStack() },
+        )
     }
 
     /**

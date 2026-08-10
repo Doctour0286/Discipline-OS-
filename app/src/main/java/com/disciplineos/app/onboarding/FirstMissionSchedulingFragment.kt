@@ -5,15 +5,13 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
 import com.disciplineos.app.ui.onboarding.FirstMissionSchedulingScreen
-import com.disciplineos.app.ui.theme.DisciplineOsTheme
+import com.disciplineos.app.ui.theme.themedComposeView
 import com.disciplineos.data.entity.Mission
 import com.disciplineos.data.entity.MissionStatus
 import kotlinx.coroutines.launch
@@ -101,17 +99,18 @@ import java.util.UUID
  * this from instead.
  *
  * **Design-system pass (see ROADMAP.md — this commit's entry):** this Fragment's UI now lives
- * in [FirstMissionSchedulingScreen], a Compose composable, hosted here via a single
- * [ComposeView] rather than inflating `fragment_first_mission_scheduling.xml` — the first
- * screen migrated as part of the incremental Views-to-Compose strategy Google's own migration
- * guide recommends (Fragment + Jetpack Navigation stay exactly as they are; only this screen's
- * *content* moves). Every business-logic method below (`parseScheduledTime`,
- * `createMissionAndFinish`, the whole kdoc above this class) is unchanged from the XML version
- * — this migration touches presentation only, not what the screen does or why.
- * `fragment_first_mission_scheduling.xml` is intentionally left in place (unreferenced) rather
- * than deleted in this same pass — cleanup of now-dead XML layouts is tracked as a deliberate
- * separate step (see ROADMAP.md) rather than bundled into every screen's individual migration
- * commit.
+ * in [FirstMissionSchedulingScreen], a Compose composable, hosted here via
+ * [themedComposeView] (ROADMAP.md §5.29 — replaces the inline
+ * `ComposeView(requireContext()).apply { ... }` boilerplate this Fragment originally
+ * established and every other onboarding Fragment went on to repeat identically) rather than
+ * inflating `fragment_first_mission_scheduling.xml` — the first screen migrated as part of the
+ * incremental Views-to-Compose strategy Google's own migration guide recommends (Fragment +
+ * Jetpack Navigation stay exactly as they are; only this screen's *content* moves). Every
+ * business-logic method below (`parseScheduledTime`, `createMissionAndFinish`, the whole kdoc
+ * above this class) is unchanged from the XML version — this migration touches presentation
+ * only, not what the screen does or why. `fragment_first_mission_scheduling.xml` itself has
+ * since been deleted (ROADMAP.md §5.28), once §5.27 confirmed the whole onboarding sequence's
+ * Compose migration CI + on-device.
  */
 class FirstMissionSchedulingFragment : Fragment() {
 
@@ -119,36 +118,23 @@ class FirstMissionSchedulingFragment : Fragment() {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?,
-    ): View {
-        return ComposeView(requireContext()).apply {
-            // Officially recommended strategy for ComposeView hosted inside a Fragment — ties
-            // Composition disposal to the Fragment's *view* lifecycle (not the Fragment's own
-            // lifecycle), which is what correctly handles back-stack navigation re-entry
-            // without leaking or double-disposing. See Android Developers' ComposeView-in-
-            // Fragment interop guidance (developer.android.com/develop/ui/compose/migrate/
-            // interoperability-apis/compose-in-views), verified current as of this pass.
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                DisciplineOsTheme {
-                    FirstMissionSchedulingScreen(
-                        onStartNow = { createMissionAndFinish(scheduledStart = null) },
-                        onSchedule = { rawTimeInput ->
-                            val parsed = parseScheduledTime(rawTimeInput.trim())
-                            if (parsed == null) {
-                                Toast.makeText(
-                                    requireContext(),
-                                    getString(R.string.first_mission_scheduling_invalid_time),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            } else {
-                                createMissionAndFinish(scheduledStart = parsed)
-                            }
-                        },
-                        onBack = { findNavController().popBackStack() },
-                    )
+    ): View = themedComposeView {
+        FirstMissionSchedulingScreen(
+            onStartNow = { createMissionAndFinish(scheduledStart = null) },
+            onSchedule = { rawTimeInput ->
+                val parsed = parseScheduledTime(rawTimeInput.trim())
+                if (parsed == null) {
+                    Toast.makeText(
+                        requireContext(),
+                        getString(R.string.first_mission_scheduling_invalid_time),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                } else {
+                    createMissionAndFinish(scheduledStart = parsed)
                 }
-            }
-        }
+            },
+            onBack = { findNavController().popBackStack() },
+        )
     }
 
     /**

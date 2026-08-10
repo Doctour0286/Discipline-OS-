@@ -4,15 +4,13 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
 import com.disciplineos.app.ui.onboarding.TierSelectionScreen
-import com.disciplineos.app.ui.theme.DisciplineOsTheme
+import com.disciplineos.app.ui.theme.themedComposeView
 import com.disciplineos.data.entity.Tier
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -57,11 +55,13 @@ import java.util.UUID
  * long enough to satisfy the row's constructor until Core Data Consent overwrites it.
  *
  * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
- * [TierSelectionScreen], hosted via a single [ComposeView]. This screen was CI + device
- * confirmed in its XML form before this migration — [TierSelectionScreen]'s kdoc documents
- * that Iron stays non-selectable (`enabled = false`) in the Compose version too, so
- * [submitInitialTier] is still structurally never reachable with [Tier.IRON] from this
- * screen, matching the pre-migration guarantee this class's own kdoc describes.
+ * [TierSelectionScreen], hosted via [themedComposeView] (ROADMAP.md §5.29 — replaces the
+ * inline `ComposeView(requireContext()).apply { ... }` boilerplate every onboarding Fragment
+ * previously repeated). This screen was CI + device confirmed in its XML form before this
+ * migration — [TierSelectionScreen]'s kdoc documents that Iron stays non-selectable
+ * (`enabled = false`) in the Compose version too, so [submitInitialTier] is still structurally
+ * never reachable with [Tier.IRON] from this screen, matching the pre-migration guarantee this
+ * class's own kdoc describes.
  *
  * **One real behavioral simplification from the XML version, noted rather than silent:** the
  * original `RadioGroup`-based listener had an `else -> null` "no selection somehow made it
@@ -80,26 +80,19 @@ class TierSelectionFragment : Fragment() {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?,
-    ): View {
-        return ComposeView(requireContext()).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                DisciplineOsTheme {
-                    TierSelectionScreen(
-                        onContinue = { selectedTier ->
-                            if (selectedTier == Tier.WARDEN) {
-                                // §2.4: Warden needs its own confirmation screen before the
-                                // tier is actually recorded.
-                                findNavController().navigate(R.id.action_tierSelection_to_tierConfirmation)
-                            } else {
-                                submitInitialTier(selectedTier)
-                            }
-                        },
-                        onBack = { findNavController().popBackStack() },
-                    )
+    ): View = themedComposeView {
+        TierSelectionScreen(
+            onContinue = { selectedTier ->
+                if (selectedTier == Tier.WARDEN) {
+                    // §2.4: Warden needs its own confirmation screen before the
+                    // tier is actually recorded.
+                    findNavController().navigate(R.id.action_tierSelection_to_tierConfirmation)
+                } else {
+                    submitInitialTier(selectedTier)
                 }
-            }
-        }
+            },
+            onBack = { findNavController().popBackStack() },
+        )
     }
 
     private fun submitInitialTier(tier: Tier) {

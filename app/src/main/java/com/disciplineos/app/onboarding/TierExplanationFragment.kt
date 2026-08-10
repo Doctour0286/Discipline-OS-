@@ -4,13 +4,11 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
 import com.disciplineos.app.ui.onboarding.TierExplanationScreen
-import com.disciplineos.app.ui.theme.DisciplineOsTheme
+import com.disciplineos.app.ui.theme.themedComposeView
 
 /**
  * Onboarding, Consent & Interaction Spec §2.3 (Tier Explanation) — real content, replacing
@@ -54,8 +52,10 @@ import com.disciplineos.app.ui.theme.DisciplineOsTheme
  *
  * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
  * [TierExplanationScreen] (a [androidx.compose.foundation.lazy.LazyRow] of four identical
- * cards, replacing the original `HorizontalScrollView`), hosted via a single [ComposeView].
- * No logic changes — this screen never had any to begin with.
+ * cards, replacing the original `HorizontalScrollView`), hosted via [themedComposeView]
+ * (ROADMAP.md §5.29 — replaces the inline `ComposeView(requireContext()).apply { ... }`
+ * boilerplate every onboarding Fragment previously repeated). No logic changes — this screen
+ * never had any to begin with.
  */
 class TierExplanationFragment : Fragment() {
 
@@ -63,19 +63,12 @@ class TierExplanationFragment : Fragment() {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?,
-    ): View {
-        return ComposeView(requireContext()).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                DisciplineOsTheme {
-                    TierExplanationScreen(
-                        onContinue = {
-                            findNavController().navigate(R.id.action_tierExplanation_to_tierSelection)
-                        },
-                        onBack = { findNavController().popBackStack() },
-                    )
-                }
-            }
-        }
+    ): View = themedComposeView {
+        TierExplanationScreen(
+            onContinue = {
+                findNavController().navigate(R.id.action_tierExplanation_to_tierSelection)
+            },
+            onBack = { findNavController().popBackStack() },
+        )
     }
 }
