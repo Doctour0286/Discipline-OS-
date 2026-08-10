@@ -1,11 +1,16 @@
 package com.disciplineos.app.onboarding
 
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
-import android.widget.Button
+import android.view.ViewGroup
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
+import com.disciplineos.app.ui.onboarding.WelcomeScreen
+import com.disciplineos.app.ui.theme.DisciplineOsTheme
 
 /**
  * Onboarding, Consent & Interaction Spec §2.1 (Welcome / Product Philosophy) — real content,
@@ -50,15 +55,30 @@ import com.disciplineos.app.R
  * a test file here would only be able to assert that string resources exist, which the
  * Android resource compiler already guarantees at build time. Revisit if that stops being
  * true (e.g. if this screen ever gains a "mark onboarding started" write).
+ *
+ * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
+ * [WelcomeScreen], hosted via a single [ComposeView] rather than inflating
+ * `fragment_welcome.xml`. All logic below is unchanged — this migration touches presentation
+ * only.
  */
-class WelcomeFragment : Fragment(R.layout.fragment_welcome) {
+class WelcomeFragment : Fragment() {
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-
-        val continueButton = view.findViewById<Button>(R.id.welcomeContinueButton)
-        continueButton.setOnClickListener {
-            findNavController().navigate(R.id.action_welcome_to_goalDefinition)
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
+        return ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                DisciplineOsTheme {
+                    WelcomeScreen(
+                        onContinue = {
+                            findNavController().navigate(R.id.action_welcome_to_goalDefinition)
+                        },
+                    )
+                }
+            }
         }
     }
 }

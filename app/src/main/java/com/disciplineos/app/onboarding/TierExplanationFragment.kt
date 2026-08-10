@@ -1,11 +1,16 @@
 package com.disciplineos.app.onboarding
 
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
-import android.widget.Button
+import android.view.ViewGroup
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
+import com.disciplineos.app.ui.onboarding.TierExplanationScreen
+import com.disciplineos.app.ui.theme.DisciplineOsTheme
 
 /**
  * Onboarding, Consent & Interaction Spec §2.3 (Tier Explanation) — real content, replacing
@@ -42,18 +47,31 @@ import com.disciplineos.app.R
  * call, no branch logic here to regress-test (same reasoning
  * [GoalDefinitionFragmentTest]/[MissionProfileSetupFragmentTest] exist for the screens that
  * do have real persistence logic — see their own kdocs).
+ *
+ * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
+ * [TierExplanationScreen] (a [androidx.compose.foundation.lazy.LazyRow] of four identical
+ * cards, replacing the original `HorizontalScrollView`), hosted via a single [ComposeView].
+ * No logic changes — this screen never had any to begin with.
  */
-class TierExplanationFragment : Fragment(R.layout.fragment_tier_explanation) {
+class TierExplanationFragment : Fragment() {
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-
-        val continueButton = view.findViewById<Button>(R.id.tierExplanationContinueButton)
-        val backButton = view.findViewById<Button>(R.id.tierExplanationBackButton)
-
-        backButton.setOnClickListener { findNavController().popBackStack() }
-        continueButton.setOnClickListener {
-            findNavController().navigate(R.id.action_tierExplanation_to_tierSelection)
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
+        return ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                DisciplineOsTheme {
+                    TierExplanationScreen(
+                        onContinue = {
+                            findNavController().navigate(R.id.action_tierExplanation_to_tierSelection)
+                        },
+                        onBack = { findNavController().popBackStack() },
+                    )
+                }
+            }
         }
     }
 }
