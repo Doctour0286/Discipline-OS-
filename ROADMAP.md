@@ -2397,3 +2397,66 @@ compiler reachable in this authoring sandbox. Layout XML across the tree re-veri
 via Python's `xml.etree.ElementTree` after deletion; the one kdoc edit above is prose, not a
 code change, and doesn't affect compilation either way. Push, let CI confirm, then this note
 graduates the same way prior entries have.
+
+---
+
+### 5.29 — RESOLVED — DisciplineOsTheme deduplicated behind a single themedComposeView helper
+
+**Closes STATUS.md's "known standing gaps" DisciplineOsTheme note and `What's actually next`
+item 1, queued in §5.28 pending item 1's own confirmation.**
+
+**Investigated the literal ask first, before writing any code.** "Move DisciplineOsTheme to the
+Activity level" implies an Activity-level `setContent { }` to hoist the theme into. Checked
+`MainActivity` and `activity_main.xml` directly: `MainActivity` is a plain `FragmentActivity`,
+not `ComponentActivity`/`AppCompatActivity`, and hosts its `NavHostFragment` declaratively via
+`app:navGraph` in XML — there is no Activity-level Compose tree anywhere in this app to hoist a
+theme wrapper into. Each of the 9 onboarding Fragments independently creates its own
+`ComposeView`. A literal "Activity-level theme" would require replacing Jetpack Navigation's
+Fragment-based graph with Compose Navigation — a materially bigger, riskier change (touches
+every Fragment, the nav graph, and needs its own full on-device re-verification pass) than what
+this item was ever scoped to be, and out of proportion with this project's own "small,
+reviewable, one-concern-per-PR" convention.
+
+**Right-sized fix, given the real architecture:** deduplicate the 9 identical
+`ComposeView(requireContext()).apply { setViewCompositionStrategy(...); setContent { DisciplineOsTheme { FooScreen(...) } } }`
+blocks — byte-identical boilerplate repeated across every onboarding Fragment (§5.26 established
+the pattern with First Mission Scheduling, §5.27 repeated it 8 more times) — into one shared
+`Fragment.themedComposeView { }` extension function, `ui/theme/ComposeFragment.kt`. This is the
+practical equivalent of "one place the theme is applied" given this app's Fragment-hosted-Compose
+architecture: still invoked per-Fragment, but from exactly one definition, matching this
+project's own "add shared structure once a real second/third call site shows up" convention —
+9 call sites is well past that bar.
+
+**Behavior-preserving, not a refactor with side effects.** `themedComposeView` reproduces the
+exact `ComposeView` construction, `ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed`
+setting, and `DisciplineOsTheme { }` wrapping every migrated Fragment already used — confirmed by
+diffing each Fragment's `onCreateView` before and after the transform, not just by inspection.
+Applied by hand, file by file (not a blind regex/script pass), since several Fragments have
+non-trivial content inside the lambda (`UnsupervisedReliabilityOptInFragment`'s `logViewedEvent()`
+call before the return; `TierSelectionFragment`'s conditional `onContinue`;
+`FirstMissionSchedulingFragment`'s `Toast`/`getString` calls inside the callback) that a naive
+transform could have mangled.
+
+**A second, speculative `themedComposeView(layoutRes)`-style overload for XML-hosted screens was
+considered and dropped** — zero real call sites exist for it (`OnboardingPlaceholderFragment` is
+the only remaining XML-based Fragment, and it isn't Compose-hosted at all), so adding it now
+would be exactly the premature structure this project's own convention argues against.
+
+**Files touched:** `ui/theme/ComposeFragment.kt` (new), and all 9 onboarding Fragments'
+`onCreateView` + imports (`WelcomeFragment`, `GoalDefinitionFragment`, `TierExplanationFragment`,
+`TierSelectionFragment`, `TierConfirmationFragment`, `MissionProfileSetupFragment`,
+`CoreDataConsentFragment`, `UnsupervisedReliabilityOptInFragment`,
+`FirstMissionSchedulingFragment`). `OnboardingPlaceholderFragment` untouched — still XML-based,
+not part of this migration. No `MainActivity`/`activity_main.xml` change — see the investigation
+above for why that turned out not to be the right-sized fix.
+
+**Not touched:** any business logic. Every `submitX`/`recordX`/`createX` method, every DAO call,
+every re-entry guard is byte-identical to before this pass — this is presentation-layer
+deduplication only, same posture §5.26/§5.27 already took for the original per-screen migration.
+
+**Same standing verification caveat as every other entry in this file:** no Android/Kotlin
+compiler reachable in this authoring sandbox. Verified manually: every fragment still imports
+`themedComposeView` and no fragment retains the old inline `ComposeView`/`ViewCompositionStrategy`
+/`DisciplineOsTheme` imports or construction in live code (kdoc prose describing the old pattern,
+for historical record, is expected and left alone). Push, let CI confirm, then on-device check
+before this note graduates the same way §5.27's did.

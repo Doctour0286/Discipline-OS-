@@ -44,8 +44,8 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-10 (through §5.28 — 9 now-dead onboarding XML layouts
-deleted, cleared by §5.27's CI + on-device confirmation)
+**Last synced to ROADMAP.md:** 2026-08-10 (through §5.29 — `DisciplineOsTheme` deduplicated
+behind a single `themedComposeView` helper, closing out both cleanup items §5.27 queued)
 
 ---
 
@@ -180,13 +180,13 @@ position (Operator's floor = INCONSISTENT, Warden's = RELIABLE, Iron's = DISCIPL
 - `androidx.security:security-crypto:1.1.0-alpha06` is an alpha version, pinned to match existing code rather than independently vetted.
 - The `Documents/` directory (PRD, data model, architecture, onboarding spec, crisis-boundary spec) referenced throughout `ROADMAP.md` §1 is **not checked into this repo** — only `docs/PHASE2_DEVICE_VERIFICATION.md` exists under version control. Worth deciding deliberately whether specs should be tracked here too, or intentionally kept elsewhere.
 - No compiler in the authoring sandbox this file may be edited from — every new file ships as "manually cross-checked, not compiled" until CI confirms it.
-- **`DisciplineOsTheme` is applied per-Fragment**, not once at the Activity level — each of the 9
-  migrated screens independently wraps its own `ComposeView` content in `DisciplineOsTheme { }`.
-  Functionally fine (all 9 confirmed on-device with this exact structure), but means 9 places to
-  touch if the theme wrapper itself ever needs to change, and `MainActivity`/`activity_main.xml`
-  still carries the pre-Compose `@android:style/Theme.NoTitleBar.Fullscreen` Activity theme rather
-  than a Compose-first equivalent. Flagged in §5.26 as a deliberate scope cut, not an oversight —
-  queued as a follow-up, not done in this pass (see below).
+- `MainActivity`/`activity_main.xml` still carries the pre-Compose
+  `@android:style/Theme.NoTitleBar.Fullscreen` Activity theme rather than a Compose-first
+  equivalent. Not resolved by §5.29's theme deduplication — that pass consolidated per-Fragment
+  theme application into one shared helper (`themedComposeView`), but didn't touch the Activity
+  theme itself, since `MainActivity` has no Activity-level Compose tree to move it into without a
+  Compose Navigation rewrite (see §5.29's own investigation). Low priority — no observed visual
+  or functional issue from the mismatch, just a naming/consistency loose end.
 
 ---
 
@@ -199,28 +199,23 @@ single design system; only Iron Calibration Gate remains a placeholder, delibera
 that's a different, currently-unbuilt flow, not an onboarding gap). Onboarding as a body of work
 is closed; what's left below is cleanup and the next phase, not more onboarding screens.
 
-Real remaining items, in rough priority order:
+Both cleanup items flagged when onboarding's Compose migration finished (dead XML layouts,
+per-Fragment theme duplication) are now done — §5.28 and §5.29 respectively, both pending push
++ CI + on-device confirmation. Real remaining items, in rough priority order:
 
-1. **Move `DisciplineOsTheme` to the Activity level** (`MainActivity`), replacing
-   `@android:style/Theme.NoTitleBar.Fullscreen`, instead of each of the 9 Fragments wrapping its
-   own `ComposeView` content in the theme independently. Flagged in §5.26 as deferred until
-   most/all onboarding screens were migrated — that's now true, and the dead-XML cleanup above is
-   done, so this is next. Touches `MainActivity`/`activity_main.xml` and every onboarding
-   Fragment's `setContent { }` block; needs its own on-device check afterward since it changes how
-   every onboarding screen is themed, not just one.
-2. **Revisit Mission Profile Setup (§2.8)** to wire in Goal Definition's flagged-categories
+1. **Revisit Mission Profile Setup (§2.8)** to wire in Goal Definition's flagged-categories
    default suggestions — unblocked since Goal Definition merged, but still not consumed.
-3. **Resolve the two `[HYPOTHESIS]` items §5.24 flagged**: a hardcoded default Mission
+2. **Resolve the two `[HYPOTHESIS]` items §5.24 flagged**: a hardcoded default Mission
    duration with no spec source, and reusing `ACTIVE` status for a scheduled-but-not-yet-
    started Mission (no dedicated status exists for that state). Neither blocks anything, but
    both are open judgment calls a product-owner sign-off pass (like the one that closed
    §5.5/§5.9/§5.10/§5.15) could resolve properly instead of leaving as engineering defaults.
-4. **Build the Iron Calibration Gate's real destination flow** — not the onboarding-time
+3. **Build the Iron Calibration Gate's real destination flow** — not the onboarding-time
    placeholder (which is correctly unreachable by design, row 4b), but the actual "existing
    user reaches Iron later via `TierTransitionUseCase.activateIron`" flow that destination
    exists for. This is a real, currently-unbuilt UI surface, not a documentation gap.
-5. **Phase 4 (Behavioral Fingerprint / Predictive Failure)** — the next full *phase*, not a
+4. **Phase 4 (Behavioral Fingerprint / Predictive Failure)** — the next full *phase*, not a
    screen-level item. Depends on Phase 3's alert-card pattern (§3.5 of the Onboarding spec
    already defines the pattern in full) existing to render into, which nothing above blocks
-   structurally. This is the largest genuinely new chunk of work once items 1–4 settle, and the
-   natural "what's next" once onboarding cleanup (1) and its two open loose ends (2–3) close.
+   structurally. This is the largest genuinely new chunk of work once items 1–2 settle, and the
+   natural "what's next" once onboarding cleanup and its two open loose ends close.

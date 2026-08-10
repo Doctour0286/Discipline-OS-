@@ -4,15 +4,13 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
 import com.disciplineos.app.ui.onboarding.UnsupervisedReliabilityOptInScreen
-import com.disciplineos.app.ui.theme.DisciplineOsTheme
+import com.disciplineos.app.ui.theme.themedComposeView
 import com.disciplineos.data.entity.OnboardingScreenEvent
 import com.disciplineos.data.entity.OnboardingScreenEventOutcome
 import kotlinx.coroutines.launch
@@ -79,10 +77,13 @@ import java.util.UUID
  * that needs protecting from a second write.
  *
  * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
- * [UnsupervisedReliabilityOptInScreen], hosted via a single [ComposeView]. All instrumentation
- * and persistence — `logViewedEvent`, `recordChoiceAndContinue`, `logEvent` — are unchanged;
- * [logViewedEvent] is still called exactly once from [onCreateView], matching the original's
- * "once per Fragment view creation" VIEWED-event guarantee described above.
+ * [UnsupervisedReliabilityOptInScreen], hosted via [themedComposeView] (ROADMAP.md §5.29 —
+ * replaces the inline `ComposeView(requireContext()).apply { ... }` boilerplate every
+ * onboarding Fragment previously repeated). All instrumentation and persistence —
+ * `logViewedEvent`, `recordChoiceAndContinue`, `logEvent` — are unchanged; [logViewedEvent] is
+ * still called exactly once from [onCreateView], before [themedComposeView] is even
+ * constructed, matching the original's "once per Fragment view creation" VIEWED-event
+ * guarantee described above.
  */
 class UnsupervisedReliabilityOptInFragment : Fragment() {
 
@@ -93,17 +94,12 @@ class UnsupervisedReliabilityOptInFragment : Fragment() {
     ): View {
         logViewedEvent()
 
-        return ComposeView(requireContext()).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                DisciplineOsTheme {
-                    UnsupervisedReliabilityOptInScreen(
-                        onEnable = { recordChoiceAndContinue(optedIn = true) },
-                        onSkip = { recordChoiceAndContinue(optedIn = false) },
-                        onBack = { findNavController().popBackStack() },
-                    )
-                }
-            }
+        return themedComposeView {
+            UnsupervisedReliabilityOptInScreen(
+                onEnable = { recordChoiceAndContinue(optedIn = true) },
+                onSkip = { recordChoiceAndContinue(optedIn = false) },
+                onBack = { findNavController().popBackStack() },
+            )
         }
     }
 

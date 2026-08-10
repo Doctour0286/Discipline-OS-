@@ -4,15 +4,13 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
 import com.disciplineos.app.ui.onboarding.GoalDefinitionScreen
-import com.disciplineos.app.ui.theme.DisciplineOsTheme
+import com.disciplineos.app.ui.theme.themedComposeView
 import com.disciplineos.data.entity.User
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -57,10 +55,12 @@ import java.util.UUID
  * other real onboarding screen in this project blocks progress on empty text input.
  *
  * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
- * [GoalDefinitionScreen], hosted via a single [ComposeView]. Free-text is read but not
- * persisted (unchanged) — Compose still collects it via [GoalDefinitionScreen]'s own state,
- * just never sent anywhere by this Fragment's callback, matching the pre-migration behavior.
- * `parseLines`/`submitCategories` are otherwise unchanged.
+ * [GoalDefinitionScreen], hosted via [themedComposeView] (ROADMAP.md §5.29 — replaces the
+ * inline `ComposeView(requireContext()).apply { ... }` boilerplate every onboarding Fragment
+ * previously repeated). Free-text is read but not persisted (unchanged) — Compose still
+ * collects it via [GoalDefinitionScreen]'s own state, just never sent anywhere by this
+ * Fragment's callback, matching the pre-migration behavior. `parseLines`/`submitCategories`
+ * are otherwise unchanged.
  */
 class GoalDefinitionFragment : Fragment() {
 
@@ -68,20 +68,13 @@ class GoalDefinitionFragment : Fragment() {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?,
-    ): View {
-        return ComposeView(requireContext()).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                DisciplineOsTheme {
-                    GoalDefinitionScreen(
-                        onContinue = { categoriesRaw ->
-                            submitCategories(parseLines(categoriesRaw))
-                        },
-                        onBack = { findNavController().popBackStack() },
-                    )
-                }
-            }
-        }
+    ): View = themedComposeView {
+        GoalDefinitionScreen(
+            onContinue = { categoriesRaw ->
+                submitCategories(parseLines(categoriesRaw))
+            },
+            onBack = { findNavController().popBackStack() },
+        )
     }
 
     /**

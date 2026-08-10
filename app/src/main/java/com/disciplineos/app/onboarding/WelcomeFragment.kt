@@ -4,13 +4,11 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
 import com.disciplineos.app.ui.onboarding.WelcomeScreen
-import com.disciplineos.app.ui.theme.DisciplineOsTheme
+import com.disciplineos.app.ui.theme.themedComposeView
 
 /**
  * Onboarding, Consent & Interaction Spec §2.1 (Welcome / Product Philosophy) — real content,
@@ -57,9 +55,10 @@ import com.disciplineos.app.ui.theme.DisciplineOsTheme
  * true (e.g. if this screen ever gains a "mark onboarding started" write).
  *
  * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
- * [WelcomeScreen], hosted via a single [ComposeView] rather than inflating
- * `fragment_welcome.xml`. All logic below is unchanged — this migration touches presentation
- * only.
+ * [WelcomeScreen], hosted via [themedComposeView] (ROADMAP.md §5.29 — replaces the inline
+ * `ComposeView(requireContext()).apply { ... }` boilerplate every onboarding Fragment
+ * previously repeated) rather than inflating `fragment_welcome.xml`. All logic below is
+ * unchanged — this migration touches presentation only.
  */
 class WelcomeFragment : Fragment() {
 
@@ -67,18 +66,11 @@ class WelcomeFragment : Fragment() {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?,
-    ): View {
-        return ComposeView(requireContext()).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                DisciplineOsTheme {
-                    WelcomeScreen(
-                        onContinue = {
-                            findNavController().navigate(R.id.action_welcome_to_goalDefinition)
-                        },
-                    )
-                }
-            }
-        }
+    ): View = themedComposeView {
+        WelcomeScreen(
+            onContinue = {
+                findNavController().navigate(R.id.action_welcome_to_goalDefinition)
+            },
+        )
     }
 }

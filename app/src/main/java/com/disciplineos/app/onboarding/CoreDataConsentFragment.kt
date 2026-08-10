@@ -4,15 +4,13 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
 import com.disciplineos.app.ui.onboarding.CoreDataConsentScreen
-import com.disciplineos.app.ui.theme.DisciplineOsTheme
+import com.disciplineos.app.ui.theme.themedComposeView
 import kotlinx.coroutines.launch
 
 /**
@@ -73,8 +71,9 @@ import kotlinx.coroutines.launch
  * already guarantee. Revisit if this screen ever grows a second write path.
  *
  * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
- * [CoreDataConsentScreen], hosted via a single [ComposeView]. `recordConsentAndContinue()` and
- * [CONSENT_VERSION] are unchanged.
+ * [CoreDataConsentScreen], hosted via [themedComposeView] (ROADMAP.md §5.29 — replaces the
+ * inline `ComposeView(requireContext()).apply { ... }` boilerplate every onboarding Fragment
+ * previously repeated). `recordConsentAndContinue()` and [CONSENT_VERSION] are unchanged.
  */
 class CoreDataConsentFragment : Fragment() {
 
@@ -82,18 +81,11 @@ class CoreDataConsentFragment : Fragment() {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?,
-    ): View {
-        return ComposeView(requireContext()).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                DisciplineOsTheme {
-                    CoreDataConsentScreen(
-                        onContinue = { recordConsentAndContinue() },
-                        onBack = { findNavController().popBackStack() },
-                    )
-                }
-            }
-        }
+    ): View = themedComposeView {
+        CoreDataConsentScreen(
+            onContinue = { recordConsentAndContinue() },
+            onBack = { findNavController().popBackStack() },
+        )
     }
 
     private fun recordConsentAndContinue() {
