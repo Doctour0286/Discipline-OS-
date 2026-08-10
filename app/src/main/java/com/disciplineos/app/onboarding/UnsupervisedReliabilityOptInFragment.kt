@@ -1,13 +1,18 @@
 package com.disciplineos.app.onboarding
 
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
-import android.widget.Button
+import android.view.ViewGroup
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
+import com.disciplineos.app.ui.onboarding.UnsupervisedReliabilityOptInScreen
+import com.disciplineos.app.ui.theme.DisciplineOsTheme
 import com.disciplineos.data.entity.OnboardingScreenEvent
 import com.disciplineos.data.entity.OnboardingScreenEventOutcome
 import kotlinx.coroutines.launch
@@ -72,27 +77,34 @@ import java.util.UUID
  * single-field overwrite, and correct here for the same reason: this is a preference a user
  * should be able to change their mind about by simply choosing again, not a one-time event
  * that needs protecting from a second write.
+ *
+ * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
+ * [UnsupervisedReliabilityOptInScreen], hosted via a single [ComposeView]. All instrumentation
+ * and persistence — `logViewedEvent`, `recordChoiceAndContinue`, `logEvent` — are unchanged;
+ * [logViewedEvent] is still called exactly once from [onCreateView], matching the original's
+ * "once per Fragment view creation" VIEWED-event guarantee described above.
  */
-class UnsupervisedReliabilityOptInFragment : Fragment(R.layout.fragment_unsupervised_reliability_opt_in) {
+class UnsupervisedReliabilityOptInFragment : Fragment() {
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-
-        val backButton = view.findViewById<Button>(R.id.unsupervisedReliabilityBackButton)
-        val enableButton = view.findViewById<Button>(R.id.unsupervisedReliabilityEnableButton)
-        val skipButton = view.findViewById<Button>(R.id.unsupervisedReliabilitySkipButton)
-
-        // Switch itself is a visual preview only — see the layout's own kdoc. Neither button
-        // handler below reads its state; Enable always means true, Skip always means false,
-        // regardless of whatever position the Switch happens to be in when pressed.
-
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
         logViewedEvent()
 
-        backButton.setOnClickListener { findNavController().popBackStack() }
-
-        enableButton.setOnClickListener { recordChoiceAndContinue(optedIn = true) }
-
-        skipButton.setOnClickListener { recordChoiceAndContinue(optedIn = false) }
+        return ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                DisciplineOsTheme {
+                    UnsupervisedReliabilityOptInScreen(
+                        onEnable = { recordChoiceAndContinue(optedIn = true) },
+                        onSkip = { recordChoiceAndContinue(optedIn = false) },
+                        onBack = { findNavController().popBackStack() },
+                    )
+                }
+            }
+        }
     }
 
     private fun logViewedEvent() {

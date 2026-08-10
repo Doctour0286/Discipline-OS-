@@ -1,14 +1,18 @@
 package com.disciplineos.app.onboarding
 
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
-import android.widget.Button
-import android.widget.EditText
+import android.view.ViewGroup
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
+import com.disciplineos.app.ui.onboarding.MissionProfileSetupScreen
+import com.disciplineos.app.ui.theme.DisciplineOsTheme
 import com.disciplineos.data.entity.MissionProfile
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -41,28 +45,33 @@ import java.util.UUID
  * [OnboardingPlaceholderFragment] content two steps earlier in this same flow), so the
  * allowlist/blocklist fields start empty rather than pre-filled with an invented guess.
  * Flagged in ROADMAP.md §5, not silently worked around.
+ *
+ * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
+ * [MissionProfileSetupScreen], hosted via a single [ComposeView]. `parseLines`, the insert,
+ * and its re-entry guard are unchanged.
  */
-class MissionProfileSetupFragment : Fragment(R.layout.fragment_mission_profile_setup) {
+class MissionProfileSetupFragment : Fragment() {
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-
-        val nameInput = view.findViewById<EditText>(R.id.missionProfileNameInput)
-        val allowlistInput = view.findViewById<EditText>(R.id.missionProfileAllowlistInput)
-        val blocklistInput = view.findViewById<EditText>(R.id.missionProfileBlocklistInput)
-        val continueButton = view.findViewById<Button>(R.id.missionProfileSetupContinueButton)
-        val backButton = view.findViewById<Button>(R.id.missionProfileSetupBackButton)
-
-        backButton.setOnClickListener { findNavController().popBackStack() }
-
-        continueButton.setOnClickListener {
-            val name = nameInput.text?.toString()?.trim().let {
-                if (it.isNullOrEmpty()) DEFAULT_PROFILE_NAME else it
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
+        return ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                DisciplineOsTheme {
+                    MissionProfileSetupScreen(
+                        onContinue = { rawName, allowlistRaw, blocklistRaw ->
+                            val name = rawName.trim().let {
+                                if (it.isEmpty()) DEFAULT_PROFILE_NAME else it
+                            }
+                            submitProfile(name, parseLines(allowlistRaw), parseLines(blocklistRaw))
+                        },
+                        onBack = { findNavController().popBackStack() },
+                    )
+                }
             }
-            val allowlist = parseLines(allowlistInput.text?.toString())
-            val blocklist = parseLines(blocklistInput.text?.toString())
-
-            submitProfile(name, allowlist, blocklist)
         }
     }
 

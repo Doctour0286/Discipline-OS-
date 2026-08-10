@@ -1,15 +1,18 @@
 package com.disciplineos.app.onboarding
 
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
-import android.widget.Button
-import android.widget.RadioButton
-import android.widget.RadioGroup
+import android.view.ViewGroup
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
+import com.disciplineos.app.ui.onboarding.TierSelectionScreen
+import com.disciplineos.app.ui.theme.DisciplineOsTheme
 import com.disciplineos.data.entity.Tier
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -52,49 +55,49 @@ import java.util.UUID
  * that Fragment's own kdoc for the full account. The value this constant holds is
  * intentionally never read back or compared against anything; it only needs to be non-null
  * long enough to satisfy the row's constructor until Core Data Consent overwrites it.
+ *
+ * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
+ * [TierSelectionScreen], hosted via a single [ComposeView]. This screen was CI + device
+ * confirmed in its XML form before this migration — [TierSelectionScreen]'s kdoc documents
+ * that Iron stays non-selectable (`enabled = false`) in the Compose version too, so
+ * [submitInitialTier] is still structurally never reachable with [Tier.IRON] from this
+ * screen, matching the pre-migration guarantee this class's own kdoc describes.
+ *
+ * **One real behavioral simplification from the XML version, noted rather than silent:** the
+ * original `RadioGroup`-based listener had an `else -> null` "no selection somehow made it
+ * through" branch, defensive against `checkedRadioButtonId` returning `View.NO_ID`.
+ * [TierSelectionScreen]'s Compose state always holds a concrete [Tier] (defaulting to
+ * [Tier.RECRUIT], mirroring the original layout's `android:checked="true"` on Recruit) — there
+ * is no Compose equivalent of an "unset" RadioGroup state to defend against, so `onContinue`
+ * below is always invoked with a real, selectable tier. This isn't a behavior change a user
+ * could ever observe (the `else` branch was unreachable in practice before this migration too,
+ * per the original kdoc's own note), just a defensive branch that no longer has anything to
+ * defend against.
  */
-class TierSelectionFragment : Fragment(R.layout.fragment_tier_selection) {
+class TierSelectionFragment : Fragment() {
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-
-        val tierRadioGroup = view.findViewById<RadioGroup>(R.id.tierRadioGroup)
-        val continueButton = view.findViewById<Button>(R.id.tierSelectionContinueButton)
-        val backButton = view.findViewById<Button>(R.id.tierSelectionBackButton)
-
-        backButton.setOnClickListener { findNavController().popBackStack() }
-
-        continueButton.setOnClickListener {
-            // Iron's RadioButton is disabled in the layout, so checkedRadioButtonId can only
-            // ever land on Recruit/Operator/Warden here — see class kdoc's "defense in depth"
-            // note on why selectInitialTier() also rejects Iron independently.
-            //
-            // Compares checkedRadioButtonId directly against each button's own R.id, rather
-            // than calling findViewById(checkedRadioButtonId) and reading .id back off the
-            // result — that pattern would depend on findViewById's behavior for an "unset"
-            // RadioGroup (RadioGroup.checkedRadioButtonId returns View.NO_ID, i.e. -1, before
-            // any button is checked), which was not independently confirmed here to behave
-            // safely rather than throw. This project's own recent history (§5.21) is explicit
-            // that "reads like it should be fine" is not a standard to build on without
-            // checking — a plain equality comparison against known-good, already-declared
-            // R.id constants sidesteps the question entirely rather than resting an answer on
-            // it. fragment_tier_selection.xml also sets android:checked="true" on Recruit, so
-            // in practice checkedRadioButtonId is never actually NO_ID when this listener
-            // fires — but the `else -> null` branch below is kept regardless, so this doesn't
-            // rely on that layout default holding either.
-            val selectedTier = when (tierRadioGroup.checkedRadioButtonId) {
-                R.id.tierRecruitRadio -> Tier.RECRUIT
-                R.id.tierOperatorRadio -> Tier.OPERATOR
-                R.id.tierWardenRadio -> Tier.WARDEN
-                else -> null // no selection somehow made it through — treat as "do nothing"
-            }
-
-            if (selectedTier == Tier.WARDEN) {
-                // §2.4: Warden needs its own confirmation screen before the tier is actually
-                // recorded — selectInitialTier() is not called here, only after confirmation.
-                findNavController().navigate(R.id.action_tierSelection_to_tierConfirmation)
-            } else if (selectedTier != null) {
-                submitInitialTier(selectedTier)
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
+        return ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                DisciplineOsTheme {
+                    TierSelectionScreen(
+                        onContinue = { selectedTier ->
+                            if (selectedTier == Tier.WARDEN) {
+                                // §2.4: Warden needs its own confirmation screen before the
+                                // tier is actually recorded.
+                                findNavController().navigate(R.id.action_tierSelection_to_tierConfirmation)
+                            } else {
+                                submitInitialTier(selectedTier)
+                            }
+                        },
+                        onBack = { findNavController().popBackStack() },
+                    )
+                }
             }
         }
     }

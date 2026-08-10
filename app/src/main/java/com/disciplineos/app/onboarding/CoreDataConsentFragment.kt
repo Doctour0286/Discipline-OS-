@@ -1,13 +1,18 @@
 package com.disciplineos.app.onboarding
 
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
-import android.widget.Button
+import android.view.ViewGroup
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
+import com.disciplineos.app.ui.onboarding.CoreDataConsentScreen
+import com.disciplineos.app.ui.theme.DisciplineOsTheme
 import kotlinx.coroutines.launch
 
 /**
@@ -66,19 +71,28 @@ import kotlinx.coroutines.launch
  * [GoalDefinitionFragment]'s genuinely two-branch insert-vs-update case, there's nothing here
  * a DAO-level test would catch that the Android resource compiler and Kotlin compiler don't
  * already guarantee. Revisit if this screen ever grows a second write path.
+ *
+ * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
+ * [CoreDataConsentScreen], hosted via a single [ComposeView]. `recordConsentAndContinue()` and
+ * [CONSENT_VERSION] are unchanged.
  */
-class CoreDataConsentFragment : Fragment(R.layout.fragment_core_data_consent) {
+class CoreDataConsentFragment : Fragment() {
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-
-        val backButton = view.findViewById<Button>(R.id.coreDataConsentBackButton)
-        val continueButton = view.findViewById<Button>(R.id.coreDataConsentContinueButton)
-
-        backButton.setOnClickListener { findNavController().popBackStack() }
-
-        continueButton.setOnClickListener {
-            recordConsentAndContinue()
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
+        return ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                DisciplineOsTheme {
+                    CoreDataConsentScreen(
+                        onContinue = { recordConsentAndContinue() },
+                        onBack = { findNavController().popBackStack() },
+                    )
+                }
+            }
         }
     }
 

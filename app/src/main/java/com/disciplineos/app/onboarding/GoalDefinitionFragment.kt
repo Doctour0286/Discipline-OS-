@@ -1,14 +1,18 @@
 package com.disciplineos.app.onboarding
 
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
-import android.widget.Button
-import android.widget.EditText
+import android.view.ViewGroup
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
+import com.disciplineos.app.ui.onboarding.GoalDefinitionScreen
+import com.disciplineos.app.ui.theme.DisciplineOsTheme
 import com.disciplineos.data.entity.User
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -51,26 +55,32 @@ import java.util.UUID
  * **Both fields optional**, same precedent as [MissionProfileSetupFragment]'s "no invented
  * validation gate" reasoning — §2.2 doesn't require either field to be non-empty, and no
  * other real onboarding screen in this project blocks progress on empty text input.
+ *
+ * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
+ * [GoalDefinitionScreen], hosted via a single [ComposeView]. Free-text is read but not
+ * persisted (unchanged) — Compose still collects it via [GoalDefinitionScreen]'s own state,
+ * just never sent anywhere by this Fragment's callback, matching the pre-migration behavior.
+ * `parseLines`/`submitCategories` are otherwise unchanged.
  */
-class GoalDefinitionFragment : Fragment(R.layout.fragment_goal_definition) {
+class GoalDefinitionFragment : Fragment() {
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-
-        val categoriesInput = view.findViewById<EditText>(R.id.goalDefinitionCategoriesInput)
-        val continueButton = view.findViewById<Button>(R.id.goalDefinitionContinueButton)
-        val backButton = view.findViewById<Button>(R.id.goalDefinitionBackButton)
-
-        // Free-text goal description is read but intentionally not captured into a variable
-        // for persistence — see class kdoc for why nothing stores it. Still wired to a real
-        // input (goalDefinitionFreetextInput in the layout) so the user experience matches
-        // §2.2's spec, even though this pass has nowhere to save that specific field yet.
-
-        backButton.setOnClickListener { findNavController().popBackStack() }
-
-        continueButton.setOnClickListener {
-            val categories = parseLines(categoriesInput.text?.toString())
-            submitCategories(categories)
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
+        return ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                DisciplineOsTheme {
+                    GoalDefinitionScreen(
+                        onContinue = { categoriesRaw ->
+                            submitCategories(parseLines(categoriesRaw))
+                        },
+                        onBack = { findNavController().popBackStack() },
+                    )
+                }
+            }
         }
     }
 
