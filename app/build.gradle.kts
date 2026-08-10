@@ -34,6 +34,19 @@ android {
         // DisciplineOsApplication.onCreate()'s BuildConfig.DEBUG gate around DebugSeeder
         // (ROADMAP.md §4(c)) — nothing in this module referenced BuildConfig before this,
         // so it was never previously turned on.
+        compose = true // Design-system pass (ROADMAP.md, see this commit): Google announced
+        // at I/O 2026 that the Views-based UI toolkit (android.widget, including MDC-Android)
+        // is now in maintenance mode and the platform is Compose-first going forward — a
+        // materially different situation than when activity_mission_interception.xml's
+        // comment ("no Compose dependency exists yet... no framework not already justified")
+        // and this module's fragment-ktx/navigation-fragment-ktx dependencies below were
+        // chosen. That comment is now stale, not wrong for its time — recorded here rather
+        // than silently contradicted. This migrates incrementally (Google's own recommended
+        // strategy): Fragments + Jetpack Navigation stay exactly as they are, each Fragment's
+        // XML content is replaced by a single ComposeView hosting real composables, one
+        // screen at a time. Phase 2 (MissionInterceptionActivity, accessibility-service
+        // interception loop) is deliberately NOT touched by this pass — it stays on plain
+        // Views for now, migrated later as its own deliberate decision, not swept in here.
     }
 
     compileOptions {
@@ -43,6 +56,16 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+
+    composeOptions {
+        // Pinned to the Compose Compiler release that Google's own compatibility guidance
+        // maps to Kotlin 1.9.24 exactly (this project's pinned Kotlin version, see root
+        // build.gradle.kts) — verified against developer.android.com/jetpack/androidx/
+        // releases/compose-compiler's own release notes ("this compiler release is targeting
+        // Kotlin 1.9.24") rather than assumed. Do not bump this independently of a Kotlin
+        // version bump; the two are coupled pre-Kotlin-2.0.
+        kotlinCompilerExtensionVersion = "1.5.14"
     }
 
     testOptions {
@@ -89,6 +112,29 @@ dependencies {
     // trigger at Phase 3's first screen — see that file's kdoc for the full reasoning. Revisit
     // once onboarding's real per-screen state (not just navigation) makes manual wiring
     // actually painful, not preemptively here.
+
+    // --- Compose (design-system pass, see ROADMAP.md) ---
+    // BOM pinned to 2024.09.00 deliberately, not the current 2026 BOM: this project stays on
+    // compileSdk 34 (see android{} block above), and later Compose BOMs (1.12.0/2026.04+)
+    // require compileSdk 37+. 2024.09.00 was the current BOM when compileSdk 34 was the norm
+    // and is fully compatible with Compose Compiler 1.5.14 / Kotlin 1.9.24 above — bumping
+    // compileSdk to chase a newer BOM is a separate, larger decision than this design-system
+    // change, not bundled in here.
+    implementation(platform("androidx.compose:compose-bom:2024.09.00"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.activity:activity-compose:1.9.1") // matches activity-ktx above
+    implementation("androidx.fragment:fragment-ktx:1.8.2") // already declared above; Compose
+    // interop (ComposeView hosted inside a Fragment) needs nothing additional beyond what
+    // fragment-ktx already provides.
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4") // collectAsStateWithLifecycle,
+    // ties Compose state collection to the Fragment's view lifecycle rather than the
+    // Fragment's own lifecycle — the officially recommended pattern for ComposeView-in-
+    // Fragment (avoids over-collecting/leaking across navigation transitions).
+    debugImplementation("androidx.compose.ui:ui-tooling") // Compose Preview support in Android
+    // Studio; debug-only per Google's own recommended dependency split (never shipped in
+    // release builds).
 
     testImplementation("junit:junit:4.13.2")
     // Mirrors :domain/build.gradle.kts's test dependency set exactly (see that file's

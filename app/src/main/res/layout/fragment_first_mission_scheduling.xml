@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
+    UNREFERENCED as of the design-system pass (ROADMAP.md — see this commit's entry):
+    FirstMissionSchedulingFragment.kt now hosts a Compose screen (FirstMissionSchedulingScreen,
+    in ui/onboarding/) via a single ComposeView instead of inflating this file. Left in place
+    deliberately rather than deleted in the same pass — cleanup of now-dead XML layouts left
+    behind by the Compose migration is being tracked as its own step (see ROADMAP.md's "known
+    standing gaps"), so other screens' still-live layouts and this file's history stay easy to
+    diff against each other rather than being interleaved with unrelated deletions. Do not
+    re-wire this file back in without updating FirstMissionSchedulingFragment.kt's kdoc, which
+    documents the Compose migration as the current source of truth for this screen.
+
+    Original content below preserved as-is, for reference only — kept in sync with neither the
+    Fragment nor strings.xml going forward.
+
     Onboarding, Consent & Interaction Spec §2.9 (First Mission Scheduling) — real content,
     replacing OnboardingPlaceholderFragment at the firstMissionSchedulingFragment destination.
     Closes onboarding — see the nav graph's own comment on why this destination declares no

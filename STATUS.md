@@ -44,7 +44,9 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-09 (through §5.25 — full onboarding sequence CI-confirmed green via PR #13's merge)
+**Last synced to ROADMAP.md:** 2026-08-10 (through §5.26 — design system: Color/Type/Theme.kt,
+Compose scaffolding, First Mission Scheduling migrated to Compose as proof-of-concept; also
+incorporates §5.25's CI-confirmation of screens 1–3, 5–8)
 
 ---
 
@@ -68,7 +70,7 @@ check.
 | 0.5 — Real Build Verification (CI) | ✅ | Gradle/CI pipeline itself confirmed working. |
 | 1 — Domain / Use-Case Layer | 🟢 | Functionally complete. §5.9's tier-floor gap resolved (see MVP table below) — no open spec gaps remain. |
 | 2 — Core Enforcement Loop | ✅ | Interception loop confirmed on-device via `DebugSeeder` (no real Mission-creation UI yet, so seeding is still required to trigger it). |
-| 3 — Onboarding & Core UI | 🟢 | See screen-by-screen table below. Every onboarding screen except Iron Calibration Gate now has real content, merged to `main`, and CI-confirmed green as of PR #13's merge (2026-08-09) — `build-and-test` runs the full `:app`/`:data`/`:domain` compile+test suite on every push to `main`, so a green run there confirms everything in the tree at that point, not just the PR's own diff. On-device verification still lags behind CI for most of these screens — see each row below. Iron Calibration Gate remains a placeholder — deliberately, not a gap (see row 4b below). |
+| 3 — Onboarding & Core UI | 🟢 | See screen-by-screen table below. Every onboarding screen except Iron Calibration Gate now has real content, merged to `main`, and CI-confirmed green as of PR #13's merge (2026-08-09) — `build-and-test` runs the full `:app`/`:data`/`:domain` compile+test suite on every push to `main`, so a green run there confirms everything in the tree at that point, not just the PR's own diff. On-device verification still lags behind CI for most of these screens — see each row below. **Design system (§5.26, not yet merged):** a real Compose/M3 design system now exists (`ui/theme/Color.kt`/`Type.kt`/`Theme.kt`, branch `design-system-compose-theme`) — dark palette, contrast-verified, spec-grounded (no severity/tier color-coding) — with First Mission Scheduling migrated to Compose as the proof-of-concept screen; the other 7 onboarding screens still render plain XML unchanged, pending incremental follow-up migration, and this new work is itself not yet CI-confirmed (see the branch note above). Iron Calibration Gate remains a placeholder — deliberately, not a gap (see row 4b below). |
 | 4 — Behavioral Fingerprint / Predictive Failure (F1–F5) | ⬜ | Not started. Depends on Phase 3's alert-card pattern existing to render into. |
 | 5 — Pilot & Hypothesis Resolution | ⬜ | Not started. No new app code — this is "use it, gather data, resolve `[HYPOTHESIS]` constants." |
 
@@ -100,7 +102,7 @@ worth doing every session rather than skipping it.
 | 5 | Mission Profile Setup | 🟢 | Merged to `main`, has a test file (`MissionProfileSetupFragmentTest.kt`) — CI-confirmed green as of PR #13's merge. On-device verification not yet done. |
 | 6 | Core Data Consent | 🟢 | CI-confirmed green as of PR #13's merge. On-device verification not yet done. Also overwrites the placeholder `onboardingConsentVersion` written earlier at Tier Selection/Confirmation with a real version (`CoreDataConsentFragment.CONSENT_VERSION`, `"v1"`) — see that Fragment's kdoc. |
 | 7 | Unsupervised Reliability Opt-In | 🟢 | Merged to `main` (PR #12). CI-confirmed green as of PR #13's merge. On-device verification not yet done. Genuinely optional per §2.7/PRD §13.4 — Enable and Skip both route to the same next screen. Writes the previously-unused `User.unsupervisedReliabilityOptIn`/`optInAt` fields. New `OnboardingScreenEvent` table (DB v6→v7) instruments completion/drop-off per the spec's own explicit ask — see `OnboardingScreenEvent.kt` kdoc for why this is a narrow, screen-scoped log rather than general analytics. Has a test file (`UnsupervisedReliabilityOptInFragmentTest.kt`). |
-| 8 | First Mission Scheduling | 🟢 | Merged to `main` (PR #13). CI-confirmed green. Closes onboarding — no outgoing nav action from this destination. Creates the first real `Mission` row (Start now vs. Schedule, setting `scheduledStart` meaningfully for the first time — see `FirstMissionSchedulingFragment`'s kdoc). Has a test file (`FirstMissionSchedulingFragmentTest.kt`). On-device verification not yet done — flagged as higher-value than most onboarding screens' on-device checks, since this is the first screen exercising real Mission creation rather than `DebugSeeder`. Two `[HYPOTHESIS]` judgment calls remain open, flagged in that kdoc and `ROADMAP.md` §5.24: a hardcoded default Mission duration, and reusing `ACTIVE` status for a not-yet-started scheduled Mission (no "scheduled" status exists in `MissionStatus`). |
+| 8 | First Mission Scheduling | 🟢 | Merged to `main` (PR #13). CI-confirmed green (original XML-based content). Closes onboarding — no outgoing nav action from this destination. Creates the first real `Mission` row (Start now vs. Schedule, setting `scheduledStart` meaningfully for the first time — see `FirstMissionSchedulingFragment`'s kdoc). Has a test file (`FirstMissionSchedulingFragmentTest.kt`). On-device verification not yet done — flagged as higher-value than most onboarding screens' on-device checks, since this is the first screen exercising real Mission creation rather than `DebugSeeder`. Two `[HYPOTHESIS]` judgment calls remain open, flagged in that kdoc and `ROADMAP.md` §5.24: a hardcoded default Mission duration, and reusing `ACTIVE` status for a not-yet-started scheduled Mission (no "scheduled" status exists in `MissionStatus`). **Migrated to Compose** as the design-system proof-of-concept (branch `design-system-compose-theme`, not yet merged, not yet CI-confirmed — see `ROADMAP.md` §5.26) — UI now lives in `FirstMissionSchedulingScreen.kt`, hosted via `ComposeView`; business logic in the Fragment unchanged, so this migration doesn't reopen either `[HYPOTHESIS]` item above. |
 
 **Other Phase 3 screens (not in the onboarding sequence):**
 
@@ -188,26 +190,44 @@ and CI-confirmed green** — `build-and-test` runs the full `:app`/`:data`/`:dom
 suite on every push, so this one green run confirms everything in the tree at that point, not
 just PR #13's own diff. Only Iron Calibration Gate remains a placeholder, deliberately (row 4b).
 
+**Also done, on top of that confirmed baseline, not yet merged or CI-confirmed:** a real
+Compose/M3 design system (`ROADMAP.md` §5.26, branch `design-system-compose-theme`) —
+`Color.kt`/`Type.kt`/`Theme.kt`, contrast-verified, spec-grounded against §2.3/§3.5's explicit
+anti-severity-coding constraints — plus First Mission Scheduling migrated to Compose as the
+proof-of-concept screen. That branch was rebased onto the CI-confirmed `main` above rather than
+an older commit, so it inherits §5.25's confirmation for everything except the Compose migration
+itself, which is new code layered on top and genuinely unconfirmed.
+
 Real remaining items, in rough priority order:
 
-1. **On-device verify the onboarding screens that are CI-green but not yet device-checked** —
+1. **Merge `design-system-compose-theme`** once CI confirms it green — rebased onto current
+   `main`, no outstanding conflict.
+2. **On-device verify the onboarding screens that are CI-green but not yet device-checked** —
    that's most of them (rows 1, 2, 3, 5, 6, 7, 8 in the screen table above). First Mission
    Scheduling (row 8) is the highest-value of these to check first: it's the only screen that
    exercises real Mission creation through the UI rather than `DebugSeeder`, so it's the first
-   real end-to-end test of "does a Mission created by an actual user actually get enforced."
-2. **Revisit Mission Profile Setup (§2.8)** to wire in Goal Definition's flagged-categories
+   real end-to-end test of "does a Mission created by an actual user actually get enforced." Once
+   `design-system-compose-theme` merges, this should also cover the Compose rendering itself —
+   emulator/device rendering can differ from static XML/kdoc review in ways this sandbox's
+   manual checks can't catch (no compiler was reachable to build either branch this session).
+3. **Migrate the remaining 7 onboarding screens to Compose incrementally**, a few at a time,
+   verified at each step — §5.26 deliberately scoped this pass to one proof-of-concept screen
+   only, matching this project's own "small, reviewable, one-concern-per-PR" convention.
+4. **Revisit Mission Profile Setup (§2.8)** to wire in Goal Definition's flagged-categories
    default suggestions — unblocked since Goal Definition merged, but still not consumed.
-3. **Resolve the two `[HYPOTHESIS]` items §5.24 flagged**: a hardcoded default Mission
+5. **Resolve the two `[HYPOTHESIS]` items §5.24 flagged**: a hardcoded default Mission
    duration with no spec source, and reusing `ACTIVE` status for a scheduled-but-not-yet-
    started Mission (no dedicated status exists for that state). Neither blocks anything, but
    both are open judgment calls a product-owner sign-off pass (like the one that closed
    §5.5/§5.9/§5.10/§5.15) could resolve properly instead of leaving as engineering defaults.
-4. **Build the Iron Calibration Gate's real destination flow** — not the onboarding-time
+6. **Remove the now-dead `fragment_first_mission_scheduling.xml`** once the Compose migration
+   is confirmed working on-device — currently left in place, marked unreferenced, per §5.26.
+7. **Build the Iron Calibration Gate's real destination flow** — not the onboarding-time
    placeholder (which is correctly unreachable by design, row 4b), but the actual "existing
    user reaches Iron later via `TierTransitionUseCase.activateIron`" flow that destination
    exists for. This is a real, currently-unbuilt UI surface, not a documentation gap.
-5. **Phase 4 (Behavioral Fingerprint / Predictive Failure)** can start once the above settles —
+8. **Phase 4 (Behavioral Fingerprint / Predictive Failure)** can start once the above settles —
    it depends on Phase 3's alert-card pattern (§3.5 of the Onboarding spec already defines the
    pattern in full) existing to render into, which nothing above blocks structurally. This is
-   the next full *phase* of work, not just the next screen, once item 4 above closes out
+   the next full *phase* of work, not just the next screen, once item 7 above closes out
    Phase 3's real remaining gap.
