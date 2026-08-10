@@ -2149,3 +2149,32 @@ the same way §5.21/§5.22/§5.23 did before it. On-device verification is a sep
 step after that — and this screen, being the one that finally exercises the real
 Mission-creation path (as opposed to `DebugSeeder`'s synthetic rows), is a meaningfully higher-
 value on-device check than most of onboarding's other screens once CI is green.
+
+---
+
+### 5.25 — CONFIRMED — full onboarding sequence (screens 1–3, 5–8) CI-green as of PR #13's
+merge to `main`
+
+**No code change this entry** — this is the CI-confirmation graduation §5.23/§5.24 each
+predicted would happen "once CI confirms it." The person confirmed PR #13 (First Mission
+Scheduling, §5.24) built cleanly. Checked `git log origin/main` directly rather than taking
+that at face value alone: PR #13 is merged (`54deb99`), and `build-and-test.yml` runs the full
+`:app`/`:data`/`:domain` compile-and-test suite (not just the diff) on every push to `main` —
+so this one green run confirms every onboarding screen currently in the tree, not only First
+Mission Scheduling's own files.
+
+**Practical effect:** every screen previously marked 🟡 "written, not yet CI-confirmed" purely
+for lack of a real compiler in the authoring sandbox — Welcome (§2.1), Goal Definition (§2.2),
+Tier Explanation (§2.3), Mission Profile Setup (§2.8), Core Data Consent (§2.6), Unsupervised
+Reliability Opt-In (§2.7), First Mission Scheduling (§2.9) — graduates to 🟢 in STATUS.md's
+tables this same pass. This does **not** upgrade any of them to ✅ — on-device verification is
+a separate, still-open step for all of them except Tier Selection/Confirmation (§2.4/4a), which
+were already device-checked in an earlier session. Two related MVP-table rows (Reputation
+decay-based demotion, §5.9; Mission Profiles) also graduate 🟡→🟢 for the same reason — both
+had code sitting in the same CI-confirmed tree with no separate compilation boundary of their
+own.
+
+**What this does not resolve:** the two `[HYPOTHESIS]` judgment calls §5.24 flagged (default
+Mission duration; reusing `ACTIVE` for a scheduled-but-not-started Mission) are still open —
+CI confirms the code compiles and its own tests pass, not that either judgment call is the
+right one. Those remain real open items, not closed by this entry.
