@@ -41,8 +41,17 @@
     Left in the graph (rather than removed) because the destination and action still need to
     exist for whatever later flow lets an *existing* user reach Iron once their calibration
     window elapses (TierTransitionUseCase.activateIron, already built and tested — see
-    ROADMAP.md Phase 1) — that flow is a Tier Selection *outside* onboarding, which this graph
-    doesn't model at all yet.
+    ROADMAP.md Phase 1) — that flow was, until this pass, a Tier Selection *outside*
+    onboarding this graph didn't model at all.
+
+    **That flow now exists, added this pass, in this same graph:** firstMissionSchedulingFragment
+    (destination 8 above) now has a real outgoing action to a new homeFragment destination —
+    the minimum post-onboarding "onboarding complete" hand-off screen this file's own comment
+    used to say didn't exist. From there, a new ironCalibrationFragment destination is the
+    real activateIron() call site. Both are new, separate from the nine onboarding screens
+    above and from ironCalibrationGateFragment specifically (still an unreachable-by-design
+    placeholder, unchanged) — see homeFragment/ironCalibrationFragment's own comments below
+    and each Fragment class's kdoc for the full reasoning.
 -->
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -197,13 +206,50 @@
     <!-- 8. First Mission Scheduling — §2.9, closes onboarding. Real content as of this pass:
          FirstMissionSchedulingFragment replaces OnboardingPlaceholderFragment here. No
          title/stepNumber/totalSteps arguments, same reasoning as every other real-content
-         destination in this graph. Still no outgoing <action> — this Fragment creates the
-         first real Mission row (see its own kdoc) but does not navigate anywhere further;
-         real "onboarding complete -> hand off to Mission enforcement" transition remains a
-         later item, not something this pass fakes just to have a destination to point at. -->
+         destination in this graph.
+
+         **Now has an outgoing action, added this pass.** Previously this destination declared
+         none at all (see this comment's own prior wording: "no real 'onboarding complete'
+         hand-off screen yet, and this Fragment does not invent one") — STATUS.md's "what's
+         actually next" item 2 named this exact gap. homeFragment below is that hand-off
+         screen: the minimum real post-onboarding destination (see HomeFragment's own kdoc for
+         scope — not a full dashboard). FirstMissionSchedulingFragment itself is unchanged; it
+         still only creates the Mission row, navigating onward afterward is new. -->
     <fragment
         android:id="@+id/firstMissionSchedulingFragment"
         android:name="com.disciplineos.app.onboarding.FirstMissionSchedulingFragment"
-        android:label="First Mission Scheduling" />
+        android:label="First Mission Scheduling">
+        <action
+            android:id="@+id/action_firstMissionScheduling_to_home"
+            app:destination="@id/homeFragment"
+            app:popUpTo="@id/onboarding_nav_graph"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <!-- Home — added this pass. Did not exist anywhere in this app before. See
+         HomeFragment/HomeScreen's own kdoc for full reasoning: the minimum real
+         post-onboarding destination, hosting the one concrete thing this pass was asked to
+         build (a real entry point into Iron Calibration for a user who finished onboarding at
+         a lower tier), not a full dashboard. Reached via popUpTo above — the entire
+         onboarding back-stack is cleared on arrival, matching "onboarding is done, this is a
+         new section of the app"; pressing Back from Home should not return into onboarding. -->
+    <fragment
+        android:id="@+id/homeFragment"
+        android:name="com.disciplineos.app.home.HomeFragment"
+        android:label="Home">
+        <action
+            android:id="@+id/action_home_to_ironCalibration"
+            app:destination="@id/ironCalibrationFragment" />
+    </fragment>
+
+    <!-- Iron Calibration — added this pass. The real "existing user reaches Iron later via
+         TierTransitionUseCase.activateIron" flow that ironCalibrationGateFragment's own
+         comment (above) already described as unmodeled. Deliberately a separate destination
+         from ironCalibrationGateFragment, not a repurposing of it — see
+         IronCalibrationFragment's own kdoc for why. Only reachable from homeFragment. -->
+    <fragment
+        android:id="@+id/ironCalibrationFragment"
+        android:name="com.disciplineos.app.home.IronCalibrationFragment"
+        android:label="Iron Calibration" />
 
 </navigation>

@@ -44,8 +44,9 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-10 (through §5.30 — Mission Profile Setup's blocklist
-now defaults to Goal Definition's flagged categories)
+**Last synced to ROADMAP.md:** 2026-08-10 (through §5.31 — post-onboarding Home shell built,
+plus a real Iron Calibration flow that finally gives `TierTransitionUseCase.activateIron` a
+call site)
 
 ---
 
@@ -69,7 +70,7 @@ now defaults to Goal Definition's flagged categories)
 | 0.5 — Real Build Verification (CI) | ✅ | Gradle/CI pipeline itself confirmed working. |
 | 1 — Domain / Use-Case Layer | 🟢 | Functionally complete. §5.9's tier-floor gap resolved (see MVP table below) — no open spec gaps remain. |
 | 2 — Core Enforcement Loop | ✅ | Interception loop confirmed on-device via `DebugSeeder` (no real Mission-creation UI yet, so seeding is still required to trigger it). |
-| 3 — Onboarding & Core UI | ✅ | See screen-by-screen table below. Every onboarding screen except Iron Calibration Gate now has real content, is merged to `main`, and is confirmed **CI green and on-device** (PR #16, 2026-08-10) — all 9 screens now render via Compose (`ui/onboarding/*Screen.kt`), a single design system (`ui/theme/Color.kt`/`Type.kt`/`Theme.kt`, §5.26), no plain-XML-inflating onboarding screen remains. Iron Calibration Gate remains a placeholder — deliberately, not a gap (see row 4b below). |
+| 3 — Onboarding & Core UI | ✅ | See screen-by-screen table below. Every onboarding screen except Iron Calibration Gate now has real content, is merged to `main`, and is confirmed **CI green and on-device** (PR #16, 2026-08-10) — all 9 screens now render via Compose (`ui/onboarding/*Screen.kt`), a single design system (`ui/theme/Color.kt`/`Type.kt`/`Theme.kt`, §5.26), no plain-XML-inflating onboarding screen remains. Iron Calibration Gate remains a placeholder — deliberately, not a gap (see row 4b below). **Post-onboarding hand-off built this session (§5.31, not yet CI-confirmed):** onboarding previously dead-ended (no outgoing action from its last screen, no post-onboarding destination anywhere) — a new `homeFragment` now closes that gap, plus a new `ironCalibrationFragment` giving `TierTransitionUseCase.activateIron` its first real call site. See §5.31 for full detail; graduates to ✅ once CI + on-device confirm it, same as every other entry in this table.
 | 4 — Behavioral Fingerprint / Predictive Failure (F1–F5) | ⬜ | Not started. Depends on Phase 3's alert-card pattern existing to render into. |
 | 5 — Pilot & Hypothesis Resolution | ⬜ | Not started. No new app code — this is "use it, gather data, resolve `[HYPOTHESIS]` constants." |
 
@@ -81,6 +82,9 @@ and `git branch -a` rather than inferred, per this note's own recurring advice b
 onboarding-related branch is currently unmerged. Check `git branch -r` and
 `git log main --oneline -10` for ground truth rather than trusting this note indefinitely —
 prior versions of this exact note went stale twice in a row for the same reason.
+`iron-calibration-gate-and-home-shell` (§5.31, this session) is **not yet merged** — pushed to
+that feature branch, PR not yet opened/reviewed as of this sync. Don't assume it's on `main`
+without checking `git branch -r` first, same standing advice this note keeps having to repeat.
 
 ---
 
@@ -123,10 +127,11 @@ on-device pass, not a logic change needing separate re-verification.
 |---|---|---|
 | Discipline Debt + Ceiling, tier decay | ✅ | Formulas + Ledger + shared-cause guard |
 | Reputation w/ decay-based demotion | 🟢 | `demotion_triggered` implemented (§5.9: 7 tier bands + N=3, `[HYPOTHESIS]`) — CI-confirmed green as of PR #13's merge, not yet device-verified |
-| Four-Tier Enforcement + transitions | 🟢 | Upgrade/downgrade logic done; Iron path unexercised on-device |
+| Four-Tier Enforcement + transitions | 🟡 | Upgrade/downgrade logic done (`:domain`, CI-confirmed). **Iron path now has a real UI call site (§5.31, this session)** — `home/IronCalibrationFragment` calls `activateIron()` — but this is written-not-yet-CI-confirmed, and the Iron path remains entirely unexercised on-device (never has been, per this row's prior note). Downgrades from `main` to 🟡 pending CI on §5.31, not a regression. |
 | Mission Enforcement (lock/allowlist loop) | ✅ | Verified via `DebugSeeder`; First Mission Scheduling is now confirmed CI + on-device (PR #16) as the first screen that creates a real Mission row via actual UI rather than seeding |
 | Distraction Interception | ✅ | |
 | Mission Profiles | ✅ | Setup screen confirmed CI + on-device (PR #16); wired into real Mission creation via First Mission Scheduling (§2.9) |
+| Post-Onboarding Home shell | 🟡 | New this session (§5.31) — did not exist before. Minimal, not a dashboard: current tier + Iron eligibility card only. Written, not yet CI-confirmed. |
 | Recovery Mode | ⬜ | Referenced by domain logic; no dedicated flow/UI |
 | Reliability Index / Resistance Score / Focus Integrity | 🟢 | Formulas exist; no reporting UI surfaces them yet |
 | Discipline Score | ✂️ | Deliberately cut from MVP (Data Model doc §3.1) — not a gap |
@@ -202,6 +207,8 @@ is closed; what's left below is cleanup and the next phase, not more onboarding 
 Both cleanup items flagged when onboarding's Compose migration finished (dead XML layouts,
 per-Fragment theme duplication) are done — §5.28 and §5.29. Mission Profile Setup's default
 suggestions are also done — §5.30, pending push + CI + on-device confirmation for all three.
+The Iron Calibration real-destination flow named below as item 2 is now also written — §5.31,
+same session as this sync — pending push + CI + on-device confirmation, same as the above.
 Real remaining items, in rough priority order:
 
 1. **Resolve the two `[HYPOTHESIS]` items §5.24 flagged**: a hardcoded default Mission
@@ -209,12 +216,16 @@ Real remaining items, in rough priority order:
    started Mission (no dedicated status exists for that state). Neither blocks anything, but
    both are open judgment calls a product-owner sign-off pass (like the one that closed
    §5.5/§5.9/§5.10/§5.15) could resolve properly instead of leaving as engineering defaults.
-2. **Build the Iron Calibration Gate's real destination flow** — not the onboarding-time
-   placeholder (which is correctly unreachable by design, row 4b), but the actual "existing
-   user reaches Iron later via `TierTransitionUseCase.activateIron`" flow that destination
-   exists for. This is a real, currently-unbuilt UI surface, not a documentation gap.
+2. **~~Build the Iron Calibration Gate's real destination flow~~ — done, §5.31, pending CI +
+   on-device confirmation.** A new `homeFragment` (also new — onboarding had no post-completion
+   destination at all until this pass) hosts an Iron eligibility card that opens a new
+   `ironCalibrationFragment`, which calls `TierTransitionUseCase.activateIron` directly — the
+   first real UI call site that use-case has ever had. Not the onboarding-time
+   `ironCalibrationGateFragment` placeholder, which stays unreachable by design (row 4b) — see
+   §5.31 for why these are deliberately two separate things. Graduates this row to fully
+   struck-through, not just noted, once CI + on-device both confirm it.
 3. **Phase 4 (Behavioral Fingerprint / Predictive Failure)** — the next full *phase*, not a
    screen-level item. Depends on Phase 3's alert-card pattern (§3.5 of the Onboarding spec
    already defines the pattern in full) existing to render into, which nothing above blocks
    structurally. This is the largest genuinely new chunk of work once item 1 settles, and the
-   natural "what's next" once onboarding cleanup and its remaining open loose end close.
+   natural "what's next" once onboarding cleanup and its remaining open loose ends close.

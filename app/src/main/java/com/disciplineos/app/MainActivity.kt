@@ -15,12 +15,19 @@ import androidx.fragment.app.FragmentActivity
  * `app:navGraph`, not built up in code — the declarative form needs no manual
  * FragmentTransaction here, and Navigation Component's own docs recommend it as the default
  * over the programmatic form used only when a NavHost's graph must be chosen at runtime,
- * which isn't the case here) running the onboarding nav graph
- * (`res/navigation/onboarding_nav_graph.xml`) — Onboarding, Consent & Interaction Spec §1's
- * nine-screen sequence, currently wired with
- * [com.disciplineos.app.onboarding.OnboardingPlaceholderFragment] placeholder content at every
- * destination (ROADMAP.md Phase 3: navigation skeleton verified before any real screen content
- * is built on top of it).
+ * which isn't the case here) running `res/navigation/onboarding_nav_graph.xml`.
+ *
+ * **Corrected, this pass — this kdoc previously described every destination as still
+ * [com.disciplineos.app.onboarding.OnboardingPlaceholderFragment] placeholder content; that
+ * stopped being true as of PR #16 (see STATUS.md), and this note had gone stale describing
+ * it.** The graph's nine onboarding screens (Welcome through First Mission Scheduling) all
+ * have real content now — only `ironCalibrationGateFragment` remains a placeholder,
+ * deliberately (see that destination's own comment in the graph). As of this pass, the same
+ * graph also carries the real post-onboarding hand-off: `firstMissionSchedulingFragment` now
+ * navigates to a new `homeFragment` destination on completion, which in turn can reach a new
+ * `ironCalibrationFragment` — see [com.disciplineos.app.home.HomeFragment] and
+ * [com.disciplineos.app.home.IronCalibrationFragment] for what those do. Still one graph, one
+ * NavHost — no second graph or Activity was introduced for this.
  *
  * [FragmentActivity], not `AppCompatActivity` — nothing here needs AppCompat's
  * toolbar/theme-compat machinery, and no dependency on `androidx.appcompat` exists anywhere in
