@@ -2460,3 +2460,66 @@ compiler reachable in this authoring sandbox. Verified manually: every fragment 
 /`DisciplineOsTheme` imports or construction in live code (kdoc prose describing the old pattern,
 for historical record, is expected and left alone). Push, let CI confirm, then on-device check
 before this note graduates the same way §5.27's did.
+
+---
+
+### 5.30 — RESOLVED — Mission Profile Setup's blocklist now defaults to Goal Definition's flagged categories
+
+**Closes STATUS.md's "what's actually next" item, queued since Goal Definition (§2.2) shipped
+real content — this item was explicitly left unblocked-but-undone in
+[MissionProfileSetupFragment]'s own kdoc pending this pass.**
+
+**§2.8's actual requirement, re-read before wiring anything:** "should default to suggestions
+drawn from §2.2's flagged categories rather than a blank list, to reduce first-session
+abandonment." Re-checked §2.2's own text too, since "flagged categories" undersells what that
+screen actually asks for: its spec line calls the same field "high-value" *and* "high-risk"
+apps/categories — a deliberately mixed bag — but `GoalDefinitionScreen`'s shipped
+implementation (an earlier pass, unchanged by this one) already collapsed that into one
+undifferentiated free-text field, and `User.flaggedCategories` is a single `List<String>` with
+no column distinguishing which flagged entry was meant as which.
+
+**Decision: pre-fill blocklist only, not allowlist, and not a heuristic split of one list into
+both.** No data in this codebase says which flagged category a given user meant as "protect
+this" vs. "restrict this" — inventing a split (e.g. keyword-guessing "social media" as
+high-risk) would be exactly the kind of invented behavior this project's own convention argues
+against, and would risk silently mis-suggesting a high-value entry into the blocklist. The
+categories field's own hint text (`"social media", "news", "games"`) and this app's whole
+premise (restricting distractions during a Mission) both point toward blocklist as the honest
+target. Allowlist starts empty, same as before this pass — not touched.
+
+**Still just a starting point, not a locked default.** The suggestion pre-fills the blocklist
+`OutlinedTextField`'s value; nothing prevents the user from clearing or editing it like any
+other field content, matching §2.8's own "reduce first-session abandonment" framing (a
+starting point removes the blank-page problem; it isn't meant to remove the user's choice).
+
+**Async-load wiring, not a Compose antipattern shortcut.** `MissionProfileSetupFragment.onCreateView`
+must return a `View` synchronously — it can't `await` the DB read before building the
+composable. `loadSuggestedBlocklist()` kicks off the read via the same `lifecycleScope.launch`
+pattern every other Fragment method in this package already uses, and pushes the result into a
+`mutableStateOf` the Fragment owns; `MissionProfileSetupScreen` observes it via
+`LaunchedEffect(suggestedBlocklist)`, applying it exactly once (a `hasAppliedSuggestion` guard
+stops a later recomposition from re-firing the effect and clobbering a user's own edits made in
+the meantime). This is the first `LaunchedEffect` usage anywhere in this codebase — checked, no
+prior precedent to match against, so this follows Compose's own documented idiom for "external
+async value populates local UI state" rather than inventing a different pattern.
+
+**A small "pre-filled from the categories you flagged earlier" note** is shown under the
+blocklist field, but only once the suggestion is actually applied (not just whenever the param
+is non-empty) — makes the source of the pre-filled text visible, matching §2.2's own
+"interaction detail" requirement (the same "make the link visible" precedent that screen's
+`goal_definition_link_note` string already established) rather than leaving the user to wonder
+where the text came from.
+
+**Files touched:** `MissionProfileSetupScreen.kt` (`suggestedBlocklist` param,
+`LaunchedEffect`, conditional note), `MissionProfileSetupFragment.kt`
+(`loadSuggestedBlocklist()`, `mutableStateOf` wiring, updated kdoc), `strings.xml` (one new
+string, `mission_profile_setup_blocklist_suggested_note`). `parseLines`, the `MissionProfile`
+insert, and its re-entry guard are all unchanged — this pass only affects what the blocklist
+field starts with, not what gets persisted or how.
+
+**Same standing verification caveat as every other entry in this file:** no Android/Kotlin
+compiler reachable in this authoring sandbox. Verified manually: brace/paren balance on both
+touched `.kt` files, `strings.xml` well-formedness. Push, let CI confirm, then on-device check
+before this note graduates the same way prior entries have — the `LaunchedEffect` timing in
+particular is worth confirming visually (does the suggestion actually appear, and does the
+note only show when it should) since it's this codebase's first use of that API.

@@ -44,8 +44,8 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-10 (through §5.29 — `DisciplineOsTheme` deduplicated
-behind a single `themedComposeView` helper, closing out both cleanup items §5.27 queued)
+**Last synced to ROADMAP.md:** 2026-08-10 (through §5.30 — Mission Profile Setup's blocklist
+now defaults to Goal Definition's flagged categories)
 
 ---
 
@@ -200,22 +200,21 @@ that's a different, currently-unbuilt flow, not an onboarding gap). Onboarding a
 is closed; what's left below is cleanup and the next phase, not more onboarding screens.
 
 Both cleanup items flagged when onboarding's Compose migration finished (dead XML layouts,
-per-Fragment theme duplication) are now done — §5.28 and §5.29 respectively, both pending push
-+ CI + on-device confirmation. Real remaining items, in rough priority order:
+per-Fragment theme duplication) are done — §5.28 and §5.29. Mission Profile Setup's default
+suggestions are also done — §5.30, pending push + CI + on-device confirmation for all three.
+Real remaining items, in rough priority order:
 
-1. **Revisit Mission Profile Setup (§2.8)** to wire in Goal Definition's flagged-categories
-   default suggestions — unblocked since Goal Definition merged, but still not consumed.
-2. **Resolve the two `[HYPOTHESIS]` items §5.24 flagged**: a hardcoded default Mission
+1. **Resolve the two `[HYPOTHESIS]` items §5.24 flagged**: a hardcoded default Mission
    duration with no spec source, and reusing `ACTIVE` status for a scheduled-but-not-yet-
    started Mission (no dedicated status exists for that state). Neither blocks anything, but
    both are open judgment calls a product-owner sign-off pass (like the one that closed
    §5.5/§5.9/§5.10/§5.15) could resolve properly instead of leaving as engineering defaults.
-3. **Build the Iron Calibration Gate's real destination flow** — not the onboarding-time
+2. **Build the Iron Calibration Gate's real destination flow** — not the onboarding-time
    placeholder (which is correctly unreachable by design, row 4b), but the actual "existing
    user reaches Iron later via `TierTransitionUseCase.activateIron`" flow that destination
    exists for. This is a real, currently-unbuilt UI surface, not a documentation gap.
-4. **Phase 4 (Behavioral Fingerprint / Predictive Failure)** — the next full *phase*, not a
+3. **Phase 4 (Behavioral Fingerprint / Predictive Failure)** — the next full *phase*, not a
    screen-level item. Depends on Phase 3's alert-card pattern (§3.5 of the Onboarding spec
    already defines the pattern in full) existing to render into, which nothing above blocks
-   structurally. This is the largest genuinely new chunk of work once items 1–2 settle, and the
-   natural "what's next" once onboarding cleanup and its two open loose ends close.
+   structurally. This is the largest genuinely new chunk of work once item 1 settles, and the
+   natural "what's next" once onboarding cleanup and its remaining open loose end close.

@@ -4,6 +4,9 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
@@ -38,11 +41,30 @@ import java.util.UUID
  * either the code or the Data Model doc. This screen is what finally gives that id something
  * real to point at.
  *
- * **What this screen does NOT do, and why:** §2.8 asks for suggested defaults "drawn from
- * §2.2's flagged categories" — that data doesn't exist (Goal Definition, §2.2, is still
- * [OnboardingPlaceholderFragment] content two steps earlier in this same flow), so the
- * allowlist/blocklist fields start empty rather than pre-filled with an invented guess.
- * Flagged in ROADMAP.md §5, not silently worked around.
+ * **Default-suggestions wiring (ROADMAP.md §5.30 — closes the gap this class's own kdoc used
+ * to flag):** §2.8 asks for the blocklist to "default to suggestions drawn from §2.2's flagged
+ * categories rather than a blank list, to reduce first-session abandonment." That data exists
+ * now (Goal Definition, §2.2, has real content as of an earlier pass) — [onCreateView] kicks
+ * off an async read of [com.disciplineos.data.entity.User.flaggedCategories] and pushes the
+ * result into [suggestedBlocklist], a Compose [androidx.compose.runtime.State] this Fragment
+ * owns, once it resolves.
+ *
+ * **Blocklist, not allowlist — and not both.** §2.2's own text calls flagged categories
+ * "high-value" *and* "high-risk" apps/categories in the same undifferentiated free-text field
+ * ([GoalDefinitionScreen][com.disciplineos.app.ui.onboarding.GoalDefinitionScreen] never asked
+ * the user to say which is which, and `User.flaggedCategories` is a single `List<String>` with
+ * no field distinguishing the two) — so there is no real signal in this codebase's data for
+ * which flagged category the user meant as "protect this" versus "restrict this." Blindly
+ * splitting the same list into both allowlist and blocklist would misrepresent high-value
+ * entries as things to block. The categories field's own hint text and this app's whole
+ * premise (restricting distractions during a Mission) both point the same direction: what a
+ * user flags here reads as "things I'm tempted by," not "things I want unrestricted access
+ * to" — so blocklist is the honest target, allowlist stays untouched (empty by default, same
+ * as before this pass), rather than inventing a heuristic split the data doesn't support.
+ *
+ * **Still just a starting point.** `MissionProfileSetupScreen`'s own kdoc covers this in more
+ * detail: the suggestion pre-fills the blocklist field's initial text, fully editable, not a
+ * locked default — a user can clear or change it exactly like any hand-typed content.
  *
  * **Design-system pass (ROADMAP.md §5.26/onboarding-wide follow-up):** UI now lives in
  * [MissionProfileSetupScreen], hosted via [themedComposeView] (ROADMAP.md §5.29 — replaces the
@@ -55,16 +77,43 @@ class MissionProfileSetupFragment : Fragment() {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?,
-    ): View = themedComposeView {
-        MissionProfileSetupScreen(
-            onContinue = { rawName, allowlistRaw, blocklistRaw ->
-                val name = rawName.trim().let {
-                    if (it.isEmpty()) DEFAULT_PROFILE_NAME else it
-                }
-                submitProfile(name, parseLines(allowlistRaw), parseLines(blocklistRaw))
-            },
-            onBack = { findNavController().popBackStack() },
-        )
+    ): View {
+        var suggestedBlocklist by mutableStateOf("")
+
+        loadSuggestedBlocklist { suggestion -> suggestedBlocklist = suggestion }
+
+        return themedComposeView {
+            MissionProfileSetupScreen(
+                onContinue = { rawName, allowlistRaw, blocklistRaw ->
+                    val name = rawName.trim().let {
+                        if (it.isEmpty()) DEFAULT_PROFILE_NAME else it
+                    }
+                    submitProfile(name, parseLines(allowlistRaw), parseLines(blocklistRaw))
+                },
+                onBack = { findNavController().popBackStack() },
+                suggestedBlocklist = suggestedBlocklist,
+            )
+        }
+    }
+
+    /**
+     * One category per line, same convention [GoalDefinitionFragment.parseLines] already
+     * established for the source data itself — blank entries dropped, not preserved as
+     * empty-string lines, matching [parseLines]'s own reasoning for why that matters
+     * downstream. Reads [com.disciplineos.data.entity.User.flaggedCategories] directly; an
+     * empty or missing list (no categories flagged, or no `User` row yet — shouldn't be
+     * reachable via this screen's own nav-graph position, but handled the same defensive way
+     * every other screen in this package treats its own "should be impossible" case) resolves
+     * to an empty string, which [MissionProfileSetupScreen] already treats as "no suggestion,"
+     * matching its pre-this-pass behavior exactly.
+     */
+    private fun loadSuggestedBlocklist(onLoaded: (String) -> Unit) {
+        lifecycleScope.launch {
+            val context = requireContext().applicationContext
+            val database = AppContainer.database(context)
+            val categories = database.userDao().getSingleLocalUser()?.flaggedCategories.orEmpty()
+            onLoaded(categories.joinToString(separator = "\n"))
+        }
     }
 
     /**

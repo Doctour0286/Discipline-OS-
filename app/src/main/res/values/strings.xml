@@ -144,6 +144,7 @@
     <string name="mission_profile_setup_blocklist_label">Blocked apps</string>
     <string name="mission_profile_setup_blocklist_hint_body">One app per line. These are off-limits for the duration of a Mission using this Profile.</string>
     <string name="mission_profile_setup_blocklist_hint">com.example.socialapp</string>
+    <string name="mission_profile_setup_blocklist_suggested_note">Pre-filled from the categories you flagged earlier — edit or clear freely.</string>
     <string name="mission_profile_setup_empty_ok_note">Both lists are optional here — you can leave them empty and fill them in later.</string>
     <string name="mission_profile_setup_continue">Continue</string>
 
