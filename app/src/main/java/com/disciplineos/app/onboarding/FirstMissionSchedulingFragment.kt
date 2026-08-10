@@ -16,10 +16,6 @@ import com.disciplineos.data.entity.Mission
 import com.disciplineos.data.entity.MissionStatus
 import kotlinx.coroutines.launch
 import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
 import java.util.UUID
 
 /**
@@ -68,15 +64,12 @@ import java.util.UUID
  * ever describes `scheduledStart` as a nullable field on the existing four-status enum, not as
  * implying a fifth status). Flagged, not silently assumed away.
  *
- * **Time input format:** plain `EditText` with `yyyy-MM-dd HH:mm` parsed via
- * [DateTimeFormatter], not a native date/time picker widget — same "plain EditText over a
- * picker" precedent
- * [MissionProfileSetupFragment][com.disciplineos.app.onboarding.MissionProfileSetupFragment]'s
- * layout already set for its own free-text fields. Parsed as [LocalDateTime] in the device's
- * default zone ([ZoneId.systemDefault]) and converted to [Instant] — a malformed or
- * unparseable entry shows an inline error and does not create a Mission row, rather than
- * silently falling back to "now" (which would incorrectly log a scheduled Mission as ad hoc,
- * corrupting the exact signal, §3.6, this screen exists to produce correctly).
+ * **Time input:** native [android.app.DatePickerDialog] + [android.app.TimePickerDialog],
+ * chained in [FirstMissionSchedulingScreen] itself — see that file's kdoc for the full
+ * reasoning. This Fragment now receives a real [Instant] directly from [onSchedule]; there is
+ * no string to parse and no malformed-input case to handle here anymore (the previous
+ * `parseScheduledTime`/`TIME_INPUT_FORMATTER`/invalid-time toast are gone along with the
+ * free-text field they existed to validate).
  *
  * **Missing Mission Profile:** this screen reads the same
  * [MissionProfileDao.mostRecentFor][com.disciplineos.data.dao.MissionProfileDao.mostRecentFor]
@@ -109,12 +102,15 @@ import java.util.UUID
  * established and every other onboarding Fragment went on to repeat identically) rather than
  * inflating `fragment_first_mission_scheduling.xml` — the first screen migrated as part of the
  * incremental Views-to-Compose strategy Google's own migration guide recommends (Fragment +
- * Jetpack Navigation stay exactly as they are; only this screen's *content* moves). Every
- * business-logic method below (`parseScheduledTime`, `createMissionAndFinish`, the whole kdoc
- * above this class) is unchanged from the XML version — this migration touches presentation
- * only, not what the screen does or why. `fragment_first_mission_scheduling.xml` itself has
+ * Jetpack Navigation stay exactly as they are; only this screen's *content* moves) — true of
+ * that original design-system pass, which left `createMissionAndFinish` and this class's own
+ * kdoc unchanged from the XML version. `fragment_first_mission_scheduling.xml` itself has
  * since been deleted (ROADMAP.md §5.28), once §5.27 confirmed the whole onboarding sequence's
- * Compose migration CI + on-device.
+ * Compose migration CI + on-device. A later pass (see "Time input" above) did change this
+ * Fragment's business logic — removing `parseScheduledTime` entirely once
+ * [FirstMissionSchedulingScreen] started producing a real [Instant] itself — so that
+ * "unchanged from the XML version" claim no longer holds in full; `createMissionAndFinish`
+ * is still the same, only its caller's contract changed.
  */
 class FirstMissionSchedulingFragment : Fragment() {
 
@@ -125,34 +121,9 @@ class FirstMissionSchedulingFragment : Fragment() {
     ): View = themedComposeView {
         FirstMissionSchedulingScreen(
             onStartNow = { createMissionAndFinish(scheduledStart = null) },
-            onSchedule = { rawTimeInput ->
-                val parsed = parseScheduledTime(rawTimeInput.trim())
-                if (parsed == null) {
-                    Toast.makeText(
-                        requireContext(),
-                        getString(R.string.first_mission_scheduling_invalid_time),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                } else {
-                    createMissionAndFinish(scheduledStart = parsed)
-                }
-            },
+            onSchedule = { scheduledStart -> createMissionAndFinish(scheduledStart) },
             onBack = { findNavController().popBackStack() },
         )
-    }
-
-    /**
-     * Returns null on any unparseable input — see class kdoc's "Time input format" section for
-     * why this must not silently fall back to any default rather than surfacing an error.
-     */
-    private fun parseScheduledTime(raw: String): Instant? {
-        if (raw.isEmpty()) return null
-        return try {
-            val local = LocalDateTime.parse(raw, TIME_INPUT_FORMATTER)
-            local.atZone(ZoneId.systemDefault()).toInstant()
-        } catch (e: DateTimeParseException) {
-            null
-        }
     }
 
     private fun createMissionAndFinish(scheduledStart: Instant?) {
@@ -200,9 +171,6 @@ class FirstMissionSchedulingFragment : Fragment() {
     }
 
     companion object {
-        private val TIME_INPUT_FORMATTER: DateTimeFormatter =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-
         // [HYPOTHESIS] — see class kdoc's "Duration" section for why this exists and what
         // would supersede it.
         private const val DEFAULT_PLANNED_DURATION_MIN = 25

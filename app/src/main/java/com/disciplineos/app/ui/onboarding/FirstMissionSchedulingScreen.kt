@@ -1,5 +1,7 @@
 package com.disciplineos.app.ui.onboarding
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,7 +13,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,40 +21,84 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.disciplineos.app.R
-import com.disciplineos.app.ui.theme.DisciplineOsTheme
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Calendar
 
 /**
  * Compose screen for Onboarding, Consent & Interaction Spec §2.9 (First Mission Scheduling).
- * Design-system pass proof-of-concept — the first screen migrated from XML+Fragment to Compose
- * per app/build.gradle.kts's buildFeatures.compose comment and Google's own recommended
- * incremental strategy (Fragment + Jetpack Navigation stay exactly as they are; only this
- * screen's *content* moves into a ComposeView — see FirstMissionSchedulingFragment.kt for the
- * host).
  *
- * All business logic (Mission creation, time parsing, navigation) stays in the Fragment
- * unchanged — this file is presentation only, taking simple callbacks. That split keeps this
- * migration pass honest: a UI framework swap, not a rewrite of what FirstMissionSchedulingFragment's
- * substantial kdoc already carefully reasoned through (scheduledStart semantics, the
- * [HYPOTHESIS] duration default, the missing-profile fallback, etc.) — none of that logic or
- * its reasoning changes here, only how it's rendered.
+ * All business logic (Mission creation, navigation) stays in
+ * [com.disciplineos.app.onboarding.FirstMissionSchedulingFragment] — this file is presentation
+ * only, taking simple callbacks. That split is unchanged from this screen's original
+ * design-system pass.
  *
- * §2.9 requirement carried over unchanged from the XML version: "schedule vs. start-now choice
- * here is itself the first data point for Self-Initiation Trend... doesn't affect this screen's
- * design" — Start Now and Schedule Mission are both [Button] (equal visual weight), not one
- * [Button] and one lower-emphasis [OutlinedButton]/[androidx.compose.material3.TextButton], so
- * neither reads as the "recommended" path.
+ * **Time input (this pass):** replaces the original free-text OutlinedTextField + "yyyy-MM-dd
+ * HH:mm" format-note hint with chained native [DatePickerDialog] + [TimePickerDialog]. The user
+ * can no longer produce a malformed or ambiguous timestamp — every value this screen can hand
+ * back via [onSchedule] is already a real, valid, unambiguous [Instant]. That's also why
+ * [onSchedule]'s signature changed from `(rawTimeInput: String) -> Unit` to `(scheduledStart:
+ * Instant) -> Unit`: there is no longer a parse step for the Fragment to own, and no
+ * invalid-input case for it to handle (see that class's own kdoc, "Time input" section, for the
+ * corresponding removal of `parseScheduledTime`).
+ *
+ * The date picker's minimum selectable date is today (`datePicker.minDate =
+ * System.currentTimeMillis()`), since scheduling a Mission in the past isn't a meaningful choice
+ * this screen offers — DatePickerDialog enforces that at the OS-widget level rather than this
+ * screen validating it after the fact.
+ *
+ * §2.9 requirement carried over unchanged: "schedule vs. start-now choice here is itself the
+ * first data point for Self-Initiation Trend... doesn't affect this screen's design" — Start Now
+ * and Schedule Mission are both [Button] (equal visual weight), not one [Button] and one
+ * lower-emphasis [OutlinedButton], so neither reads as the "recommended" path.
  */
 @Composable
 fun FirstMissionSchedulingScreen(
     onStartNow: () -> Unit,
-    onSchedule: (rawTimeInput: String) -> Unit,
+    onSchedule: (scheduledStart: Instant) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var timeInput by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    var pickedInstant by remember { mutableStateOf<Instant?>(null) }
+
+    val displayFormatter = remember {
+        DateTimeFormatter.ofPattern("EEE, MMM d 'at' h:mm a")
+    }
+
+    fun launchPickers() {
+        val now = Calendar.getInstance()
+
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val timeInitial = Calendar.getInstance()
+                TimePickerDialog(
+                    context,
+                    { _, hourOfDay, minute ->
+                        val combined = Calendar.getInstance().apply {
+                            set(year, month, dayOfMonth, hourOfDay, minute, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }
+                        pickedInstant = Instant.ofEpochMilli(combined.timeInMillis)
+                    },
+                    timeInitial.get(Calendar.HOUR_OF_DAY),
+                    timeInitial.get(Calendar.MINUTE),
+                    false,
+                ).show()
+            },
+            now.get(Calendar.YEAR),
+            now.get(Calendar.MONTH),
+            now.get(Calendar.DAY_OF_MONTH),
+        ).apply {
+            datePicker.minDate = System.currentTimeMillis()
+        }.show()
+    }
 
     Scaffold(modifier = modifier.fillMaxSize()) { contentPadding ->
         Column(
@@ -105,25 +150,27 @@ fun FirstMissionSchedulingScreen(
                 modifier = Modifier.padding(bottom = 8.dp),
             )
 
-            OutlinedTextField(
-                value = timeInput,
-                onValueChange = { timeInput = it },
-                placeholder = { Text(stringResource(R.string.first_mission_scheduling_schedule_hint)) },
+            Text(
+                text = pickedInstant?.let {
+                    displayFormatter.format(it.atZone(ZoneId.systemDefault()))
+                } ?: stringResource(R.string.first_mission_scheduling_schedule_unset),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+
+            OutlinedButton(
+                onClick = { launchPickers() },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                singleLine = true,
-            )
-
-            Text(
-                text = stringResource(R.string.first_mission_scheduling_schedule_format_note),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 16.dp),
-            )
+                    .padding(bottom = 16.dp),
+            ) {
+                Text(stringResource(R.string.first_mission_scheduling_pick_date_time))
+            }
 
             Button(
-                onClick = { onSchedule(timeInput) },
+                onClick = { pickedInstant?.let(onSchedule) },
+                enabled = pickedInstant != null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 12.dp),
