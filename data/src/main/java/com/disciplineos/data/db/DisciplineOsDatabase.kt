@@ -8,6 +8,7 @@ import androidx.room.TypeConverters
 import com.disciplineos.data.dao.MissionDao
 import com.disciplineos.data.dao.MissionProfileDao
 import com.disciplineos.data.dao.OnboardingEventDao
+import com.disciplineos.data.dao.PredictiveFailureAlertDismissalDao
 import com.disciplineos.data.dao.TierDao
 import com.disciplineos.data.dao.UserDao
 import com.disciplineos.data.dao.ViolationDao
@@ -15,6 +16,7 @@ import com.disciplineos.data.entity.Mission
 import com.disciplineos.data.entity.MissionProfile
 import com.disciplineos.data.entity.OnboardingScreenEvent
 import com.disciplineos.data.entity.OutputArtifact
+import com.disciplineos.data.entity.PredictiveFailureAlertDismissal
 import com.disciplineos.data.entity.TierEvent
 import com.disciplineos.data.entity.User
 import com.disciplineos.data.entity.Violation
@@ -47,6 +49,7 @@ import net.sqlcipher.database.SupportFactory
         TierEvent::class,
         MissionProfile::class,
         OnboardingScreenEvent::class,
+        PredictiveFailureAlertDismissal::class,
     ],
     // v2 (Phase 1): LedgerEntry.pausedAt added for §26.4 dispute-pause semantics.
     // v3 (Phase 1, TierTransitionUseCase): TierEvent table added; User gained
@@ -76,7 +79,18 @@ import net.sqlcipher.database.SupportFactory
     // on User (added in an earlier phase, unused until this pass wires a real screen to
     // write them — see User.kt). Same fallbackToDestructiveMigration reasoning applies
     // unchanged; still no real installed base.
-    version = 7,
+    // v8 (Phase 4, Behavioral Fingerprint / Predictive Failure Rules, F1–F5):
+    // predictive_failure_alert_dismissals table added — see
+    // PredictiveFailureAlertDismissal.kt kdoc. Backs Fingerprint doc §5's "logged, not just
+    // discarded" dismissal-accuracy requirement. No other schema change this bump — F1–F5's
+    // signals are all computed on read from existing Mission/Violation/LedgerEntry rows
+    // rather than persisted as a separate BehavioralFingerprint/FingerprintSignal table,
+    // matching this project's stated bias (MissionProfileDao's "no @Update yet" reasoning,
+    // restated here) against schema that isn't earning its keep yet — nothing currently
+    // needs a durable FingerprintSignal row, only the accuracy log does. Same
+    // fallbackToDestructiveMigration reasoning applies unchanged; still no real installed
+    // base.
+    version = 8,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -88,6 +102,7 @@ abstract class DisciplineOsDatabase : RoomDatabase() {
     abstract fun tierDao(): TierDao
     abstract fun missionProfileDao(): MissionProfileDao
     abstract fun onboardingEventDao(): OnboardingEventDao
+    abstract fun predictiveFailureAlertDismissalDao(): PredictiveFailureAlertDismissalDao
 
     companion object {
         private const val DB_NAME = "disciplineos_core.db"

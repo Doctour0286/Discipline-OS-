@@ -181,6 +181,66 @@ interface MissionDao {
     /** Backs `recovery_per_completed_mission` (Data Model §3.5) — a simple count, one credit per completed Mission in the window. */
     @Query("SELECT COUNT(*) FROM missions WHERE userId = :userId AND status = 'COMPLETED' AND actualStart >= :since")
     suspend fun completedMissionsSince(userId: UUID, since: Instant): Int
+
+    /**
+     * Backs Rule F1 (Time-of-Day Violation Clustering, Fingerprint doc §3): "the last 10
+     * Missions with any violation" — a Mission-scoped window, not a violation-scoped one (a
+     * single Mission can have more than one Violation, so these aren't the same count). Used
+     * by [com.disciplineos.domain.usecase.ComputeBehavioralFingerprintUseCase] to bound which
+     * Missions' violations [ViolationDao.violationTimestampsFor] results should even be
+     * considered for, before binning by hour-of-day. `DISTINCT` + a subquery rather than a
+     * plain join, since a Mission with 3 violations must still only count once toward the
+     * "last 10 Missions" limit — an inner join would count it three times.
+     */
+    @Query(
+        """
+        SELECT id FROM missions
+        WHERE userId = :userId
+          AND id IN (SELECT DISTINCT missionId FROM violations)
+        ORDER BY actualStart DESC
+        LIMIT :limit
+        """
+    )
+    suspend fun missionIdsWithAnyViolation(userId: UUID, limit: Int): List<UUID>
+
+    /**
+     * Backs Rule F2 (Pre-Mission Cancellation Pattern, Fingerprint doc §3): "Missions
+     * cancelled/aborted within the first 5 minutes of `actual_start`, as a proportion of all
+     * Missions" over the last 14 days. A Mission counts as an early cancellation here if it
+     * reached a resolved (non-ACTIVE) state and `actualEnd - actualStart` is under
+     * [maxEarlyMinutes] — VIOLATED and DISPUTED both qualify (F2 is about the Mission ending
+     * fast, not about which resolution it ended in; a dispute doesn't undo the fact that the
+     * user stopped almost immediately), matching how the spec's own framing ("the scope or
+     * allowlist right for what you're trying to do") is about elapsed time, not disposition.
+     * `ABORTED_CRISIS_EXIT` is deliberately excluded — Data Model §5 / PRD §12.4.4 already
+     * treat a crisis exit as "not counted like a normal Violation for consequence purposes,"
+     * and F2's own framing (a *design* signal about the Mission Profile) has nothing to do
+     * with why a crisis exit happened, so folding it in here would misattribute a safety
+     * mechanism as a scoping problem.
+     */
+    @Query(
+        """
+        SELECT COUNT(*) FROM missions
+        WHERE userId = :userId AND actualStart >= :since
+          AND status IN ('COMPLETED', 'VIOLATED', 'DISPUTED')
+          AND actualEnd IS NOT NULL
+          AND (actualEnd - actualStart) <= (:maxEarlyMinutes * 60000)
+        """
+    )
+    suspend fun earlyCancelledMissionsSince(userId: UUID, since: Instant, maxEarlyMinutes: Int): Int
+
+    /**
+     * Denominator for Rule F2's proportion — every resolved Mission in the window, regardless
+     * of how it ended. `ACTIVE` is excluded (a Mission still in progress can't yet be judged
+     * as "cancelled early" or not).
+     */
+    @Query(
+        """
+        SELECT COUNT(*) FROM missions
+        WHERE userId = :userId AND actualStart >= :since AND status != 'ACTIVE'
+        """
+    )
+    suspend fun resolvedMissionCountSince(userId: UUID, since: Instant): Int
 }
 
 /**
@@ -274,4 +334,19 @@ interface ViolationDao {
         """
     )
     suspend fun countingViolationsSince(userId: UUID, since: Instant): Int
+
+    /**
+     * Backs Rule F1 (Time-of-Day Violation Clustering, Behavioral Fingerprint & Predictive
+     * Failure Rules Spec §3) — [detectedAt] timestamps for every Violation attached to any
+     * Mission in [missionIds] (see [MissionDao.missionIdsWithAnyViolation] for how that list is
+     * bounded to "the last 10 Missions with any violation" per that spec). Same `IN (:list)`
+     * pattern [forRootCauseCluster]'s neighbor [LedgerDao.activeEntriesForViolations] already
+     * uses elsewhere in this codebase. Deliberately does NOT exclude OVERTURNED disputes the
+     * way [countingViolationsSince] does — F1 asks "when do violations cluster," a
+     * descriptive/pattern question, not "how many violations count against Reliability Index,"
+     * a scoring question; those are legitimately different filters over the same table, not an
+     * oversight.
+     */
+    @Query("SELECT detectedAt FROM violations WHERE missionId IN (:missionIds)")
+    suspend fun detectedAtTimestampsForMissions(missionIds: List<UUID>): List<Instant>
 }

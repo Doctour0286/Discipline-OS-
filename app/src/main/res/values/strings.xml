@@ -357,4 +357,27 @@
     <string name="iron_calibration_gate_not_satisfied_body">Your calibration window hasn\'t elapsed yet — %d day(s) remaining. There\'s no way to skip this; check back once it has.</string>
     <string name="iron_calibration_done_button">Done</string>
 
+    <!--
+        Predictive Failure Alert cards — Onboarding/Interaction Spec §3.5 ("Card anatomy").
+        Copy taken directly from Behavioral Fingerprint & Predictive Failure Rules Spec §3's
+        own per-rule example lines, not invented here. §3.5's "Observation, not verdict" rule
+        applies: no "Warning"/"Alert" badge language on any of these, and §3.5's "no severity
+        color coding" rule is enforced at the Compose layer (PredictiveFailureAlertCard.kt),
+        not by anything these strings say. F4 has no entry here — Fingerprint doc §3, F4 is
+        explicitly internal-only for MVP, "no UI surface at all until promoted."
+    -->
+    <string name="predictive_alert_f1_observation">Your last several violations happened in the evening — want to review your evening Mission Profile?</string>
+    <string name="predictive_alert_f2_observation">Several recent Missions ended in the first few minutes — is the scope or allowlist right for what you\'re trying to do?</string>
+    <string name="predictive_alert_f3_observation">You\'re trending toward your Debt Ceiling this week.</string>
+    <string name="predictive_alert_f5_observation">This Mission Profile may no longer fit your goals.</string>
+
+    <string name="predictive_alert_action_review_evening_profile">Review evening Mission Profile</string>
+    <string name="predictive_alert_action_review_profile_scope">Review Mission Profile scope</string>
+    <string name="predictive_alert_action_open_recovery_mode">Open Recovery Mode</string>
+    <string name="predictive_alert_action_review_profile_drift">Review Mission Profile</string>
+
+    <!-- §3.5: "two options not one" — deliberately separate, never a single "Dismiss". -->
+    <string name="predictive_alert_dismiss_not_accurate">Not accurate</string>
+    <string name="predictive_alert_dismiss_got_it">Got it</string>
+
 </resources>

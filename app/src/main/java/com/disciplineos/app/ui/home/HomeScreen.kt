@@ -18,7 +18,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.disciplineos.app.R
+import com.disciplineos.data.entity.PredictiveFailureAlertOutcome
 import com.disciplineos.data.entity.Tier
+import com.disciplineos.domain.usecase.FollowUpAction
+import com.disciplineos.domain.usecase.PredictiveFailureAlert
 
 /**
  * Post-onboarding home shell. Did not exist anywhere in this app before this pass — see this
@@ -40,6 +43,13 @@ import com.disciplineos.data.entity.Tier
  *
  * **Not shown at all if [currentTier] is already IRON** — nothing left to calibrate toward.
  *
+ * **Predictive Failure Alert card (Phase 4, this pass) — see [activeAlert]/[PredictiveFailureAlertCard].**
+ * Onboarding/Interaction Spec §3.5's shared card pattern for F1/F2/F3/F5, rendered here as a
+ * second, independent optional section — presentation only, same split as everything else on
+ * this screen: [com.disciplineos.app.home.HomeFragment] computes which rule (if any) is
+ * currently active and passes it in; this composable makes no use-case or database calls of
+ * its own for it either.
+ *
  * Presentation only, same split every other screen in this project already follows: current
  * tier / calibration state is computed by the hosting Fragment
  * ([com.disciplineos.app.home.HomeFragment]) and passed in as plain parameters; this composable
@@ -53,6 +63,9 @@ fun HomeScreen(
     daysRemainingUntilIronEligible: Long,
     onOpenIronCalibration: () -> Unit,
     modifier: Modifier = Modifier,
+    activeAlert: PredictiveFailureAlert? = null,
+    onAlertFollowUpAction: (FollowUpAction) -> Unit = {},
+    onAlertDismissed: (PredictiveFailureAlertOutcome) -> Unit = {},
 ) {
     Scaffold(modifier = modifier.fillMaxSize()) { contentPadding ->
         Column(
@@ -75,6 +88,24 @@ fun HomeScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 24.dp),
             )
+
+            // Onboarding/Interaction Spec §3.5 — Predictive Failure Alert card. Placed above
+            // the Iron eligibility card: no spec section orders the two relative to each other
+            // (§3.5 only says the alert lives "on the home/dashboard screen," not where on it),
+            // so this is a judgment call, not a spec-derived ordering — reasoning: the alert is
+            // a fresh, ambient observation about recent behavior, closer in spirit to
+            // time-sensitive content than the Iron card's comparatively static "is the window
+            // up yet" status, so it reads first.
+            if (activeAlert != null) {
+                PredictiveFailureAlertCard(
+                    observationText = observationTextFor(activeAlert.followUpAction),
+                    followUpActionLabel = followUpLabelFor(activeAlert.followUpAction),
+                    onFollowUpAction = { onAlertFollowUpAction(activeAlert.followUpAction) },
+                    onNotAccurate = { onAlertDismissed(PredictiveFailureAlertOutcome.NOT_ACCURATE) },
+                    onGotIt = { onAlertDismissed(PredictiveFailureAlertOutcome.ACKNOWLEDGED) },
+                    modifier = Modifier.padding(bottom = 16.dp),
+                )
+            }
 
             if (showIronEligibilityCard) {
                 Card(
