@@ -46,7 +46,11 @@ check.
 
 **Last synced to ROADMAP.md:** 2026-08-10 (through §5.31 — post-onboarding Home shell built,
 plus a real Iron Calibration flow that finally gives `TierTransitionUseCase.activateIron` a
-call site)
+call site. **Corrected same day:** §5.31 is now merged to `main` via PR #21 — the
+"not yet merged" note below and in the Phase 3 row was accurate when first written but went
+stale within the same session. Verified directly via `git log main --oneline -1`,
+`git merge-base --is-ancestor <§5.31 commit> main`, and `git branch -r` rather than trusted
+from a prior note, per this file's own standing advice.)
 
 ---
 
@@ -70,7 +74,7 @@ call site)
 | 0.5 — Real Build Verification (CI) | ✅ | Gradle/CI pipeline itself confirmed working. |
 | 1 — Domain / Use-Case Layer | 🟢 | Functionally complete. §5.9's tier-floor gap resolved (see MVP table below) — no open spec gaps remain. |
 | 2 — Core Enforcement Loop | ✅ | Interception loop confirmed on-device via `DebugSeeder` (no real Mission-creation UI yet, so seeding is still required to trigger it). |
-| 3 — Onboarding & Core UI | ✅ | See screen-by-screen table below. Every onboarding screen except Iron Calibration Gate now has real content, is merged to `main`, and is confirmed **CI green and on-device** (PR #16, 2026-08-10) — all 9 screens now render via Compose (`ui/onboarding/*Screen.kt`), a single design system (`ui/theme/Color.kt`/`Type.kt`/`Theme.kt`, §5.26), no plain-XML-inflating onboarding screen remains. Iron Calibration Gate remains a placeholder — deliberately, not a gap (see row 4b below). **Post-onboarding hand-off built this session (§5.31, not yet CI-confirmed):** onboarding previously dead-ended (no outgoing action from its last screen, no post-onboarding destination anywhere) — a new `homeFragment` now closes that gap, plus a new `ironCalibrationFragment` giving `TierTransitionUseCase.activateIron` its first real call site. See §5.31 for full detail; graduates to ✅ once CI + on-device confirm it, same as every other entry in this table.
+| 3 — Onboarding & Core UI | ✅ | See screen-by-screen table below. Every onboarding screen except Iron Calibration Gate now has real content, is merged to `main`, and is confirmed **CI green and on-device** (PR #16, 2026-08-10) — all 9 screens now render via Compose (`ui/onboarding/*Screen.kt`), a single design system (`ui/theme/Color.kt`/`Type.kt`/`Theme.kt`, §5.26), no plain-XML-inflating onboarding screen remains. Iron Calibration Gate remains a placeholder — deliberately, not a gap (see row 4b below). **Post-onboarding hand-off (§5.31):** onboarding previously dead-ended (no outgoing action from its last screen, no post-onboarding destination anywhere) — a new `homeFragment` now closes that gap, plus a new `ironCalibrationFragment` giving `TierTransitionUseCase.activateIron` its first real call site. Merged to `main` via PR #21. See §5.31 for full detail; still 🟡 below pending CI + on-device confirmation on `main` specifically (merged ≠ confirmed — those are two separate checks this file tracks separately, same as every other entry in this table).
 | 4 — Behavioral Fingerprint / Predictive Failure (F1–F5) | ⬜ | Not started. Depends on Phase 3's alert-card pattern existing to render into. |
 | 5 — Pilot & Hypothesis Resolution | ⬜ | Not started. No new app code — this is "use it, gather data, resolve `[HYPOTHESIS]` constants." |
 
@@ -82,9 +86,10 @@ and `git branch -a` rather than inferred, per this note's own recurring advice b
 onboarding-related branch is currently unmerged. Check `git branch -r` and
 `git log main --oneline -10` for ground truth rather than trusting this note indefinitely —
 prior versions of this exact note went stale twice in a row for the same reason.
-`iron-calibration-gate-and-home-shell` (§5.31, this session) is **not yet merged** — pushed to
-that feature branch, PR not yet opened/reviewed as of this sync. Don't assume it's on `main`
-without checking `git branch -r` first, same standing advice this note keeps having to repeat.
+`iron-calibration-gate-and-home-shell` (§5.31) **is now merged to `main`** via PR #21. This
+note previously said "not yet merged, PR not yet opened" — that was correct when written and
+became stale before the next sync. Standing advice unchanged: check `git branch -r` and
+`git log main --oneline -10` yourself rather than trusting this note indefinitely.
 
 ---
 
@@ -131,7 +136,7 @@ on-device pass, not a logic change needing separate re-verification.
 | Mission Enforcement (lock/allowlist loop) | ✅ | Verified via `DebugSeeder`; First Mission Scheduling is now confirmed CI + on-device (PR #16) as the first screen that creates a real Mission row via actual UI rather than seeding |
 | Distraction Interception | ✅ | |
 | Mission Profiles | ✅ | Setup screen confirmed CI + on-device (PR #16); wired into real Mission creation via First Mission Scheduling (§2.9) |
-| Post-Onboarding Home shell | 🟡 | New this session (§5.31) — did not exist before. Minimal, not a dashboard: current tier + Iron eligibility card only. Written, not yet CI-confirmed. |
+| Post-Onboarding Home shell | 🟡 | §5.31 — did not exist before this pass. Minimal, not a dashboard: current tier + Iron eligibility card only. Merged to `main` via PR #21; still 🟡 (not ✅) because CI-on-`main` and on-device confirmation for this specific merge haven't been separately verified yet — merged is not the same claim as confirmed. |
 | Recovery Mode | ⬜ | Referenced by domain logic; no dedicated flow/UI |
 | Reliability Index / Resistance Score / Focus Integrity | 🟢 | Formulas exist; no reporting UI surfaces them yet |
 | Discipline Score | ✂️ | Deliberately cut from MVP (Data Model doc §3.1) — not a gap |
@@ -206,10 +211,12 @@ is closed; what's left below is cleanup and the next phase, not more onboarding 
 
 Both cleanup items flagged when onboarding's Compose migration finished (dead XML layouts,
 per-Fragment theme duplication) are done — §5.28 and §5.29. Mission Profile Setup's default
-suggestions are also done — §5.30, pending push + CI + on-device confirmation for all three.
-The Iron Calibration real-destination flow named below as item 2 is now also written — §5.31,
-same session as this sync — pending push + CI + on-device confirmation, same as the above.
-Real remaining items, in rough priority order:
+suggestions are also done — §5.30. The Iron Calibration real-destination flow named below as
+item 2 is also done and merged — §5.31, PR #21. **Correction:** an earlier version of this
+section said all of the above were "pending push + CI + on-device confirmation" — that's now
+inaccurate for the merge step specifically (§5.28–§5.31 are all on `main`); CI-on-`main` and
+on-device confirmation are the remaining open piece, not the merge itself. Real remaining
+items, in rough priority order:
 
 1. **Resolve the two `[HYPOTHESIS]` items §5.24 flagged**: a hardcoded default Mission
    duration with no spec source, and reusing `ACTIVE` status for a scheduled-but-not-yet-
