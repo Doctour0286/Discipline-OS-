@@ -3145,3 +3145,33 @@ secondary," asserting `inScope == true`, `isSecondary == true`, and a non-null `
 No G4 code exists yet to consume `isSecondary` (G4 hasn't started) — this fix is purely G3-side,
 correcting the computation/`Result` shape before anything is built against it.
 
+### 5.39 G4: Mission Detail screen + Home entry point (Integration Plan §5/§7.6, base doc §4.1/§4.2)
+
+Builds on §5.38's corrected `Result` shape. New: `MissionDetailFragment`/`MissionDetailScreen`
+(Adherence display + the four-quadrant outcome/behavior relationship read for
+`OUTCOME_DRIVEN` missions), plus a Mission list card on `HomeScreen` — the "real new nav
+destination required" entry point Integration Plan §7.6 names explicitly, since nothing before
+this batch let a user reach a `GoalMission`'s detail screen at all.
+
+**Behavior axis reads `ApplyAdherenceDecayUseCase.Result.hitRate` against
+`AdherenceDecayPolicy.hitRateThreshold()`, not `adherenceScore`'s sign and not
+`consecutiveWindowsBelowThreshold`.** `[HYPOTHESIS]`, departs from base doc §4.1's literal
+`adherenceScore` wording — full reasoning (why `adherenceScore` is too lagging a signal for a
+"what's happening right now" screen, why a streak-style boolean was rejected in favor of a
+rolling compliance-rate read, and the habit-tracking research that informed the near-miss
+banding) is in `MissionDetailFragment`'s own class kdoc rather than restated here. The threshold
+itself is read live from `AppContainer.adherenceDecayPolicy().hitRateThreshold()` at the call
+site and passed into the pure `computeMissionDetailState`/`behaviorReadFor` functions as a
+parameter — not duplicated as a second hardcoded literal — so the display layer can't silently
+drift from the domain layer's real threshold.
+
+**Outcome axis** (outcome-driven missions only): recent-half vs. earlier-half mean of logged
+`numericValue`s, direction-checked against `targetDirection`. `[HYPOTHESIS]` trend algorithm,
+same "plainest thing that answers the question" bias as every other placeholder in this
+codebase — neither spec doc states how "moving" should be computed from raw log rows.
+
+**Unit tests:** `MissionDetailFragmentTest` covers `computeMissionDetailState` directly (pure
+function, no Robolectric), matching `HomeFragmentTest`'s precedent — behavior-axis
+classification at and around the threshold/near-miss boundary, all four relationship quadrants,
+the `MAINTAIN` tolerance band, and the never-evaluated (`null` hitRate) case.
+

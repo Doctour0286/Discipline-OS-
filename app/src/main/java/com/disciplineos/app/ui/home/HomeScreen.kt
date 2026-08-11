@@ -1,5 +1,6 @@
 package com.disciplineos.app.ui.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +23,24 @@ import com.disciplineos.data.entity.PredictiveFailureAlertOutcome
 import com.disciplineos.data.entity.Tier
 import com.disciplineos.domain.usecase.FollowUpAction
 import com.disciplineos.domain.usecase.PredictiveFailureAlert
+import java.util.UUID
+
+/**
+ * Batch G4 (Integration Plan §5/§7.6) — the "real new nav destination required" entry point
+ * that section names explicitly: nothing pre-G4 lets a user reach [com.disciplineos.app.mission
+ * .MissionDetailFragment], so this card list is that entry point, added to Home rather than a
+ * new standalone destination (Integration Plan §7.6's own stated resolution — "G4 needs to add a
+ * Mission list/card to Home as a prerequisite for the detail screen being reachable at all").
+ * Plain summary only: [title] plus [archetypeLabel] and [adherenceScore] if evaluated — the
+ * detail screen itself, not this card, is where the four-quadrant read and full Adherence
+ * context live.
+ */
+data class MissionSummary(
+    val id: UUID,
+    val title: String,
+    val archetypeLabel: String,
+    val adherenceScore: Double?,
+)
 
 /**
  * Post-onboarding home shell. Did not exist anywhere in this app before this pass — see this
@@ -66,6 +85,8 @@ fun HomeScreen(
     activeAlert: PredictiveFailureAlert? = null,
     onAlertFollowUpAction: (FollowUpAction) -> Unit = {},
     onAlertDismissed: (PredictiveFailureAlertOutcome) -> Unit = {},
+    missions: List<MissionSummary> = emptyList(),
+    onOpenMissionDetail: (UUID) -> Unit = {},
 ) {
     Scaffold(modifier = modifier.fillMaxSize()) { contentPadding ->
         Column(
@@ -88,6 +109,28 @@ fun HomeScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 24.dp),
             )
+
+            // Batch G4 (Integration Plan §5/§7.6) — Mission list, the real entry point into
+            // MissionDetailFragment. Placed above the alert/Iron cards: a person's own goals are
+            // the primary content this screen exists to surface, closer to the top of the
+            // screen's information hierarchy than either a transient alert or the comparatively
+            // rare Iron-eligibility status — a judgment call, since no spec section orders these
+            // relative to each other any more than it does for the alert/Iron pairing below.
+            if (missions.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.home_missions_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                missions.forEach { mission ->
+                    MissionListItem(
+                        mission = mission,
+                        onClick = { onOpenMissionDetail(mission.id) },
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+            }
 
             // Onboarding/Interaction Spec §3.5 — Predictive Failure Alert card. Placed above
             // the Iron eligibility card: no spec section orders the two relative to each other
@@ -153,6 +196,33 @@ fun HomeScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MissionListItem(
+    mission: MissionSummary,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = mission.title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = mission.archetypeLabel,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
