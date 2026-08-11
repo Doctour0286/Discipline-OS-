@@ -25,17 +25,22 @@ import kotlin.math.ceil
  * inventing a new shape — a `*Policy` object gating the pure math, a use-case applying it and
  * writing the result via an event-sourced ledger table.
  *
- * **Scope — base doc §4.2's exact wording:** "Applies to Outcome-driven and Constraint missions,
- * and to Behavior-driven missions that have no attached EnforcementSession." [execute] checks
- * this first and short-circuits (empty [Result], no ledger writes) for a [GoalMission] outside
- * scope — a Behavior-driven mission whose `MissionPeriod`(s) already produced a real
- * `EnforcementSession` gets Reputation/Debt treatment via that session instead (base doc §4.2:
- * "shown as a secondary number, never substituted for Reputation on that mission" — this
- * use-case simply doesn't compute one in that case, rather than computing and discarding it).
- * The "no attached EnforcementSession" check is [EnforcementSessionDao.hasAnySessionFor], not
- * [com.disciplineos.data.entity.MissionPeriod.enforcementProfileId] nullability — see that
- * field's own kdoc for why (a real, separate, unflagged base-doc divergence this batch found but
- * did not fix, since this existence check sidesteps it cleanly).
+ * **Scope — every [GoalMission] that exists computes Adherence, full stop.** Base doc §4.2's
+ * "Applies to Outcome-driven and Constraint missions, and to Behavior-driven missions that have
+ * no attached EnforcementSession" reads at first as an archetype-based computation gate, but the
+ * very next sentence overrides that reading for the one archetype it would have excluded: "A
+ * Behavior-driven mission with a MissionPeriod that does have enforcementProfileId set already
+ * gets Reputation/Debt treatment via its sessions — **Adherence still computes for it** (log-only
+ * days between scheduled sessions are real signal too), but is shown as a secondary number, never
+ * substituted for Reputation on that mission." So the first sentence is explaining *why*
+ * Adherence matters more for sessionless Behavior-driven missions (no other feedback loop exists
+ * for them), not gating whether it computes at all — every archetype is in scope. What the spec
+ * actually distinguishes is **display priority** (primary vs. secondary), which is a G4
+ * (rendering) concern, not a G3 (computation) one. [execute] therefore only treats a [GoalMission]
+ * as out of scope when [goalMissionId] doesn't exist; [Result.isSecondary] carries the
+ * primary/secondary distinction forward for G4 to read, computed via
+ * [EnforcementSessionDao.hasAnySessionFor] — true exactly for a Behavior-driven mission with an
+ * attached session, matching the one case base doc §4.2 names as secondary.
  *
  * **Hit-rate computation — base doc §4.2: "Computed from MissionLogEntry presence/value against
  * cadenceType and targetDirection over adherenceWindow... a straightforward hit-rate."** Per
@@ -105,20 +110,19 @@ class ApplyAdherenceDecayUseCase(
      * [goalMissionId]. See class kdoc for the full scope/hit-rate/decay walkthrough.
      *
      * @return [Result.inScope] false (with empty [Result.entries] and null
-     *   [Result.thresholdCrossing]) if [goalMissionId] doesn't exist or is out of Adherence's
-     *   base-doc-§4.2 scope — a real, distinct outcome from "in scope but nothing changed this
-     *   call," not conflated with it, so a caller can tell "this Mission doesn't get an
-     *   Adherence number" apart from "this Mission's Adherence number didn't move today."
+     *   [Result.thresholdCrossing]/[Result.isSecondary]) if [goalMissionId] doesn't exist — the
+     *   only out-of-scope case per base doc §4.2 (see class kdoc's "Scope" section); every
+     *   existing [GoalMission] gets a computed Adherence number, with [Result.isSecondary]
+     *   carrying the primary/secondary *display* distinction for G4 to use.
      */
     suspend fun execute(goalMissionId: UUID, now: Instant = Instant.now()): Result {
         val goalMission = goalMissionDao.get(goalMissionId) ?: return Result.outOfScope()
 
-        val inScope = when (goalMission.archetype) {
-            MissionArchetype.OUTCOME_DRIVEN, MissionArchetype.CONSTRAINT -> true
-            MissionArchetype.BEHAVIOR_DRIVEN ->
-                !enforcementSessionDao.hasAnySessionFor(goalMissionId)
-        }
-        if (!inScope) return Result.outOfScope()
+        // Display-priority flag, not a computation gate — see class kdoc's "Scope" section.
+        // True only for the one case base doc §4.2 names as secondary: a Behavior-driven mission
+        // that already has Reputation/Debt treatment via an attached EnforcementSession.
+        val isSecondary = goalMission.archetype == MissionArchetype.BEHAVIOR_DRIVEN &&
+            enforcementSessionDao.hasAnySessionFor(goalMissionId)
 
         val windowDays = goalMission.adherenceWindow ?: policy.defaultAdherenceWindowDays()
         val windowStart = now.minus(windowDays.toLong(), ChronoUnit.DAYS)
@@ -179,6 +183,7 @@ class ApplyAdherenceDecayUseCase(
                 entries = ledgerEntries,
                 thresholdCrossing = thresholdCrossing,
                 hitRate = hitRate,
+                isSecondary = isSecondary,
             )
         }
     }
@@ -212,7 +217,7 @@ class ApplyAdherenceDecayUseCase(
     }
 
     data class Result(
-        /** False if [goalMissionId] doesn't exist or is out of Adherence's base-doc §4.2 scope. */
+        /** False only if [goalMissionId] doesn't exist — see class kdoc's "Scope" section. */
         val inScope: Boolean,
         /** Empty unless this call's decay check fired a threshold crossing. */
         val entries: List<AdherenceLedgerEntry> = emptyList(),
@@ -220,6 +225,13 @@ class ApplyAdherenceDecayUseCase(
         val thresholdCrossing: Boolean = false,
         /** This window's computed hit-rate (0.0–1.0), null when [inScope] is false. */
         val hitRate: Double? = null,
+        /**
+         * True when this Mission's Adherence number should be shown as secondary rather than
+         * primary (base doc §4.2) — a Behavior-driven mission that already has Reputation/Debt
+         * treatment via an attached EnforcementSession. G4 display concern; does not affect
+         * whether Adherence computes. Null when [inScope] is false.
+         */
+        val isSecondary: Boolean? = null,
     ) {
         companion object {
             fun outOfScope() = Result(inScope = false)

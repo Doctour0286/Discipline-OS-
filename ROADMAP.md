@@ -3120,3 +3120,28 @@ dependency graph makes cleaner once G4's actual screen work starts.
 `MissionPeriod.enforcementProfileId`'s nullability divergence, both already flagged in §5.36,
 remain exactly as open as that entry left them.
 
+### 5.38 Fix §5.37's scope bug: Adherence computes for every GoalMission; primary/secondary moves to `Result.isSecondary`
+
+Small, standalone fix, landed as its own PR ahead of G4 per §5.37's own note that it should be
+resolved "before or alongside G4, whichever the dependency graph makes cleaner." Doing it first
+turned out cleaner — G4's screen work reads `adherenceScore`/`Result`, so it should see the
+correct shape from the start rather than being built against the known-wrong one and patched
+after.
+
+`ApplyAdherenceDecayUseCase.execute`'s scope gate previously excluded a Behavior-driven mission
+with any attached `EnforcementSession` entirely (`Result.outOfScope()`, no ledger write, no
+score). Per base doc §4.2's full text (quoted in §5.37), that's wrong — Adherence still computes
+for that case, it's only the *display priority* that changes (secondary vs. primary), which is a
+G4 rendering concern, not something G3's computation should gate on.
+
+**Fix:** `inScope` now only reflects whether `goalMissionId` exists — every archetype computes an
+Adherence number. A new `Result.isSecondary: Boolean?` carries the primary/secondary distinction
+forward: true exactly when the mission is Behavior-driven with an attached `EnforcementSession`
+(the one case base doc §4.2 names as secondary), false for every other in-scope case, null when
+out of scope. `ApplyAdherenceDecayUseCaseTest`'s scope-gating block updated to match — the old
+"BEHAVIOR_DRIVEN with a session is out of scope" test is now "...still computes but is flagged
+secondary," asserting `inScope == true`, `isSecondary == true`, and a non-null `hitRate`.
+
+No G4 code exists yet to consume `isSecondary` (G4 hasn't started) — this fix is purely G3-side,
+correcting the computation/`Result` shape before anything is built against it.
+
