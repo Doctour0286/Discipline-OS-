@@ -3204,3 +3204,46 @@ file with a long import block where the missing entry is one line among many tha
 otherwise correct. Doesn't change the practice (this project still can't run Gradle in the
 authoring environment), but is worth naming again as a known, recurring blind spot rather than
 assuming §5.36's finding was a one-time fluke.
+
+### 5.41 Fix Batch G1's `Trigger` entity: shipped shape was a different entity, not a variant of the specced one
+
+Found while starting Batch G5 (Trigger UI), before writing any G5 code — the same "read the real
+spec text before building against a summary of it" discipline that caught §5.36/§5.37's findings.
+
+**What was wrong:** Batch G1 shipped `Trigger` as `TriggerConditionType { INACTIVITY,
+SCHEDULE_MISS, MANUAL }` / `conditionValue: String?` / `active: Boolean` / `lastFiredAt:
+Instant?` — a session-inactivity watchdog ("if no session has run in N days, prompt"). Base doc
+§3.4/§4.3 specify `Trigger` as an **implementation-intention cue** entity entirely: Gollwitzer's
+"if-then" plans (d = 0.65, 94-study meta-analysis) binding a specific cue to a specific response
+— "when I finish dinner, open the reading app" — with `cueType: TIME_OF_DAY|PRECEDING_EVENT|
+LOCATION|APP_OPEN|MANUAL`, `cueDescription`, `responseDescription`, `cueTimeOfDay`,
+`cuePrecedingMissionId`, `cueLocationLabel`, `cueTriggerPackageId`. These are not two versions of
+the same idea — they answer different questions and share almost no fields. The Integration
+Plan's own §2.1 explicitly called `Trigger.kt` a "direct transcription of base doc §3.2–§3.5,"
+so this was never a deliberate narrowing either; it's an unflagged divergence from the document
+it was meant to summarize, the same category §5.36 (`MissionLogEntry`) and §5.37 (`Result`'s
+scope gate) already found twice in this same integration effort.
+
+**Why fix in place rather than add a second, correctly-shaped entity or a migration:** confirmed
+directly (`grep` across `:domain`/`:app`) that nothing reads or writes `Trigger` anywhere —
+`TriggerDao.insert`/`forMission` exist but are called from zero real call sites. No data to lose,
+no call site to migrate, no reason to carry the wrong shape forward "for compatibility" when
+there is nothing to be compatible with. Fixed as its own small, standalone PR ahead of G5's own
+UI work, same "small motivated fix landed first, so the batch that actually needs the entity
+sees the correct shape from the start" pattern §5.38 used for the `Result.isSecondary` fix ahead
+of G4.
+
+**Fix:** `Trigger` rebuilt to match base doc §3.4 exactly, plus one small flagged addition:
+`active: Boolean = true` (base doc states no such field) — lets a person deactivate a Trigger
+without deleting the row and losing their own cue/response text, same "small motivated addition,
+logged rather than silently assumed" category as `GoalMission.consecutiveWindowsBelowThreshold`
+(§5.36) and `MilestoneDao`'s `@Update` exception. `TriggerDao`'s method set/queries were
+already spec-shaped and needed no change. DB version bumped to 12 (`fallbackToDestructiveMigration`
+still in effect, still pre-launch, still no real installed base — same standing reasoning as
+every prior bump).
+
+**Restated once more, since this is now the third time it's mattered in this integration
+effort:** an Integration Plan section that says "direct transcription of §X" is a claim to
+verify against the actual source text, not a claim to trust because a prior batch already built
+against it. Trusting summaries of summaries is exactly how this class of drift compounds
+silently across batches.

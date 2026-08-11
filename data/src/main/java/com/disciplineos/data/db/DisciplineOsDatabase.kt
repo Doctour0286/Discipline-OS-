@@ -154,7 +154,19 @@ import net.sqlcipher.database.SupportFactory
     // separate table from `ledger_entries`, not a new `LedgerMetric` value. Same
     // fallbackToDestructiveMigration reasoning as every bump above: still pre-launch, still no
     // real installed base (re-checked this pass).
-    version = 11,
+    // v12 (fix/g1-trigger-entity-shape, ROADMAP.md §5.41): `Trigger` fully rebuilt — the shape
+    // that shipped with Batch G1 (`TriggerConditionType { INACTIVITY, SCHEDULE_MISS, MANUAL }`,
+    // `conditionValue: String?`, `lastFiredAt: Instant?`) modeled a session-inactivity watchdog,
+    // not the implementation-intention cue entity base doc §3.4/§4.3 actually specify
+    // (`cueType: TIME_OF_DAY|PRECEDING_EVENT|LOCATION|APP_OPEN|MANUAL`, `cueDescription`,
+    // `responseDescription`, `cueTimeOfDay`, `cuePrecedingMissionId`, `cueLocationLabel`,
+    // `cueTriggerPackageId`) — same "diverged from the document it was meant to summarize,
+    // caught only while implementing the batch that needed the real shape" pattern v11 already
+    // found twice (MissionLogEntry, ApplyAdherenceDecayUseCase.Result). See Trigger.kt's own
+    // kdoc for the full account. No prior code read or wrote the old shape (`TriggerDao.insert`/
+    // `forMission` exist but were called nowhere), so nothing else changes and no data is lost
+    // under this project's still-in-effect fallbackToDestructiveMigration() policy.
+    version = 12,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
