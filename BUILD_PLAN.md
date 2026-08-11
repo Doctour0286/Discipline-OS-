@@ -284,9 +284,10 @@ about `EnforcementSession`, not `GoalMission`.
 
 ## Batch G3 — Adherence engine
 
-**Status: NOT STARTED. Depends on G1/G2 (needs real `GoalMission`/`EnforcementSession` data to
-decay against, same structural reason Reputation decay couldn't be piloted before Missions
-existed — see Phase 5's exit criteria elsewhere in this project's docs for the same pattern).**
+**Status: SHIPPED, not yet CI-confirmed.** See `ROADMAP.md` §5.36 for the full account,
+including two real base-doc divergences found while implementing this batch (one fixed —
+`MissionLogEntry` was missing the `numericValue`/`didOccur` fields the hit-rate math needs at
+all — one flagged, not fixed — `MissionPeriod.enforcementProfileId`'s nullability).
 
 **Full detail:** Integration Plan §4.
 
@@ -301,12 +302,19 @@ existed — see Phase 5's exit criteria elsewhere in this project's docs for the
   Batch E's F5 threshold uses).
 - One `[HYPOTHESIS]` constant — Integration Plan §4.3 names it; do not silently pick a number,
   flag it in `ROADMAP.md` §5 the way every other hypothesis constant in this project has been.
+  (Shipped as four flagged placeholder numbers on `HypothesisAdherenceDecayPolicy` — window
+  length, hit-rate threshold, consecutive-windows-for-decay, decay-per-crossing — see
+  `ROADMAP.md` §5.36.)
 
 **Verification checklist:**
-- [ ] CI green
-- [ ] Pure-function tests for the decay math, same isolation-from-Room pattern
-      `ApplyReputationDecayUseCase`'s own tests use
-- [ ] The `[HYPOTHESIS]` constant is named and flagged, not buried
+- [ ] CI green — blocked on sandbox network access to `services.gradle.org`, same standing gap
+      every batch since §5.7
+- [x] Pure-function tests for the decay math, same isolation-from-Room pattern
+      `ApplyReputationDecayUseCase`'s own tests use — `ApplyAdherenceDecayUseCaseTest` (`:domain`)
+- [x] The `[HYPOTHESIS]` constant is named and flagged, not buried — four constants on
+      `HypothesisAdherenceDecayPolicy`, each with an inline comment stating it's unvalidated
+- [ ] On-device confirmation — not attempted; no UI call site exists yet for this use-case
+      (matches `ApplyReputationDecayUseCase`'s own still-unbuilt-scheduler state)
 
 ---
 

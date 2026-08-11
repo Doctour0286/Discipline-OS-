@@ -2924,3 +2924,104 @@ claims together, the same mistake §5.34 itself was written to correct.
 instrumented test, per §5.34's original list — the DAO-level test doesn't substitute for any of
 the three); this test's own first real CI run; Integration Plan §7.3's open question (whether a
 re-entry guard should exist at all), left exactly as open as §5.34 found it.
+
+---
+
+### 5.36 — Batch G3 shipped (Adherence engine); two real, unflagged base-doc divergences found and handled — one fixed, one flagged, neither guessed
+
+**Closes Batch G3** (`BUILD_PLAN.md`), Integration Plan §4. Not yet CI-confirmed — same standing
+gap every batch since §5.7 has noted: no Gradle/Android toolchain reachable from the authoring
+sandbox (`./gradlew --version` still fails with an HTTP 403 fetching the Gradle distribution;
+`services.gradle.org` isn't on the domain allowlist). Manual review of every changed file's
+imports, DAO signatures, and enum branches was done in its place, same standard §5.35 already
+used for its own unconfirmed state.
+
+**What was found before any code was written, not silently resolved:**
+
+1. **Real schema regression, fixed this pass.** `MissionLogEntry` — the table Integration Plan
+   §4.1 says Adherence's hit-rate is computed from — shipped in Batch G1 with only
+   `{id, missionId, createdAt, note: String}`. The base design doc
+   (`06_GOAL_ORIENTED_MISSION_MODEL.md` §3.3, confirmed against the original proposal and
+   addendum drafts as well) always specified `numericValue: Double?` and `didOccur: Boolean?` as
+   the actual hit/miss signal Adherence measures — "computed from MissionLogEntry
+   presence/value." The Integration Plan's own §2.1 field list simply dropped both fields when
+   summarizing the base doc, and G1 shipped that drop unflagged. Without them, the hit-rate math
+   Integration Plan §4.1 asks for was literally uncomputable from a freeform note string. Fixed
+   this pass: both fields added, `note` made nullable (a numeric/boolean-only log entry with no
+   note is a normal case, e.g. logging "ran 3 miles" via `numericValue` alone). DB version bumped
+   to v11 alongside the new Adherence tables (see `DisciplineOsDatabase.kt`'s own v11 comment) —
+   bundled in one version bump rather than two, matching v6's own precedent for folding
+   independent additions together.
+
+2. **Real, smaller divergence, flagged not fixed.** `MissionPeriod.enforcementProfileId` shipped
+   non-null; the base doc §3.2 specifies `UUID | null` ("null = tracked/logged only, no
+   blocking") — the mechanism §4.2's "Behavior-driven mission with no attached
+   EnforcementSession" scope rule was expected to key off. Not fixed this pass: a clean
+   workaround exists (`EnforcementSessionDao.hasAnySessionFor` — does a real `EnforcementSession`
+   row exist for this `GoalMission`, checked directly rather than via the field's nullability),
+   so `ApplyAdherenceDecayUseCase` doesn't depend on this gap being closed. Noted in
+   `MissionPeriod`'s own kdoc as a real, unresolved divergence for a future pass — every
+   `MissionPeriod` row currently claims a concrete enforcement profile even for a purely
+   log-only, no-blocking period the base doc's model explicitly allows.
+
+Both were traced by reading the original `06_GOAL_ORIENTED_MISSION_MODEL_PROPOSAL.md`,
+`06a_..._ADDENDUM.md`, and `06_GOAL_ORIENTED_MISSION_MODEL.md` drafts directly rather than
+trusting the Integration Plan's own claim to be "direct transcriptions" of them — that claim
+turned out not to be literally true in both cases above.
+
+**What was built:**
+
+- `MissionLogEntry` gains `numericValue`/`didOccur`; `note` becomes nullable
+  (`data/entity/GoalMission.kt`).
+- `GoalMission` gains `consecutiveWindowsBelowThreshold: Int = 0` (Integration Plan §7.5),
+  mirroring `User.consecutiveDaysBelowFloor` exactly — running state across calls is the only
+  way to detect "sustained miss patterns, not single misses" (base doc §4.2).
+- `GoalMissionDao` gains `@Update` — a real, motivated exception to its "no `@Update` yet"
+  precedent, same category `MilestoneDao.update` already established for `achievedAt`.
+- `EnforcementSessionDao` gains `hasAnySessionFor(goalMissionId)` — existence-only
+  (`SELECT EXISTS(...)`), backing the scope check above.
+- New `AdherenceLedgerEntry` + `AdherenceLedgerDao` (`data/adherence/`) — a **physically
+  separate table** from `LedgerEntry`/`LedgerDao`, not a new `LedgerMetric` value, per
+  Integration Plan §4.1's "never feeds Tier" requirement expressed as a schema fact rather than
+  a convention. `DisciplineOsDatabase` bumped to v11, new DAO accessor added.
+- New `AdherenceDecayPolicy` + `HypothesisAdherenceDecayPolicy` (`domain/policy/`), mirroring
+  `ReputationDecayPolicy`'s shape exactly. **The `[HYPOTHESIS]` constant Integration Plan §4.3
+  calls out is actually four placeholder numbers, all flagged in code, none derived from any
+  spec doc:** default window length (7 days), hit-rate threshold (0.7), consecutive windows
+  before decay (2), decay per crossing (10.0 points). Swap the implementation, don't tune these
+  in place, once real pilot data exists — same standing instruction
+  `HypothesisReputationDecayPolicy` already states for its own numbers.
+- New `ApplyAdherenceDecayUseCase` (`domain/usecase/`) — the engine itself. Scope-gates by
+  archetype (OUTCOME_DRIVEN/CONSTRAINT always in scope; BEHAVIOR_DRIVEN only if no
+  EnforcementSession is attached yet). Computes a hit-rate per entry via `didOccur` first, else
+  `numericValue` checked against `targetDirection`/`targetValue` (a 10% tolerance for `MAINTAIN`
+  — `[HYPOTHESIS]`, no tolerance is stated in either spec doc). Expected-entry denominator
+  derived from `cadenceType` (DAILY = window days, WEEKLY = `ceil(windowDays / 7.0)`, CUSTOM_DAYS
+  = DAILY's expectation as a placeholder pending a real per-week schedule field — Integration
+  Plan doesn't add one, NONE = 1). Decays only on sustained miss *windows*
+  (`consecutiveWindowsBelowThreshold` reaching the policy's threshold), never on a single miss.
+  Writes only to `AdherenceLedgerDao`/`GoalMissionDao` — never calls `TierTransitionUseCase`,
+  never touches `LedgerDao`. Returns `Result.thresholdCrossing` as the Weekly Report callout hook
+  (Integration Plan §4.2) — Batch F, when it exists, reads `AdherenceLedgerEntry
+  .thresholdCrossing` rows rather than computing anything new.
+- `ApplyAdherenceDecayUseCaseTest` (`:domain`) — scope-gating (all four archetype/session
+  combinations), hit-rate math (`didOccur`, all three `TargetDirection` branches, presence-only,
+  note-only exclusion, window boundary), expected-count-by-cadence (DAILY/WEEKLY/NONE), decay
+  behavior (single miss vs. threshold-reaching miss vs. a met window resetting the counter), the
+  "first call establishes 0.0, not null" behavior, "score always reflects ledger sum even when
+  this call writes nothing," and an explicit assertion that `LedgerDao`'s REPUTATION/DEBT values
+  never move as a result of Adherence decay.
+
+**What this does and does not confirm:** same precise standard §5.34/§5.35 already set for this
+project — this is a manual-review-plus-mirrored-test pass, not a compiler- or CI-confirmed one.
+Every changed file's imports, DAO method signatures, and enum `when` exhaustiveness were checked
+by hand against the actual shipped schema (not assumed from the specs) before this entry was
+written; that's real evidence the code is internally consistent, not evidence it compiles.
+
+**Still open:** first real CI run (blocked on the same sandbox network gap every prior batch
+since §5.7 has hit); on-device confirmation (not attempted — no UI call site exists for this
+use-case yet, matching `ApplyReputationDecayUseCase`'s own still-unbuilt-scheduler state, so
+there's nothing to run on-device against); `MissionPeriod.enforcementProfileId`'s nullability
+divergence (flagged above, deliberately not fixed this pass); Integration Plan §7.1-style
+CUSTOM_DAYS cadence schedule gap (no per-week schedule field exists — flagged in
+`ApplyAdherenceDecayUseCase`'s own kdoc, not resolved here).

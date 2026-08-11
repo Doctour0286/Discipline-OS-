@@ -28,6 +28,16 @@ interface GoalMissionDao {
     @Insert
     suspend fun insert(goalMission: GoalMission)
 
+    /**
+     * Added ROADMAP.md §5.36/Batch G3 — the first real writer of `adherenceScore`/
+     * `consecutiveWindowsBelowThreshold` post-creation. Same "real, motivated exception to
+     * 'no @Update yet'" pattern [MilestoneDao.update] already established for `achievedAt`
+     * (see that DAO's own kdoc) — this class's original "no call site needs one as of this
+     * pass" note no longer holds once `ApplyAdherenceDecayUseCase` exists.
+     */
+    @Update
+    suspend fun update(goalMission: GoalMission)
+
     @Query("SELECT * FROM goal_missions WHERE id = :id")
     suspend fun get(id: UUID): GoalMission?
 
@@ -63,7 +73,8 @@ interface MissionPeriodDao {
  * Backs [MissionLogEntry]. Method set matches Integration Plan §2.2: `insert`, `forMission
  * (missionId)`, `forMissionSince(missionId, since)` — the latter is what Adherence's
  * rolling-window computation in Batch G3 needs (`ApplyAdherenceDecayUseCase`, Integration Plan
- * §4.1), added now so G3 doesn't need its own DAO-layer PR.
+ * §4.1), added now so G3 doesn't need its own DAO-layer PR. Method set itself needed no change
+ * for G3 — only [MissionLogEntry]'s own fields did (`numericValue`/`didOccur`, ROADMAP.md §5.36).
  */
 @Dao
 interface MissionLogEntryDao {

@@ -5,6 +5,8 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.disciplineos.data.adherence.AdherenceLedgerDao
+import com.disciplineos.data.adherence.AdherenceLedgerEntry
 import com.disciplineos.data.dao.EnforcementSessionDao
 import com.disciplineos.data.dao.GoalMissionDao
 import com.disciplineos.data.dao.MilestoneDao
@@ -66,6 +68,7 @@ import net.sqlcipher.database.SupportFactory
         MissionLogEntry::class,
         Trigger::class,
         Milestone::class,
+        AdherenceLedgerEntry::class,
     ],
     // v2 (Phase 1): LedgerEntry.pausedAt added for §26.4 dispute-pause semantics.
     // v3 (Phase 1, TierTransitionUseCase): TierEvent table added; User gained
@@ -133,7 +136,25 @@ import net.sqlcipher.database.SupportFactory
     // real installed base (no release tag, no store listing — re-checked this pass). Same
     // "DebugSeeder already assumes a fresh reinstall re-seeds from scratch" reasoning v9 gave
     // still applies. Revisit before the first real pilot install (Phase 5).
-    version = 10,
+    // v11 (Batch G3, Adherence engine, ROADMAP.md §5.36): two schema changes, bundled in one
+    // bump per this project's own precedent (v6 folded two independent additions the same way).
+    // (1) `MissionLogEntry` gains `numericValue: Double?` and `didOccur: Boolean?`, and `note`
+    // becomes nullable — correcting a real gap: the base design doc
+    // (`06_GOAL_ORIENTED_MISSION_MODEL.md` §3.3) always specified both fields as Adherence's
+    // actual hit/miss input ("computed from MissionLogEntry presence/value"), but the Integration
+    // Plan's §2.1 field list dropped them and v9/v10 shipped without them — an unflagged
+    // divergence from the document it was meant to summarize, only caught while implementing this
+    // batch (no prior code depended on the missing fields, so nothing else changes). See
+    // MissionLogEntry.kt kdoc for the full account. (2) `GoalMission` gains
+    // `consecutiveWindowsBelowThreshold: Int = 0` (Integration Plan §7.5, a small motivated
+    // addition the Plan itself already flagged as a deviation from the base doc's stated field
+    // list — needed to detect sustained-miss-pattern decay the same way
+    // `User.consecutiveDaysBelowFloor` does for Reputation). New table `adherence_ledger_entries`
+    // (`AdherenceLedgerEntry::class`) — see that class's kdoc for why this is a physically
+    // separate table from `ledger_entries`, not a new `LedgerMetric` value. Same
+    // fallbackToDestructiveMigration reasoning as every bump above: still pre-launch, still no
+    // real installed base (re-checked this pass).
+    version = 11,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -151,6 +172,7 @@ abstract class DisciplineOsDatabase : RoomDatabase() {
     abstract fun missionLogEntryDao(): MissionLogEntryDao
     abstract fun triggerDao(): TriggerDao
     abstract fun milestoneDao(): MilestoneDao
+    abstract fun adherenceLedgerDao(): AdherenceLedgerDao
 
     companion object {
         private const val DB_NAME = "disciplineos_core.db"
