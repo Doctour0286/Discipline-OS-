@@ -380,8 +380,10 @@ see Integration Plan §6 for the exact prompt copy/timing requirements it specif
 
 ## Batch G6 — Milestone UI
 
-**Status: NOT STARTED. Sequenced last, per the base design document's own §F ordering — depends
-on G1–G5.**
+**Status: WRITTEN, PUSHED, NOT YET MERGED.** PR open, code-only branch
+`g6-milestone-ui` (§5.44) — doc sync (this entry) follows as a separate PR, per this
+project's established two-branch convention (see G5's `g5-trigger-ui-lifecycle-prompts` +
+`g5-docsync-pending-merge` split for precedent).
 
 **Full detail:** Integration Plan §7 ("Milestone (G6) — sequenced last, per base document §F").
 
@@ -389,6 +391,13 @@ on G1–G5.**
 `GoalMission`. Descriptive only, per schema doc §2.2a's restated boundary — a `Milestone`
 being hit or missed never feeds Reputation, Discipline Debt, or any Ledger entry; only
 `EnforcementSession`-level violations do.
+
+**Notable finding during implementation:** the `Milestone`/`MilestoneDao`/DB-wiring data layer
+already existed since the original G1 schema pass (`v9`) — this status line's prior "NOT
+STARTED" was stale; the actual gap was the missing `:domain`/`:app` layer only. Also fixed a
+real bug found en route: `Milestone.targetValue` shipped as `String?`, spec (Addendum §B.2)
+calls for `Double?` — see §5.44 for the full account, including why this was safe (zero call
+sites constructed a `Milestone` anywhere pre-fix).
 
 **Verification checklist:**
 - [ ] CI green

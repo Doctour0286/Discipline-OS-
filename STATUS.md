@@ -44,15 +44,25 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-11 (through §5.43 — audit and fix of the
+**Last synced to ROADMAP.md:** 2026-08-11 (through §5.44 — Batch G6, Milestone UI. Data layer
+(`Milestone` entity/DAO/DB wiring) was already shipped since G1 but unsurfaced in `:domain`/
+`:app`; this batch adds the missing domain/UI layer, plus fixes a real bug found en route
+(`Milestone.targetValue` shipped as `String?`, spec calls for `Double?` — DB bumped to `v14`).
+Pushed to `g6-milestone-ui`, PR open, code only — not yet merged, doc sync is this same commit
+per this project's convention but the branch itself is code-only, no docs in that diff. No
+compiler reachable to verify by building — see "known standing gaps" below. See §5.44 for the
+full account.
+
+**Prior sync (through §5.43):** audit and fix of the
 `requireNotNull`/`checkNotNull` pattern flagged in §5.42. Twelve call sites across
 `RecordViolationUseCase`, `ApplyReputationDecayUseCase`, `ResolveDisputeUseCase`,
 `TierTransitionUseCase`, and `MissionInterceptionActivity` fixed to `checkNotNull`;
 `TriggerCreationFragment`'s one flagged site confirmed to be a genuinely different,
 correctly-`requireNotNull` case and left unchanged. No compiler reachable to verify by
-building — see "known standing gaps" below. See §5.43 for the full per-file account.
+building — see "known standing gaps" below. This audit merged to `main` via PR #40, same
+sync pass it was written in.
 
-**Prior sync (through §5.42):** Batch G5 (Trigger UI + lifecycle prompts) pushed to
+**Sync prior to this (through §5.42):** Batch G5 (Trigger UI + lifecycle prompts) pushed to
 `g5-trigger-ui-lifecycle-prompts`, PR open (#38), not yet merged as of that sync. Two CI
 rounds, both fixed: run #151 failed on two test-authoring bugs in
 `CreateConstraintTriggerUseCaseTest` (an `Instant`-precision DB-round-trip mismatch and a
@@ -196,7 +206,7 @@ on-device pass, not a logic change needing separate re-verification.
 | Behavioral Fingerprint + Predictive Failure Alerts | ⬜ | Phase 4, not started |
 | Unsupervised Reliability (opt-in tracking) | ✅ | Schema isolated (Phase 0); opt-in flow (`UnsupervisedReliabilityOptInFragment`, §2.7) merged and confirmed CI + on-device (PR #16) — writes `User.unsupervisedReliabilityOptIn`/`optInAt`. No capture pipeline (actual passive signal collection into `UnsupervisedSignalDao`) built yet — this pass is the consent/opt-in screen only, not the measurement pipeline itself. |
 | Daily / Weekly Reports | ⬜ | Not started |
-| Goal-Oriented Mission Model (`GoalMission`/`EnforcementSession` split) | 🟡 | **G1–G4 on `main`, confirmed compiling** (G1 schema/DAO rename, G2 real auto-create-parent-`GoalMission` fix, G3 Adherence engine, G4 Mission Detail screen + Home entry point — PR #35, §5.39/§5.40 — plus a G1 `Trigger`-entity correctness fix, §5.41). **G5 (Trigger UI + lifecycle prompts) is written and pushed but not yet merged** — PR open (#38), two CI rounds so far (two test-authoring bugs, then one real `requireNotNull`/`checkNotNull` production bug), all fixed; CI re-run pending (§5.42). G6 (Milestone UI) not started. Not part of PRD §41's MVP bar (post-v3.6 addition). Tracked as `BUILD_PLAN.md` Batches G1–G6, separate from the A–F sequence above. See `Documents/01_DATA_MODEL_AND_SCHEMA.md` §2.2a for the accepted shape, §5.42 for current real status. |
+| Goal-Oriented Mission Model (`GoalMission`/`EnforcementSession` split) | 🟡 | **G1–G4 on `main`, confirmed compiling** (G1 schema/DAO rename, G2 real auto-create-parent-`GoalMission` fix, G3 Adherence engine, G4 Mission Detail screen + Home entry point — PR #35, §5.39/§5.40 — plus a G1 `Trigger`-entity correctness fix, §5.41). **G5 (Trigger UI + lifecycle prompts) is written and pushed but not yet merged** — PR open (#38), two CI rounds so far (two test-authoring bugs, then one real `requireNotNull`/`checkNotNull` production bug), all fixed; CI re-run pending (§5.42). **G6 (Milestone UI) is written and pushed but not yet merged** — PR open, code-only branch (`g6-milestone-ui`), CI not yet run against it (§5.44). Not part of PRD §41's MVP bar (post-v3.6 addition). Tracked as `BUILD_PLAN.md` Batches G1–G6, separate from the A–F sequence above. See `Documents/01_DATA_MODEL_AND_SCHEMA.md` §2.2a for the accepted shape, §5.44 for current real status. |
 
 ---
 
