@@ -284,10 +284,12 @@ about `EnforcementSession`, not `GoalMission`.
 
 ## Batch G3 — Adherence engine
 
-**Status: SHIPPED, not yet CI-confirmed.** See `ROADMAP.md` §5.36 for the full account,
-including two real base-doc divergences found while implementing this batch (one fixed —
-`MissionLogEntry` was missing the `numericValue`/`didOccur` fields the hit-rate math needs at
-all — one flagged, not fixed — `MissionPeriod.enforcementProfileId`'s nullability).
+**Status: ON `main` (merged via PR #31, CI green, confirmed installed).** See `ROADMAP.md`
+§5.36 for the full account, including two real base-doc divergences found while implementing
+this batch (one fixed — `MissionLogEntry` was missing the `numericValue`/`didOccur` fields the
+hit-rate math needs at all — one flagged, not fixed — `MissionPeriod.enforcementProfileId`'s
+nullability) and the one real CI-caught bug (a test timing issue, not production code — see
+§5.36's post-merge update).
 
 **Full detail:** Integration Plan §4.
 
@@ -307,14 +309,16 @@ all — one flagged, not fixed — `MissionPeriod.enforcementProfileId`'s nullab
   `ROADMAP.md` §5.36.)
 
 **Verification checklist:**
-- [ ] CI green — blocked on sandbox network access to `services.gradle.org`, same standing gap
-      every batch since §5.7
+- [x] CI green — PR #31, merged. First run caught a flaky test (time-handling bug in the test
+      itself, fixed same PR); second run green.
 - [x] Pure-function tests for the decay math, same isolation-from-Room pattern
       `ApplyReputationDecayUseCase`'s own tests use — `ApplyAdherenceDecayUseCaseTest` (`:domain`)
 - [x] The `[HYPOTHESIS]` constant is named and flagged, not buried — four constants on
       `HypothesisAdherenceDecayPolicy`, each with an inline comment stating it's unvalidated
-- [ ] On-device confirmation — not attempted; no UI call site exists yet for this use-case
-      (matches `ApplyReputationDecayUseCase`'s own still-unbuilt-scheduler state)
+- [x] Installed and confirmed on a real device.
+- [ ] Real UI call site for this use-case — none yet; matches `ApplyReputationDecayUseCase`'s
+      own still-unbuilt-scheduler state. Not a G3 requirement, but the natural next dependency
+      for Batch G4 (Mission detail screen) to actually surface `adherenceScore` somewhere.
 
 ---
 

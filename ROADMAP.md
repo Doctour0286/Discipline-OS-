@@ -2927,14 +2927,35 @@ re-entry guard should exist at all), left exactly as open as §5.34 found it.
 
 ---
 
-### 5.36 — Batch G3 shipped (Adherence engine); two real, unflagged base-doc divergences found and handled — one fixed, one flagged, neither guessed
+### 5.36 — Batch G3 shipped (Adherence engine); two real, unflagged base-doc divergences found and handled — one fixed, one flagged, neither guessed — PR #31 merged, CI green, installed
 
-**Closes Batch G3** (`BUILD_PLAN.md`), Integration Plan §4. Not yet CI-confirmed — same standing
-gap every batch since §5.7 has noted: no Gradle/Android toolchain reachable from the authoring
-sandbox (`./gradlew --version` still fails with an HTTP 403 fetching the Gradle distribution;
-`services.gradle.org` isn't on the domain allowlist). Manual review of every changed file's
-imports, DAO signatures, and enum branches was done in its place, same standard §5.35 already
-used for its own unconfirmed state.
+**Closes Batch G3** (`BUILD_PLAN.md`), Integration Plan §4. **Update, PR #31:** merged to
+`main`, real CI (`services.gradle.org` reachable from GitHub Actions, unlike the authoring
+sandbox) caught one failure — `ApplyAdherenceDecayUseCaseTest`'s "DAILY cadence expects one
+entry per window day" — on the first run. Root cause was in the test, not the production code:
+every test called `useCase.execute(mission.id)` without passing `now`, so the use-case's own
+`Instant.now()` default ran strictly after the test had already seeded log entries via its own,
+separately-called `Instant.now()`. The DAILY test seeds an entry at `now(test) − 7 days`;
+`windowStart` is computed as `now(usecase) − 7 days`; since `now(usecase) > now(test)`,
+`windowStart` lands after the seeded entry's `createdAt`, and `MissionLogEntryDao
+.forMissionSince`'s `>=` filter drops it, undercounting hits by one. This was latent in every
+window-boundary-adjacent test in the file, not just the one that happened to trip — fixed by
+pinning a single `val now = Instant.now()` per test and passing it explicitly to
+`execute(mission.id, now)`, the same pattern `ApplyReputationDecayUseCaseTest` already uses for
+its own now-sensitive assertions. Second push, CI green, merged. **Confirmed installed** on a
+real device.
+
+This is a real, useful data point for this project's own "not yet CI-confirmed" caveats
+elsewhere (§5.7 onward): the manual-review pass below did catch every schema/signature/import
+issue by hand, and the actual bug CI found was in test scaffolding's implicit-`now()` timing,
+not in anything the manual review was checking for — a category of bug (nondeterministic time
+handling across two independently-called clock reads in the same test) that's realistically
+only caught by actually running the test, not by reading it. Worth remembering next time this
+project is tempted to treat a careful manual review as a substitute for real CI rather than a
+stopgap for it.
+
+Below is the original pre-merge account, left as written rather than rewritten to look
+prescient — the divergence-tracing work and what got built are both unchanged by the fix above.
 
 **What was found before any code was written, not silently resolved:**
 
@@ -3012,16 +3033,19 @@ turned out not to be literally true in both cases above.
   this call writes nothing," and an explicit assertion that `LedgerDao`'s REPUTATION/DEBT values
   never move as a result of Adherence decay.
 
-**What this does and does not confirm:** same precise standard §5.34/§5.35 already set for this
-project — this is a manual-review-plus-mirrored-test pass, not a compiler- or CI-confirmed one.
-Every changed file's imports, DAO method signatures, and enum `when` exhaustiveness were checked
-by hand against the actual shipped schema (not assumed from the specs) before this entry was
-written; that's real evidence the code is internally consistent, not evidence it compiles.
+**What this does and does not confirm (as originally written, pre-merge):** same precise
+standard §5.34/§5.35 already set for this project — this is a manual-review-plus-mirrored-test
+pass, not a compiler- or CI-confirmed one. Every changed file's imports, DAO method signatures,
+and enum `when` exhaustiveness were checked by hand against the actual shipped schema (not
+assumed from the specs) before this entry was written; that's real evidence the code is
+internally consistent, not evidence it compiles. **Superseded by the update above: CI has now
+run for real, found one bug (in the test, not the reviewed production code), and that bug is
+fixed.**
 
-**Still open:** first real CI run (blocked on the same sandbox network gap every prior batch
-since §5.7 has hit); on-device confirmation (not attempted — no UI call site exists for this
-use-case yet, matching `ApplyReputationDecayUseCase`'s own still-unbuilt-scheduler state, so
-there's nothing to run on-device against); `MissionPeriod.enforcementProfileId`'s nullability
-divergence (flagged above, deliberately not fixed this pass); Integration Plan §7.1-style
-CUSTOM_DAYS cadence schedule gap (no per-week schedule field exists — flagged in
-`ApplyAdherenceDecayUseCase`'s own kdoc, not resolved here).
+**Still open, updated post-merge:** `MissionPeriod.enforcementProfileId`'s nullability
+divergence (flagged above, deliberately not fixed this pass — still true); Integration Plan
+§7.1-style CUSTOM_DAYS cadence schedule gap (no per-week schedule field exists — flagged in
+`ApplyAdherenceDecayUseCase`'s own kdoc, not resolved here — still true). No longer open: first
+real CI run (done, green, PR #31 merged); installed confirmation (done). Still true that no UI
+call site exists yet for this use-case, matching `ApplyReputationDecayUseCase`'s own
+still-unbuilt-scheduler state — Batch G4 (Mission detail screen) is the natural first caller.
