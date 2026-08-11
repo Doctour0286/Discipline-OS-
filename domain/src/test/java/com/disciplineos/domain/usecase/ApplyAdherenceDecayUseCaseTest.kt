@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -163,6 +164,7 @@ class ApplyAdherenceDecayUseCaseTest {
         val result = useCase.execute(mission.id, now)
 
         assertTrue(result.inScope)
+        assertEquals(false, result.isSecondary)
     }
 
     @Test
@@ -173,28 +175,35 @@ class ApplyAdherenceDecayUseCaseTest {
         val result = useCase.execute(mission.id, now)
 
         assertTrue(result.inScope)
+        assertEquals(false, result.isSecondary)
     }
 
     @Test
-    fun `a BEHAVIOR_DRIVEN mission with no attached EnforcementSession is in scope`() = runTest {
+    fun `a BEHAVIOR_DRIVEN mission with no attached EnforcementSession is in scope and primary`() = runTest {
         val now = Instant.now()
         val mission = seedGoalMission(archetype = MissionArchetype.BEHAVIOR_DRIVEN)
 
         val result = useCase.execute(mission.id, now)
 
         assertTrue(result.inScope)
+        assertEquals(false, result.isSecondary)
     }
 
     @Test
-    fun `a BEHAVIOR_DRIVEN mission with an attached EnforcementSession is out of scope`() = runTest {
+    fun `a BEHAVIOR_DRIVEN mission with an attached EnforcementSession still computes Adherence but is flagged secondary`() = runTest {
+        // Base doc §4.2: "Adherence still computes for it (log-only days between scheduled
+        // sessions are real signal too), but is shown as a secondary number, never substituted
+        // for Reputation on that mission." An attached EnforcementSession changes display
+        // priority, not whether this use-case computes anything.
         val now = Instant.now()
         val mission = seedGoalMission(archetype = MissionArchetype.BEHAVIOR_DRIVEN)
         seedEnforcementSession(mission.id)
 
         val result = useCase.execute(mission.id, now)
 
-        assertFalse(result.inScope)
-        assertEquals(emptyList<Any>(), result.entries)
+        assertTrue(result.inScope)
+        assertEquals(true, result.isSecondary)
+        assertNotNull(result.hitRate)
     }
 
     // --- Hit-rate computation ------------------------------------------------------------
