@@ -79,7 +79,7 @@ class TierTransitionUseCaseTest {
         )
     }
 
-    private suspend fun seedMission(missionId: UUID, status: MissionStatus = MissionStatus.ACTIVE): Mission {
+    private suspend fun seedMission(missionId: UUID, status: MissionStatus = MissionStatus.ACTIVE): EnforcementSession {
         val mission = EnforcementSession(
             id = missionId,
             userId = userId,
