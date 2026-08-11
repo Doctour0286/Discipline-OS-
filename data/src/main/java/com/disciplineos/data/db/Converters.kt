@@ -39,5 +39,5 @@ class Converters {
     fun fromLocalTime(value: LocalTime?): Int? = value?.toSecondOfDay()
 
     @TypeConverter
-    fun toLocalTime(value: Int?): LocalTime? = value?.let(LocalTime::ofSecondOfDay)
+    fun toLocalTime(value: Int?): LocalTime? = value?.let { LocalTime.ofSecondOfDay(it.toLong()) }
 }
