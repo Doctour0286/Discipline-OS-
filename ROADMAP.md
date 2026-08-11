@@ -3482,3 +3482,70 @@ balance check across all six touched files after editing. This is the same postu
 prior entry's caveat — real, not closed by this pass, worth remaining on `STATUS.md`'s known
 standing gaps list as a general sandbox limitation even though this specific finding is now
 resolved.
+
+### 5.44 G6: Milestone UI (Integration Plan §7, base design doc Addendum §B.2) — pushed, PR open, not yet merged
+
+**Data layer was already secretly built.** `Milestone` entity, `MilestoneDao`
+(`insert`/`update`/`forMission`), and full `DisciplineOsDatabase` wiring have existed since the
+original G1 schema pass (`v9`) — contradicting `BUILD_PLAN.md`'s "NOT STARTED" status for this
+batch, discovered only while starting this pass. What was actually missing, confirmed by
+grepping `:domain` and `:app` for any reference, was the entire domain/UI layer: zero code
+outside `:data` touched `Milestone` at all.
+
+**Real bug found and fixed en route:** `Milestone.targetValue` shipped as `String?` since the
+original G1 pass ("interpretation depends on the parent `GoalMission`'s target shape," per the
+old in-code comment) — but Addendum §B.2's actual field list always specifies `Double?`. Same
+category of finding as two prior entries in this log (§5.11's `MissionLogEntry` gap, §5.41's
+`Trigger` shape fix): an unflagged divergence from the document the shipped code was meant to
+summarize, caught only while implementing the batch that needed the real shape. Confirmed zero
+call sites constructed a `Milestone` anywhere in the codebase before this fix, so no migration
+risk. Added the also-missing `targetDate: Instant?` (present in the Addendum's field list,
+absent pre-fix) in the same pass, since both fields trace to the same never-revisited gap.
+`DisciplineOsDatabase` bumped `v13` -> `v14`; same `fallbackToDestructiveMigration()` reasoning
+as every prior bump in that file's own version-history comment (still pre-launch, no real
+installed base).
+
+**Scope decisions, resolved rather than left as an open question a second time** (both
+questions Addendum §B.3 explicitly leaves un-signed-off):
+- **Person-authored milestones only, no auto-generation.** This project's established
+  convention (`MissionProfile`'s kdoc rejecting an unfounded allowlist/blocklist split, this same
+  log's own decision entries) is to not invent behavior a spec leaves open. Auto-generation
+  (e.g. proposing evenly-spaced milestones for a cadenced mission) remains a real, named future
+  option, not resolved by this pass.
+- **Missed/regressed milestones are purely descriptive, never a consequence path.** Matches the
+  entity's own already-documented "descriptive only, same boundary as `MissionLogEntry`" kdoc —
+  a milestone being hit or missed never feeds Reputation, Discipline Debt, or any `LedgerEntry`.
+  Once achieved, always achieved — no un-achieve path if a later log entry regresses (e.g. a
+  numeric value creeping back past a crossed threshold); no spec language or product sign-off
+  supports building one.
+
+**Where the achievement check actually runs, and why it diverges from the Integration Plan's
+literal framing:** §7 states `achievedAt` is "computed when a new `MissionLogEntry` crosses the
+threshold" — implying a hook on the log-entry *write* path. Checked at implementation time: no
+production code anywhere writes a `MissionLogEntry` yet (only a test constructs one), so that
+write path doesn't exist to hook into. Given that, `milestoneAchievementSatisfied()` (a pure,
+DB-free function in `Metrics.kt`, matching the `ironCalibrationSatisfied`/
+`hypothesizingStageSatisfied` pattern already established in that file) runs instead on
+`MissionDetailFragment`'s existing load pass — the one place `MissionLogEntry` rows for a
+mission are actually read today, reused by both `loadMissionDetailState` and
+`dismissTriggerPrompt` via a shared `checkAndPersistMilestoneAchievements` helper. A manual
+"mark achieved" checkbox (`MilestoneRow`, one-directional only — disabled once already achieved)
+covers the case the pure function can never resolve on its own: an ordinal-only milestone with
+no numeric target.
+
+**Shipped this pass:** `Milestone` entity fix + `v14` bump; `milestoneAchievementSatisfied()` +
+full `MetricsTest.kt` coverage; `MilestoneCreationScreen.kt`/`MilestoneCreationFragment.kt`
+(person-authored creation form, matching `TriggerCreationScreen`/`TriggerCreationFragment`'s
+established shape exactly); milestones card + `MilestoneRow` on `MissionDetailScreen.kt`;
+`MissionDetailFragment.kt` wiring (achievement check on load, manual-achieve write path, both
+new callbacks); nav graph destination + action (`milestoneCreationFragment`, matching G5's
+trigger-creation destination shape); `MissionDetailFragmentTest.kt` coverage for
+`milestones`/`targetDirection` pass-through on `computeMissionDetailState`.
+
+**Not run: an actual compile.** Same standing gap as every entry in this log back through
+§5.41/§5.43 — no Kotlin/Gradle toolchain reachable from this sandbox. Verification was manual:
+every edited file diffed against current `main` before changes were applied (confirming the
+starting point matched what this entry describes, not a stale assumption), brace-balance checked
+after editing, and every cross-file reference (`MilestoneDao` accessor name, `TargetDirection`
+enum, `MissionLogEntry` field names) grepped and confirmed against the real files on disk rather
+than assumed from memory of the spec docs alone.
