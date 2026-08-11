@@ -49,7 +49,40 @@ Batch F (Daily/Weekly Reports + real AI Voice generation)
         │
         ▼
 MVP feature-complete (PRD §41) → Phase 5 (pilot, no new code, resolves [HYPOTHESIS] constants)
+
+Batch G1 (Goal-Oriented Mission Model: rename + additive schema)  ◄── independent of B–F,
+        │                                                              can run any time after A.5
+        │                                                              (needs a stable DB version
+        │                                                              to migrate from)
+        ▼
+Batch G2 (Mission creation: real FirstMissionSchedulingFragment fix)
+        │
+        ▼
+Batch G3 (Adherence engine: ApplyAdherenceDecayUseCase)
+        │
+        ▼
+Batch G4 (Mission detail screen)  ◄── needs a real entry point; see G4's own note
+        │
+        ▼
+Batch G5 (Trigger UI + lifecycle prompts)
+        │
+        ▼
+Batch G6 (Milestone UI)  ◄── sequenced last, per the base design doc's own §F
 ```
+
+**Where Batches G1–G6 fit relative to A–F:** the Goal-Oriented Mission Model is a structural
+rework of the `Mission` entity itself (renamed to `EnforcementSession`, with a new `GoalMission`
+parent) — see `Documents/01_DATA_MODEL_AND_SCHEMA.md` §2.2a and
+`Documents/06_GOAL_ORIENTED_MISSION_MODEL_INTEGRATION_PLAN.md` for the full design and every
+verified call site. **G1 touches files that B, C, D, E, and F either also touch or build on top
+of** (every DAO/use-case/screen that references `Mission`/`MissionDao` — see the Integration
+Plan's §2.4 call-site inventory). Whichever of {G1, B, C, D, E, F} merges to `main` second across
+any shared file needs the same "real rebase-and-review, not a mechanical merge" treatment
+Batch A.5's three-way v5 collision note above already established as this project's working
+pattern — flagging it here rather than waiting for it to surface as a surprise conflict, same
+as that note did. **Recommended sequencing, not a hard rule:** land G1 as early as possible,
+ideally immediately after Batch A.5, specifically to minimize the number of batches that end up
+racing it for the same rename.
 
 **Why E cannot move earlier:** `ROADMAP.md` Phase 4 states Behavioral Fingerprint "depends on
 Phase 3's alert-card pattern existing to render into" — and the Onboarding/Consent spec §3.5
@@ -123,6 +156,176 @@ pass before Phase 5, but doesn't block any batch below.
       needs to happen on a machine that has one, or via the existing GitHub Actions CI)
 - [ ] On-device smoke test: trigger a real demotion via 3 consecutive low-Reputation days,
       confirm the tier actually drops and a `TierEvent` is recorded
+
+---
+
+## Batch G1 — Goal-Oriented Mission Model: rename + additive schema (structural only, zero behavior change)
+
+**Status: NOT STARTED.**
+
+**Full detail:** `Documents/06_GOAL_ORIENTED_MISSION_MODEL_INTEGRATION_PLAN.md` §2 — that
+document verified every entity/DAO/database change and every existing call site directly
+against the live tree before being written, not inferred from the design doc alone. Treat
+that section as this batch's real spec; what follows here is a summary for dependency-graph
+legibility, not a duplicate to build from.
+
+**Scope:**
+- Rename `Mission` → `EnforcementSession` (entity, DAO, table) — same fields, same enforcement
+  mechanics, confirmed unchanged against the live `Mission.kt`/`CoreDaos.kt` before this plan
+  was written.
+- Add four new entities: `GoalMission`, `MissionPeriod`, `MissionLogEntry`, and the
+  `Trigger`/`Milestone` pair — see schema doc §2.2a for full shape.
+- Real Room `Migration`, not a fresh table — the live DB has shipped rows and is currently at
+  v7 (confirm the exact version against `DisciplineOsDatabase.kt` before writing the migration;
+  this number moves as other batches land).
+- Mechanical updates to every existing `MissionDao`/`Mission`-typed call site — the Integration
+  Plan's §2.4 lists these by file, verified by direct grep against the tree, not assumed from
+  the class name alone (includes `InterceptionController`, `MissionAccessibilityService`,
+  `MissionInterceptionActivity`, `ComputeBehavioralFingerprintUseCase`, `TierTransitionUseCase`,
+  `DebugSeeder`, and `AppContainer`'s DI wiring).
+
+**Explicitly zero behavior change:** this batch is a rename plus additive schema only — no
+enforcement logic, scoring formula, or UI behavior changes. `FirstMissionSchedulingFragment`
+still creates what is now an `EnforcementSession` row exactly as it did before; wiring it to
+also create a `GoalMission` is Batch G2, deliberately kept separate so this batch stays
+reviewable as "did the rename break anything" in isolation.
+
+**Verification checklist:**
+- [ ] CI green
+- [ ] Migration tested against a real pre-migration DB snapshot (not just a fresh install) —
+      confirm existing `Mission` rows survive the rename with all fields intact
+- [ ] Every call site in the Integration Plan's §2.4 inventory re-confirmed compiling, not just
+      the ones this batch's author remembered
+- [ ] `ArchitectureBoundaryTest` (§7 isolation enforcement) still passes — the new entities
+      don't introduce a foreign key from `GoalMission`/`MissionPeriod`/etc. into anything the
+      isolation boundary protects
+
+---
+
+## Batch G2 — Mission creation: the real `FirstMissionSchedulingFragment` fix
+
+**Status: NOT STARTED. Depends on G1.**
+
+**Full detail:** Integration Plan §3, including §3.3's "new open questions this batch surfaces"
+— read those before starting, they're real open judgment calls (double-run creating two
+`GoalMission` rows, `MissionPeriod.periodType` for an auto-generated onboarding period), not
+resolved by the base design doc and not resolved by this build plan either. Flag them in
+`ROADMAP.md` §5 when this batch is built, same as every other unresolved judgment call in this
+project.
+
+**Scope:** `FirstMissionSchedulingFragment.createMissionAndFinish` currently creates a single
+`Mission`/`EnforcementSession` row directly (§5.24's two open `[HYPOTHESIS]` items — default
+duration, reused `ACTIVE` status for scheduled-not-started — are unaffected by this batch and
+remain open). This batch makes it create a real `GoalMission` first, then an
+`EnforcementSession` under it, matching the new model rather than leaving onboarding's own
+Mission-creation path on the old flat shape.
+
+**What this does not change:** Integration Plan §3.2 — the enforcement loop itself
+(`MissionAccessibilityService`, `InterceptionController`) is untouched; it already only cares
+about `EnforcementSession`, not `GoalMission`.
+
+**Verification checklist:**
+- [ ] CI green
+- [ ] On-device confirmed: complete onboarding, confirm exactly one `GoalMission` and one
+      `EnforcementSession` row exist, correctly linked
+- [ ] §3.3's open questions either resolved (with a `ROADMAP.md` §5 entry) or explicitly
+      deferred with a stated reason — not silently left unaddressed
+
+---
+
+## Batch G3 — Adherence engine
+
+**Status: NOT STARTED. Depends on G1/G2 (needs real `GoalMission`/`EnforcementSession` data to
+decay against, same structural reason Reputation decay couldn't be piloted before Missions
+existed — see Phase 5's exit criteria elsewhere in this project's docs for the same pattern).**
+
+**Full detail:** Integration Plan §4.
+
+**Scope:**
+- `ApplyAdherenceDecayUseCase` — new use-case, sibling to `ApplyReputationDecayUseCase`, same
+  decay-policy shape (a `*Policy` object gating the pure math, a use-case applying it and
+  writing the result) rather than a structurally different pattern for what's conceptually the
+  same kind of operation.
+- Weekly Report callout hook — feeds whichever surface Batch F's Daily/Weekly Reports work
+  builds; if this batch lands before Batch F, the hook should exist and be tested in isolation
+  even with no report UI yet to render into (same "build the mechanism, UI catches up" pattern
+  Batch E's F5 threshold uses).
+- One `[HYPOTHESIS]` constant — Integration Plan §4.3 names it; do not silently pick a number,
+  flag it in `ROADMAP.md` §5 the way every other hypothesis constant in this project has been.
+
+**Verification checklist:**
+- [ ] CI green
+- [ ] Pure-function tests for the decay math, same isolation-from-Room pattern
+      `ApplyReputationDecayUseCase`'s own tests use
+- [ ] The `[HYPOTHESIS]` constant is named and flagged, not buried
+
+---
+
+## Batch G4 — Mission detail screen (§4.1 relationship view)
+
+**Status: NOT STARTED. Depends on G1–G3 for real data to render.**
+
+**Full detail:** Integration Plan §5.
+
+**Scope:** a real detail screen showing a `GoalMission`'s relationship to its
+`EnforcementSession`s, `MissionPeriod`s, and log entries — Integration Plan §5's own framing.
+
+**Needs a real entry point — this is not automatic.** Integration Plan §7.6 flags that nothing
+in the base design doc's §8 names where this screen is reached *from*. `HomeScreen.kt`
+currently shows "current tier + Iron eligibility card only" (§5.31) — deliberately minimal, not
+a dashboard. This batch needs an explicit decision (product-owner sign-off, same pattern as
+every other open fork in this project) on whether the entry point is a Home screen addition, a
+new nav destination reachable some other way, or something else — do not silently invent one.
+
+**Verification checklist:**
+- [ ] CI green
+- [ ] On-device confirmed
+- [ ] Entry-point decision recorded in `ROADMAP.md` §5 before/alongside this batch, not
+      improvised inside the PR with no record of why
+
+---
+
+## Batch G5 — Trigger UI + lifecycle prompts
+
+**Status: NOT STARTED. Depends on G1 (needs the `Trigger` entity) and G4 (needs a screen to
+surface prompts from/into).**
+
+**Full detail:** Integration Plan §6.
+
+**Scope:** UI for the `Trigger` entity's condition-based prompts and `GoalMission` lifecycle
+transitions (active → completed/abandoned) — see Integration Plan §6 for the exact prompt
+copy/timing requirements it specifies.
+
+**Verification checklist:**
+- [ ] CI green
+- [ ] On-device confirmed
+- [ ] Trigger-fired prompts confirmed not to collide with the Predictive Failure Alert card
+      pattern's own home-screen surface (Batch C §3.5) — two different systems independently
+      wanting the same visual real estate is exactly the kind of surprise this checklist item
+      exists to catch before it ships, not after
+
+---
+
+## Batch G6 — Milestone UI
+
+**Status: NOT STARTED. Sequenced last, per the base design document's own §F ordering — depends
+on G1–G5.**
+
+**Full detail:** Integration Plan §7 ("Milestone (G6) — sequenced last, per base document §F").
+
+**Scope:** UI for `Milestone` progress checkpoints within a `quantity`/`deadline`-type
+`GoalMission`. Descriptive only, per schema doc §2.2a's restated boundary — a `Milestone`
+being hit or missed never feeds Reputation, Discipline Debt, or any Ledger entry; only
+`EnforcementSession`-level violations do.
+
+**Verification checklist:**
+- [ ] CI green
+- [ ] On-device confirmed
+- [ ] Confirm directly (not assumed from the entity's own "descriptive only" label) that no
+      code path lets a `Milestone` write to `LedgerEntry` or any scored metric — same style of
+      structural check `ArchitectureBoundaryTest` already does for `UnsupervisedSignal`; worth
+      asking whether this boundary should get the same automated enforcement rather than
+      resting on code-review discipline alone
 
 ---
 
@@ -373,6 +576,12 @@ than inventing a different convention for daily/weekly cadence.
 ---
 
 ## After Batch F — MVP feature-complete, then Phase 5
+
+**Batches G1–G6 are tracked separately and are not part of PRD §41's MVP feature-complete
+bar** — the Goal-Oriented Mission Model is a post-v3.6 addition (schema doc §8's open-items
+table), not a PRD-required feature. They can complete before, during, or after A–F without
+blocking "MVP feature-complete," though the merge-collision risk noted in the dependency
+diagram above means G1 in particular is cheapest to land early rather than late.
 
 Once F lands, cross-check every row in `STATUS.md`'s "MVP feature list" table — everything
 currently ⬜ or 🟡 should be ✅ or a consciously-cut ✂️ item. At that point:

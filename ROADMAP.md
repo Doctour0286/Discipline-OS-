@@ -2616,3 +2616,98 @@ let CI confirm, then on-device check before this note graduates — the Iron pat
 has never been on-device exercised at all before this pass (STATUS.md's Phase 1 row already
 flags "Iron path unexercised on-device"), so that on-device check is a meaningfully higher-value
 one than most of onboarding's own screens got.
+
+### 5.32 — RESOLVED 2026-08-11, docs-only pass, no code — Goal-Oriented Mission Model accepted
+and folded into the spec docs
+
+**What this closes:** four external documents (a base design doc, an integration plan, and two
+now-superseded earlier drafts) describing a structural rework of `Mission` into a
+`GoalMission`/`EnforcementSession` split, plus three new supporting entities
+(`MissionPeriod`, `MissionLogEntry`, `Trigger`/`Milestone`). Per the base document's own §0
+instruction ("once accepted, the relevant pieces fold into `DisciplineOS_PRD_v3_6.md` and
+`01_DATA_MODEL_AND_SCHEMA.md` directly and this file is reduced to a historical pointer at the
+decision log entry that replaces it") — this entry is that decision log entry.
+
+**Explicitly scoped as docs-only, per product-owner instruction this session:** no code was
+written. This is the same "design doc → sign-off → `BUILD_PLAN.md` batch → code" sequencing
+this project already uses elsewhere (see Batch A's own "no code, no branch of its own
+conceptually" framing) — Batches G1–G6 now exist in `BUILD_PLAN.md` as real, sequenced,
+dependency-ordered work items, but none of them have started.
+
+**Verified against the live tree before folding anything in, not taken on faith from the
+uploaded documents:** cross-checked `data/src/main/java/com/disciplineos/data/entity/Mission.kt`,
+`CoreDaos.kt`, `DisciplineOsDatabase.kt`, `RecordViolationUseCase.kt`,
+`ApplyReputationDecayUseCase.kt`, `LedgerEntry.kt`/`LedgerDao.kt`,
+`FirstMissionSchedulingFragment.kt`, `HomeFragment.kt`/`HomeScreen.kt`,
+`Converters.kt`, `MissionProfile.kt`, `AppContainer.kt`, and every call site the uploaded
+Integration Plan claimed to have found (`InterceptionController`, `MissionAccessibilityService`,
+`MissionInterceptionActivity`, `ComputeBehavioralFingerprintUseCase`, `TierTransitionUseCase`,
+`DebugSeeder`) directly, one by one, via `grep`/`view` rather than trusting the uploaded
+document's own claims unverified. **One gap found in the uploaded Integration Plan's own
+call-site inventory, corrected here rather than silently carried forward:** `AppContainer.kt`
+(the app's DI wiring) also needs the `MissionDao`→`EnforcementSessionDao` rename and doesn't
+appear in the uploaded plan's file-by-file list — noted in `BUILD_PLAN.md`'s Batch G1 scope so
+it isn't missed when that batch is actually built. Also confirmed `ResolveDisputeUseCase.kt`
+does **not** reference `Mission`/`MissionDao` at all (only its test file does), correcting an
+inference that could otherwise have added an unnecessary call site to G1's scope.
+
+**A live-repo fact this pass surfaced that the uploaded documents didn't have:** the current DB
+version, per `DisciplineOsDatabase.kt`, is v7 as of this pass — Batch G1's migration needs to be
+written against whatever version is actually current *when G1 is built*, not against v7 as a
+fixed number, since other batches (B's three-way v5 collision is the standing cautionary
+example) can and do bump the version in the meantime.
+
+**A pre-existing `STATUS.md` "known standing gap" corrected while touching adjacent docs:**
+that file's "Known standing gaps" section claimed `Documents/` (the PRD, data model,
+architecture, onboarding spec, crisis-boundary spec) is "not checked into this repo — only
+`docs/PHASE2_DEVICE_VERIFICATION.md` exists under version control." That's false as of this
+pass — confirmed directly via `ls Documents/`, all six spec docs are tracked. Corrected in
+`STATUS.md` in this same pass rather than left to compound; unclear how long it had already been
+stale, worth a general reminder that "known standing gaps" sections are exactly the kind of note
+that goes unverified longest, precisely because nothing re-checks them by default.
+
+**Disposition of the four uploaded documents, per the base document's own instructions, followed
+exactly rather than improvised:**
+- `06_GOAL_ORIENTED_MISSION_MODEL_PROPOSAL.md` and `06a_GOAL_ORIENTED_MISSION_MODEL_ADDENDUM.md`
+  (the two earlier, superseded drafts) — the base document's own §0 says to delete these once
+  reviewed. Confirmed via `ls Documents/` that neither was ever actually checked into this repo
+  in the first place (only uploaded directly, never committed) — so there was nothing to
+  delete; noted here so a future reader doesn't wonder why no deletion commit exists.
+- `06_GOAL_ORIENTED_MISSION_MODEL.md` (the base design doc) — reduced to a historical pointer,
+  exactly as its own §0 specifies, rather than checked in verbatim. Its content is not
+  duplicated in git history beyond this pass's own commit (the pointer file states this
+  explicitly) — a future reader who needs the full six-fork rationale and worked examples
+  should look at the commit that replaced this file's body, not expect it preserved elsewhere.
+- `06_GOAL_ORIENTED_MISSION_MODEL_INTEGRATION_PLAN.md` — checked in in full, unmodified. This
+  document is the engineering-ready artifact (exact file diffs, verified call sites, per-batch
+  open questions) and doesn't get compressed the way the base design doc does; `BUILD_PLAN.md`'s
+  new Batches G1–G6 point to its sections directly rather than re-deriving their content.
+
+**What's now live, for a future reader orienting on this decision:**
+- `Documents/01_DATA_MODEL_AND_SCHEMA.md` §2.2a — schema-level summary of the five
+  new/renamed entities, the boundary rule (a `GoalMission` cannot be violated, only an
+  `EnforcementSession` under it can — same isolation pattern as §7's `UnsupervisedSignal`
+  boundary), and the migration note.
+- `Documents/01_DATA_MODEL_AND_SCHEMA.md` §8 — new open-items row pointing here.
+- `Documents/06_GOAL_ORIENTED_MISSION_MODEL.md` — now a pointer file only.
+- `Documents/06_GOAL_ORIENTED_MISSION_MODEL_INTEGRATION_PLAN.md` — full implementation plan,
+  checked in unmodified.
+- `BUILD_PLAN.md` — Batches G1–G6, inserted into the dependency diagram and given full detail
+  sections in the same style as Batches A–F, including a standing merge-collision warning
+  (mirroring Batch A.5's three-way v5 note) since G1 renames a table every other in-flight
+  batch may also touch.
+- `STATUS.md` — sync line, phase table, and known-standing-gaps section updated to match (see
+  that file's own edit, this same pass).
+
+**Nothing in this pass changed `DisciplineOS_PRD_v3_6.md` itself** — the base design document's
+§0 named both the schema doc and the PRD as fold-in targets, but the Goal-Oriented Mission
+Model is explicitly a post-v3.6 addition (schema doc §8: "Not in PRD at all"), and no PRD
+section currently describes or contradicts it. Revisit whether the PRD needs its own update
+once G1–G6 are actually built and the shape has been through real implementation, rather than
+editing a numbered, versioned product document speculatively ahead of working code — flagged
+here rather than silently skipped.
+
+**Same standing verification caveat as every other entry in this file:** no Android/Kotlin
+compiler reachable in this authoring sandbox — moot for this specific pass since it wrote zero
+code, but the next reader picking up Batch G1 should not assume this entry did any code-level
+verification beyond reading the existing files directly, which is what it actually did.

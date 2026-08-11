@@ -61,6 +61,87 @@ Violation {
 }
 ```
 
+### 2.2a Goal-Oriented Mission Model — supersedes 2.2's single-`Mission` shape
+
+**Status: accepted, not yet implemented.** Full design lives in
+`Documents/06_GOAL_ORIENTED_MISSION_MODEL.md`; this section is a schema-level summary, not a
+duplicate — read the companion doc for the reasoning, examples, and open questions. Folded in
+here per that doc's own §0 instruction ("once accepted... reduce to a historical pointer").
+
+**Why 2.2 is being superseded, not appended to:** the single flat `Mission` entity conflated two
+different things — a *goal* ("finish the report," open-ended, may span days) and an *enforcement
+window* (one locked, monitored session against a device). The live codebase's `Mission.kt`
+already matches §2.2 exactly (confirmed directly against
+`data/src/main/java/com/disciplineos/data/entity/Mission.kt` before writing this note, not
+assumed) — so this is a real rename/restructure of existing shipped code, not a greenfield
+addition. `BUILD_PLAN.md`'s Batch G1–G6 sequence is the implementation order; nothing below is
+built yet.
+
+**The five entities, at schema level** (see the companion doc for full field-by-field rationale):
+
+```
+GoalMission {
+  id: UUID
+  user_id: UUID
+  title: string
+  target_type: enum[quantity, boolean, deadline]   // what "done" means for this goal
+  target_value: jsonb | null                        // shape depends on target_type
+  status: enum[active, completed, abandoned]
+  created_at: timestamp
+  completed_at: timestamp | null
+  mission_profile_id: UUID | null                   // default allow/blocklist for sessions under this goal
+}
+
+EnforcementSession {                 // renamed from Mission (§2.2) — same enforcement mechanics, new parent
+  id: UUID
+  user_id: UUID
+  goal_mission_id: UUID | null       // null = standalone session, not tied to a goal
+  scheduled_start: timestamp | null
+  actual_start: timestamp
+  actual_end: timestamp | null
+  planned_duration_min: int
+  status: enum[active, completed, violated, disputed, aborted_crisis_exit]
+  allowlist: [package_id]
+  blocklist: [package_id]
+  mission_profile_id: UUID
+  output_artifacts: [OutputArtifact]
+}
+
+MissionPeriod {                      // recurring-schedule template a GoalMission can generate sessions from
+  id: UUID
+  goal_mission_id: UUID
+  days_of_week: [enum[mon..sun]]
+  start_time: local_time
+  planned_duration_min: int
+  active: bool
+}
+
+MissionLogEntry {                    // freeform user note/checkpoint against a GoalMission — descriptive only, never scored
+  id: UUID
+  goal_mission_id: UUID
+  created_at: timestamp
+  note: string
+}
+
+Trigger / Milestone {                // see companion doc §2 for the two entities' distinct roles
+  // Trigger: condition that can auto-generate or flag an EnforcementSession under a GoalMission
+  // Milestone: a progress checkpoint within a quantity/deadline GoalMission, descriptive only
+}
+```
+
+**Hard boundary carried over unchanged from §2.2/§2.3, restated explicitly so the rename doesn't
+blur it:** `Violation`, `LedgerEntry`, Reputation, and Discipline Debt all key off
+`EnforcementSession`, never off `GoalMission` directly. A `GoalMission` cannot be violated —
+only a session enforced under it can. This mirrors §7's `UnsupervisedSignal` isolation pattern:
+scoring reaches down to the session, not up to the goal.
+
+**Migration note:** this is an in-place rename of a table with live rows in the shipped schema
+(DB is currently at v7 — see `data/src/main/java/com/disciplineos/data/db/DisciplineOsDatabase.kt`
+for current version and full migration chain before writing the next one), not a fresh table —
+`BUILD_PLAN.md` Batch G1 must ship a real Room `Migration`, not just a new `@Entity`.
+
+---
+
 ### 2.4 UnsupervisedSignal — isolated schema/namespace, per §13.3
 ```
 // Stored in a physically or logically separate store from all scoring tables.
@@ -194,6 +275,7 @@ This is a hard product requirement, but it needs a **hard technical enforcement*
 | Discipline Score composite | Not in PRD at all | **Resolved this revision** — cut from MVP, four components shown separately; see §3.1 |
 | Behavioral Fingerprint rule set | Not in PRD at all | **Resolved this revision** — see companion doc `04_BEHAVIORAL_FINGERPRINT_RULES_SPEC.md` |
 | Debt-Reliability Divergence false-positive rate | §42 | Explicitly post-launch only per PRD — don't gate MVP on this |
+| Goal-Oriented Mission Model (`GoalMission`/`EnforcementSession` split) | Not in PRD — post-v3.6 addition | **Accepted, not yet implemented.** See §2.2a above, `06_GOAL_ORIENTED_MISSION_MODEL.md`, and `BUILD_PLAN.md` Batches G1–G6. |
 
 ---
 
