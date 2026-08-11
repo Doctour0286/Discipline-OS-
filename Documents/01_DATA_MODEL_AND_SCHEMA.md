@@ -63,29 +63,38 @@ Violation {
 
 ### 2.2a Goal-Oriented Mission Model — supersedes 2.2's single-`Mission` shape
 
-**Status: partially implemented — schema landing in Batch G1's conformance pass.** Full design
-lives in `Documents/06_GOAL_ORIENTED_MISSION_MODEL.md`; this section is a schema-level summary,
-not a duplicate — read the companion doc for the reasoning, examples, and open questions. Folded
-in here per that doc's own §0 instruction ("once accepted... reduce to a historical pointer").
+**Status: fully implemented, merged to `main`, CI-green.** Batches G1–G6 (`BUILD_PLAN.md`) are
+all merged (`ROADMAP.md` §5.32–§5.44). Full design lives in `Documents/06_GOAL_ORIENTED_MISSION_MODEL.md`
+— now reduced to a historical pointer per that doc's own §0 instruction, since its content has
+folded in here and into the Integration Plan. This section is a schema-level summary, not a
+duplicate; read the base doc's full content (one commit back from the pointer, per its own note)
+for reasoning, examples, and resolved decisions, and `06_GOAL_ORIENTED_MISSION_MODEL_INTEGRATION_PLAN.md`
+for the engineering-ready batch-by-batch plan.
 
-**Correction (this pass):** this section's field list and migration note previously diverged
-from `06_GOAL_ORIENTED_MISSION_MODEL_INTEGRATION_PLAN.md` §2.1/§9 — the actual engineering-ready
-source, checked in unmodified in the same commit that added this summary. That divergence was
-never a deliberate decision; it looks like this summary was drafted independently rather than
-derived field-by-field from the plan it's meant to summarize. The field list and migration note
-below are corrected to match the Integration Plan exactly. See `EnforcementSession.kt` and
-`GoalMission.kt`'s own kdoc for the as-built shape.
+**Correction (this pass, 2026-08-11):** this section's prior version was stale on two independent
+axes, neither previously flagged:
+1. **Status line was wrong.** It read "partially implemented... nothing below is built yet,"
+   accurate only up through Batch G1. All six batches are actually merged now.
+2. **Field lists had drifted from the real shipped entities**, in three specific places —
+   `MissionLogEntry` was missing `numericValue`/`didOccur` (added by `ROADMAP.md` §5.36 to fix a
+   real gap — this section was never updated to match), `PeriodType`'s middle value was named
+   `deadline` instead of the base doc's `FLOATING_DEADLINE` (the shipped enum actually uses
+   `DEADLINE` — matching neither this section's original wording nor the base doc exactly; see
+   the divergence note below), and `Trigger`/`Milestone` had no field list at all, just a comment
+   pointing at the base doc — which, now that the base doc is a pointer, pointed nowhere.
+
+The field lists below are corrected against the real files
+(`data/src/main/java/com/disciplineos/data/entity/GoalMission.kt`, same-file `EnforcementSession`
+kdoc) as of 2026-08-11, not against the Integration Plan or base doc alone — where shipped code
+diverges from either spec document, that divergence is called out explicitly rather than
+silently resolved one way.
 
 **Why 2.2 is being superseded, not appended to:** the single flat `Mission` entity conflated two
 different things — a *goal* ("finish the report," open-ended, may span days) and an *enforcement
-window* (one locked, monitored session against a device). The live codebase's `Mission.kt`
-already matches §2.2 exactly (confirmed directly against
-`data/src/main/java/com/disciplineos/data/entity/Mission.kt` before writing this note, not
-assumed) — so this is a real rename/restructure of existing shipped code, not a greenfield
-addition. `BUILD_PLAN.md`'s Batch G1–G6 sequence is the implementation order; nothing below is
-built yet.
+window* (one locked, monitored session against a device). `BUILD_PLAN.md`'s Batch G1–G6 sequence
+was the implementation order; all six batches are complete.
 
-**The five entities, at schema level** (see the companion doc for full field-by-field rationale):
+**The five entities, at schema level, matching the real shipped Kotlin exactly:**
 
 ```
 GoalMission {
@@ -102,8 +111,16 @@ GoalMission {
   lifecycle_stage: enum[observing, hypothesizing, enforcing, reviewing]
   adherence_score: double | null
   adherence_window: int | null                       // days
+  consecutive_windows_below_threshold: int            // default 0 — added Integration Plan §7.5/
+                                                        // ROADMAP.md §5.36, not in the base doc's
+                                                        // original §3.1 field list; tracks
+                                                        // sustained-miss runs for Adherence decay,
+                                                        // mirrors User.consecutiveDaysBelowFloor
   created_at: timestamp
   archived_at: timestamp | null
+  trigger_prompt_dismissed_at: timestamp | null        // added Batch G5 — per-Mission dismissal
+                                                        // state for the "attach a Trigger?" prompt
+                                                        // (base doc §4.3/§5); not in base doc §3.1
   // no mission_profile_id — a goal has no default enforcement scope of its own; each
   // EnforcementSession under it carries its own mission_profile_id instead.
 }
@@ -127,28 +144,87 @@ EnforcementSession {                 // renamed from Mission (§2.2) — same en
 MissionPeriod {                      // recurring-schedule template a GoalMission can generate sessions from
   id: UUID
   mission_id: UUID
-  period_type: enum[fixed_window, deadline, always_on]
+  period_type: enum[fixed_window, deadline, always_on]  // "deadline", not base doc's
+                                                          // FLOATING_DEADLINE — see divergence
+                                                          // note below
   days_of_week: [enum[mon..sun]]
   window_start: local_time | null    // FIXED_WINDOW fields
   window_end: local_time | null
   target_duration_min: int | null
   deadline_time: local_time | null   // DEADLINE field
-  enforcement_profile_id: UUID
+  enforcement_profile_id: UUID       // non-null as shipped — base doc §3.2 specifies this
+                                      // nullable ("null = tracked/logged only, no blocking");
+                                      // see divergence note below, this is a known open gap,
+                                      // not a silent contradiction
 }
 
-MissionLogEntry {                    // freeform user note/checkpoint against a GoalMission — descriptive only, never scored
+MissionLogEntry {                    // freeform user note/checkpoint against a GoalMission
   id: UUID
   mission_id: UUID
   created_at: timestamp
-  note: string
+  note: string | null
+  numeric_value: double | null       // added ROADMAP.md §5.36 — the actual hit/miss signal
+                                      // Adherence (§4.2 of base doc) computes against for
+                                      // outcome-driven/numeric-behavior Missions
+  did_occur: bool | null             // added ROADMAP.md §5.36 — same purpose as numeric_value,
+                                      // for habit/constraint Missions with no number
+  // note is descriptive only, never scored. numeric_value/did_occur are read-only inputs to
+  // Adherence's hit-rate math — never themselves written to Reputation/Debt/LedgerEntry
+  // directly; only AdherenceLedgerEntry may derive from them (§5.36).
 }
 
-Trigger / Milestone {                // see companion doc §2 for the two entities' distinct roles
-  // Trigger: condition that can auto-generate or flag an EnforcementSession under a GoalMission
-  // Milestone: a progress checkpoint within a GoalMission with a numeric/deadline-style target,
-  //   descriptive only
+Trigger {                            // implementation-intention cue (Gollwitzer "if-then" plans,
+                                      // base doc §4.3) — NOT a session-inactivity watchdog; see
+                                      // ROADMAP.md §5.41 for the entity-shape fix this required
+  id: UUID
+  mission_id: UUID
+  cue_type: enum[time_of_day, preceding_event, location, app_open, manual]
+  cue_description: string            // free text: "after my first coffee"
+  response_description: string       // free text: "open the reading app"
+  created_at: timestamp
+  mission_period_id: UUID | null     // optional — a trigger can exist without a clock window
+  cue_time_of_day: local_time | null
+  cue_preceding_mission_id: UUID | null
+  cue_location_label: string | null  // display-only; no geofencing implied
+  cue_trigger_package_id: string | null  // for cue_type = app_open
+  active: bool                       // default true — not in base doc §3.4's field list;
+                                      // lets a person deactivate without deleting (see kdoc)
+  // cue_type = app_open on a CONSTRAINT-archetype GoalMission is sugar over a MissionPeriod
+  // with period_type = always_on and this package on its blocklist (base doc §6.2) — this row
+  // never independently enforces; the real blocking always goes through MissionPeriod.
+}
+
+Milestone {                          // progress checkpoint within a GoalMission — descriptive
+                                      // only, same boundary as MissionLogEntry.note
+  id: UUID
+  mission_id: UUID
+  label: string
+  target_value: double | null        // null = ordinal-only checkpoint (e.g. "halfway")
+  target_date: timestamp | null      // null = not date-bound; requires reset_mode = fixed_calendar
+                                      // if set (base doc §4.4)
+  achieved_at: timestamp | null      // computed from MissionLogEntry crossing target_value, or
+                                      // set via manual "mark achieved" for ordinal-only milestones
+                                      // that a pure numeric check can't resolve on its own
 }
 ```
+
+**Two real, still-open divergences between the base design doc and the shipped schema** (flagged
+here, not silently resolved either direction — matches this project's standing convention):
+
+- **`PeriodType`'s middle value.** Base doc §3.2 names it `FLOATING_DEADLINE`. Shipped code names
+  it `DEADLINE`. This summary previously showed a third, different spelling (`deadline`,
+  lowercase) that matched neither — now corrected to the real shipped enum value. Whether the
+  base doc's name or the shipped name is the one to standardize on is an open naming question, low
+  stakes, same category as Integration Plan §7.1's `Mission.kt` naming-collision question — not
+  resolved by this pass.
+- **`MissionPeriod.enforcementProfileId` nullability.** Base doc §3.2 specifies `UUID | null`
+  ("null = tracked/logged only, no blocking"). Shipped code has it non-null — every `MissionPeriod`
+  as built claims a concrete enforcement profile, even for a purely log-only period the base doc's
+  model explicitly allows. Not currently causing an observed bug: Adherence's "Behavior-driven
+  mission with no attached EnforcementSession" scope check is implemented via
+  `EnforcementSessionDao.hasAnySessionFor` (real session existence), not this field's nullability,
+  so nothing downstream depends on this gap being closed. Flagged for a future pass, per the
+  entity's own kdoc.
 
 **Hard boundary carried over unchanged from §2.2/§2.3, restated explicitly so the rename doesn't
 blur it:** `Violation`, `LedgerEntry`, Reputation, and Discipline Debt all key off
@@ -156,15 +232,21 @@ blur it:** `Violation`, `LedgerEntry`, Reputation, and Discipline Debt all key o
 only a session enforced under it can. This mirrors §7's `UnsupervisedSignal` isolation pattern:
 scoring reaches down to the session, not up to the goal.
 
+**Two `[HYPOTHESIS]`-flagged shortcuts in `FirstMissionSchedulingFragment`, resolved as
+deliberate v1 shape, not open questions** (base doc §6.6, accepted 2026-08-11 alongside the rest
+of this model): the auto-created `EnforcementSession.plannedDurationMin` default (25 minutes, no
+duration picker on this screen) and reusing `MissionStatus.active` immediately for a
+scheduled-but-not-yet-started session (no `scheduled` status exists in the enum, and none is
+being added). Both were flagged, considered, and accepted as the minimum-viable shape for this
+one call site — see §6.6 for the full reasoning (a duration picker or a new status value are
+real future options once a dedicated Mission Launch Protocol or scheduling UI exists to source
+them from, not defects in the current screen).
+
 **Migration note:** per Integration Plan §9, this is **not** a real Room `Migration` — a
-destructive version bump (`fallbackToDestructiveMigration()`), matching this project's v2
-through v8 precedent. No release tag, no store listing, no real installed base exists as of this
-pass, so there's nothing a real Migration would meaningfully preserve. This corrects this
-section's prior claim that a real `Migration` was required — that claim was never derived from
-the Integration Plan's own reasoning (§0/§9), which re-confirms the destructive-fallback
-justification explicitly rather than assuming it. See
-`data/src/main/java/com/disciplineos/data/db/DisciplineOsDatabase.kt`'s own version-history
-comments for the exact current version and full migration chain.
+destructive version bump (`fallbackToDestructiveMigration()`), matching this project's precedent
+through the current schema version (`v14`, `DisciplineOsDatabase.kt`'s own version-history
+comments). No release tag, no store listing, no real installed base exists as of this pass, so
+there's nothing a real Migration would meaningfully preserve.
 
 ---
 
@@ -301,7 +383,7 @@ This is a hard product requirement, but it needs a **hard technical enforcement*
 | Discipline Score composite | Not in PRD at all | **Resolved this revision** — cut from MVP, four components shown separately; see §3.1 |
 | Behavioral Fingerprint rule set | Not in PRD at all | **Resolved this revision** — see companion doc `04_BEHAVIORAL_FINGERPRINT_RULES_SPEC.md` |
 | Debt-Reliability Divergence false-positive rate | §42 | Explicitly post-launch only per PRD — don't gate MVP on this |
-| Goal-Oriented Mission Model (`GoalMission`/`EnforcementSession` split) | Not in PRD — post-v3.6 addition | **Accepted, not yet implemented.** See §2.2a above, `06_GOAL_ORIENTED_MISSION_MODEL.md`, and `BUILD_PLAN.md` Batches G1–G6. |
+| Goal-Oriented Mission Model (`GoalMission`/`EnforcementSession` split) | Not in PRD — post-v3.6 addition | **Accepted and fully implemented — Batches G1–G6 merged, CI-green.** See §2.2a above, `06_GOAL_ORIENTED_MISSION_MODEL.md`, and `BUILD_PLAN.md` Batches G1–G6. |
 
 ---
 

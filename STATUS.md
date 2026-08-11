@@ -44,14 +44,24 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-11 (through §5.44 — Batch G6, Milestone UI. Data layer
+**Last synced to ROADMAP.md:** 2026-08-11 (through §5.45 — doc audit against the Goal-Oriented
+Mission Model base document: resolved the two §5.24 `[HYPOTHESIS]` items per base doc §6.6 as
+deliberate-not-open, found Phase 4 merged to `main` since 2026-08-10 but never logged in this
+file or `ROADMAP.md` §2's phase table, and corrected five independent stale points in
+`01_DATA_MODEL_AND_SCHEMA.md` §2.2a. See §5.45 for the full account. This pass also confirmed
+G6's CI (below) went green after this file's prior sync recorded it as still in progress.)
+
+**Prior sync, through §5.44 — Batch G6, Milestone UI. Data layer
 (`Milestone` entity/DAO/DB wiring) was already shipped since G1 but unsurfaced in `:domain`/
 `:app`; this batch adds the missing domain/UI layer, plus fixes a real bug found en route
 (`Milestone.targetValue` shipped as `String?`, spec calls for `Double?` — DB bumped to `v14`).
-Pushed to `g6-milestone-ui`, PR open, code only — not yet merged, doc sync is this same commit
-per this project's convention but the branch itself is code-only, no docs in that diff. No
-compiler reachable to verify by building — see "known standing gaps" below. See §5.44 for the
-full account.
+**Correction, confirmed directly against GitHub during the §5.45 pass:** this entry originally
+said "PR open, code only — not yet merged" — that's now stale on two counts. PR #41 (code) and
+PR #42 (doc sync) are both merged to `main` (merge commit `c3f3311`), and `main`'s CI
+(`build-and-test`) is confirmed green on that commit as of this correction — it was still
+mid-run the first time this was checked. No compiler reachable in this sandbox to verify by
+building directly — the green result above is from real GitHub Actions CI, not this sandbox. See
+§5.44 for the full account of the batch itself.
 
 **Prior sync (through §5.43):** audit and fix of the
 `requireNotNull`/`checkNotNull` pattern flagged in §5.42. Twelve call sites across
@@ -307,21 +317,32 @@ inaccurate for the merge step specifically (§5.28–§5.31 are all on `main`); 
 on-device confirmation are the remaining open piece, not the merge itself. Real remaining
 items, in rough priority order:
 
-1. **Resolve the two `[HYPOTHESIS]` items §5.24 flagged**: a hardcoded default Mission
-   duration with no spec source, and reusing `ACTIVE` status for a scheduled-but-not-yet-
-   started Mission (no dedicated status exists for that state). Neither blocks anything, but
-   both are open judgment calls a product-owner sign-off pass (like the one that closed
-   §5.5/§5.9/§5.10/§5.15) could resolve properly instead of leaving as engineering defaults.
-2. **~~Build the Iron Calibration Gate's real destination flow~~ — done, §5.31, pending CI +
-   on-device confirmation.** A new `homeFragment` (also new — onboarding had no post-completion
-   destination at all until this pass) hosts an Iron eligibility card that opens a new
-   `ironCalibrationFragment`, which calls `TierTransitionUseCase.activateIron` directly — the
-   first real UI call site that use-case has ever had. Not the onboarding-time
-   `ironCalibrationGateFragment` placeholder, which stays unreachable by design (row 4b) — see
-   §5.31 for why these are deliberately two separate things. Graduates this row to fully
-   struck-through, not just noted, once CI + on-device both confirm it.
-3. **Phase 4 (Behavioral Fingerprint / Predictive Failure)** — the next full *phase*, not a
-   screen-level item. Depends on Phase 3's alert-card pattern (§3.5 of the Onboarding spec
-   already defines the pattern in full) existing to render into, which nothing above blocks
-   structurally. This is the largest genuinely new chunk of work once item 1 settles, and the
-   natural "what's next" once onboarding cleanup and its remaining open loose ends close.
+1. **~~Resolve the two `[HYPOTHESIS]` items §5.24 flagged~~ — resolved 2026-08-11, base doc
+   `06_GOAL_ORIENTED_MISSION_MODEL.md` §6.6.** The hardcoded 25-minute default duration and
+   reusing `MissionStatus.active` for a scheduled-but-not-yet-started Mission are both explicitly
+   named and accepted as the deliberate, minimum-viable v1 shape for `FirstMissionSchedulingFragment`
+   — not open questions needing separate sign-off, since §6.6's own acceptance (as part of the
+   larger Goal-Oriented Mission Model decision, `ROADMAP.md` §5.32) already covers them. See
+   `01_DATA_MODEL_AND_SCHEMA.md` §2.2a for the current-state summary. A duration picker or a
+   dedicated `scheduled` status remain real future options once a Mission Launch Protocol or
+   scheduling UI exists to source them from — not defects in the current screen.
+2. **~~Build the Iron Calibration Gate's real destination flow~~ — done, §5.31.** A new
+   `homeFragment` (also new — onboarding had no post-completion destination at all until this
+   pass) hosts an Iron eligibility card that opens a new `ironCalibrationFragment`, which calls
+   `TierTransitionUseCase.activateIron` directly — the first real UI call site that use-case has
+   ever had. Not the onboarding-time `ironCalibrationGateFragment` placeholder, which stays
+   unreachable by design (row 4b) — see §5.31 for why these are deliberately two separate things.
+3. **This numbered list (items 1–3) is stale relative to `main` as of 2026-08-11 and needs a
+   fuller resync, not done in this pass.** Confirmed directly against the repo while resolving
+   item 1 above: Phase 4 (Behavioral Fingerprint / Predictive Failure) is also already merged to
+   `main` (commit `45d82f8`, 2026-08-10) — wired end-to-end (`ComputeBehavioralFingerprintUseCase`,
+   `BehavioralFingerprintPolicy`, `AppContainer` DI, `HomeFragment`/`HomeScreen`,
+   `PredictiveFailureAlertCard`, dismissal tracking), F1–F5 all present and spec-matching
+   (`BUILD_PLAN.md` Batch E), 15 test cases in `ComputeBehavioralFingerprintUseCaseTest`. Never
+   flagged with a `ROADMAP.md` §5 entry when it landed, and `ROADMAP.md` §2's phase table still
+   marks it "⬜ NOT STARTED / 0%" — a real, live documentation gap, same category as every
+   "shipped but unflagged" finding elsewhere in this project's history, just at phase scale. Also
+   G1–G6 (the Goal-Oriented Mission Model itself) are fully merged, not just item 2 above — see
+   `01_DATA_MODEL_AND_SCHEMA.md` §2.2a. This whole section needs a real resync pass against
+   current `main`, not further item-by-item patching — flagged here rather than attempted
+   piecemeal in the same edit that resolved item 1.

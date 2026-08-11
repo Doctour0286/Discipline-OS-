@@ -246,9 +246,11 @@ project.
 **Scope:** `FirstMissionSchedulingFragment.createMissionAndFinish` currently creates a single
 `Mission`/`EnforcementSession` row directly (§5.24's two open `[HYPOTHESIS]` items — default
 duration, reused `ACTIVE` status for scheduled-not-started — are unaffected by this batch and
-remain open). This batch makes it create a real `GoalMission` first, then an
-`EnforcementSession` under it, matching the new model rather than leaving onboarding's own
-Mission-creation path on the old flat shape.
+remained open at the time this batch was written). **Resolved since:** base doc §6.6 (accepted
+2026-08-11) names both explicitly and accepts them as the deliberate v1 shape for this screen,
+not open questions — see `01_DATA_MODEL_AND_SCHEMA.md` §2.2a for the current status. This batch
+makes it create a real `GoalMission` first, then an `EnforcementSession` under it, matching the
+new model rather than leaving onboarding's own Mission-creation path on the old flat shape.
 
 **What this does not change:** Integration Plan §3.2 — the enforcement loop itself
 (`MissionAccessibilityService`, `InterceptionController`) is untouched; it already only cares
