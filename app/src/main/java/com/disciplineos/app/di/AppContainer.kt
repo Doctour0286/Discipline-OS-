@@ -54,7 +54,7 @@ object AppContainer {
         return RecordViolationUseCase(
             database = db,
             violationDao = db.violationDao(),
-            missionDao = db.missionDao(),
+            missionDao = db.enforcementSessionDao(),
             userDao = db.userDao(),
             ledgerDao = db.ledgerDao(),
             consequencePolicy = consequencePolicy(),
@@ -67,7 +67,7 @@ object AppContainer {
             database = db,
             userDao = db.userDao(),
             tierDao = db.tierDao(),
-            missionDao = db.missionDao(),
+            missionDao = db.enforcementSessionDao(),
         )
     }
 
@@ -81,7 +81,7 @@ object AppContainer {
     fun computeBehavioralFingerprintUseCase(context: Context): ComputeBehavioralFingerprintUseCase {
         val db = database(context)
         return ComputeBehavioralFingerprintUseCase(
-            missionDao = db.missionDao(),
+            missionDao = db.enforcementSessionDao(),
             violationDao = db.violationDao(),
             ledgerDao = db.ledgerDao(),
             userDao = db.userDao(),

@@ -2711,3 +2711,108 @@ here rather than silently skipped.
 compiler reachable in this authoring sandbox — moot for this specific pass since it wrote zero
 code, but the next reader picking up Batch G1 should not assume this entry did any code-level
 verification beyond reading the existing files directly, which is what it actually did.
+
+### 5.33 — Batch G1 shipped diverged from the checked-in plan; conformance pass, now complete
+pending CI/on-device
+
+**What happened, plainly:** Batch G1 was built and merged to `main` (PR #27, commit `c0a4598`
++ two CI-fixup commits) claiming to implement
+`06_GOAL_ORIENTED_MISSION_MODEL_INTEGRATION_PLAN.md` §2 — but on inspection it diverged from
+that document in three real ways, not just naming color:
+
+- Plan §2.1: `EnforcementSession.missionId: UUID` (non-null). Shipped: `goalMissionId: UUID?`
+  (nullable) — a different field name and a different nullability contract.
+- Plan §2.3: `MissionDao` interface renamed to `EnforcementSessionDao`. Shipped: kept the
+  `MissionDao` interface name (only the entity type parameter changed).
+- Plan §2.1: `GoalMission` carries no `missionProfileId`. Shipped: carried one over from the old
+  shape anyway.
+- Separately, Batch G2 scope (Integration Plan §3.1 — `FirstMissionSchedulingFragment`
+  auto-creating a parent `GoalMission`/`MissionPeriod`) was left unimplemented, with
+  `goalMissionId` set to `null` at that call site — consistent with G1 being scoped to schema
+  only, but worth stating since it means the shipped `EnforcementSession` rows had no working
+  parent-attachment path at all until this pass.
+
+None of this was hidden — the shipping commit's own message describes each deviation and its
+reasoning (low-churn DAO naming, carrying the field over "to minimize call-site churn"). It's
+flagged here as a real process gap, not a cover-up: the plan is the checked-in, engineering-
+ready spec this project's own conventions treat as authoritative (see §5.32's framing above),
+and a batch that diverges from it should either update the plan first or flag the divergence in
+that same commit/PR for sign-off — neither happened here. The right fix, once noticed
+(same day, this repo's history shows), was a conformance pass bringing the code back to what
+the checked-in plan actually specifies, not silently updating the plan after the fact to match
+what shipped.
+
+**First conformance attempt (`goal-oriented-mission-model-g1-conform-to-plan` branch, commit
+`c4b94ec`):** rebuilt `EnforcementSession`/`GoalMission`/DAOs to match plan §2.1–§2.3 exactly
+(`missionId` non-null, `EnforcementSessionDao` rename, `GoalMission` field list trimmed to the
+plan's exact set), and additionally implemented the real Batch G2 fix (§3.1's auto-create-
+parent-`GoalMission` logic in `FirstMissionSchedulingFragment`) rather than leaving that gap
+open. Also caught and fixed a second, independent problem while there: `01_DATA_MODEL_AND_
+SCHEMA.md` §2.2a and the Integration Plan itself disagreed with each other (different
+`GoalMission` field shapes; the schema doc incorrectly claimed a real Room `Migration` was
+required, which the plan's §9 explicitly rules out pre-launch) — both authored in the same
+commit (`e35948a`) without being cross-checked against each other. Corrected the schema doc to
+match the plan, not the other way — the plan is the artifact whose file diffs and call sites
+were actually verified against the live tree (§5.32's own framing).
+
+**Left explicitly incomplete by that commit, per its own message:** 9 test files (5 in
+`:domain`, 4 in `:app`) still referenced the pre-conformance `.missionDao()` accessor and/or
+`goalMissionId` field name and would not compile. Pushed anyway, deliberately, as a checkpoint
+rather than held for one large PR — this project's own stated preference (see multiple prior
+entries in this file for the same "checkpoint working-so-far progress" pattern).
+
+**This pass (same branch, on top of `c4b94ec`):** fixed all 9 flagged test files. Mechanical
+pattern throughout, cross-checked file-by-file against the actual current `EnforcementSession`/
+`EnforcementSessionDao`/use-case constructor signatures on this branch rather than assumed from
+the commit message alone:
+
+- `db.missionDao()` → `db.enforcementSessionDao()` (accessor rename) everywhere it appeared,
+  including nested constructor calls (e.g. `ApplyReputationDecayUseCaseTest`'s embedded
+  `TierTransitionUseCase` construction).
+- `EnforcementSession(..., goalMissionId = null, ...)` → `EnforcementSession(..., missionId =
+  UUID.randomUUID(), missionPeriodId = null, ...)` at every construction site — a fresh random
+  UUID rather than a real inserted `GoalMission` row, matching how these same tests already
+  reference `missionProfileId` (by UUID, no FK, no insert) since none of these use-cases
+  actually join against `GoalMission` and no `@ForeignKey` constraint exists at the DB level
+  (Integration Plan §2.1's explicit "no FK constraints where none exist elsewhere" reasoning
+  extends to why this is safe for unit tests too, not just production code).
+- Confirmed the use-case constructor parameter *name* (`missionDao =`) did not need to change
+  in any of these files — only its declared type moved, from `MissionDao` to
+  `EnforcementSessionDao`; the parameter itself was never renamed by the plan.
+
+**Files touched this pass, all in `:app`/`:domain` test source sets, zero production code
+changed:** `RecordViolationUseCaseTest.kt`, `TierTransitionUseCaseTest.kt`,
+`ComputeBehavioralFingerprintUseCaseTest.kt`, `ApplyReputationDecayUseCaseTest.kt`,
+`ResolveDisputeUseCaseTest.kt`, `InterceptionControllerTest.kt`, `DebugSeederTest.kt`,
+`IronCalibrationFragmentTest.kt`, `FirstMissionSchedulingFragmentTest.kt`.
+
+**Verification done, and its real limits:** full-repo grep sweep (including `androidTest`
+source sets and non-`.kt` files) confirms zero remaining `.missionDao(`, `goalMissionId`, or
+bare `MissionDao` type references anywhere except correct historical kdoc prose narrating the
+rename itself. Brace/paren balance checked per edited file. Every added `UUID.randomUUID()`
+call site confirmed to have `java.util.UUID` already imported in that file. `AppContainer.kt`'s
+DAO wiring (already updated by the `c4b94ec` pass) cross-checked as consistent with these
+fixes, not independently re-verified. **What this pass did not do:** run an actual compiler —
+still no Android/Kotlin toolchain reachable in this authoring sandbox, same standing gap every
+prior entry in this file has flagged. Every fix above is manually cross-checked against the
+current source tree's real signatures, not build-verified. `ArchitectureBoundaryTest`
+(data module) read directly and confirmed structurally unaffected — it's a static import-scan
+for `UnsupervisedSignalDao`+`LedgerDao` co-imports, and nothing touched by this Goal-Oriented
+Mission Model work imports `UnsupervisedSignalDao` — but this was reasoning about the check,
+not running it.
+
+**What's still open before this branch is a mergeable PR:**
+1. CI must actually run and confirm green — this branch has never been through a real build.
+2. On-device verification of the real change in this pass — `FirstMissionSchedulingFragment`'s
+   new three-row transactional insert (`GoalMission` → `MissionPeriod` → `EnforcementSession`)
+   has not been exercised on a device at all; it was written in the `c4b94ec` checkpoint and
+   has had no runtime verification of any kind yet.
+3. The Integration Plan's own flagged open questions (§3.3/§7.3/§7.4 — `resetMode` choice,
+   `FIXED_WINDOW` with null bounds, the no-re-entry-guard "second visit creates a second
+   GoalMission" behavior) remain genuinely open, not resolved by this pass or the one before
+   it — carried forward exactly as flagged, not silently narrowed.
+4. `STATUS.md`'s MVP table row for the Goal-Oriented Mission Model still reads "⬜ — Accepted,
+   docs-only... no code written yet," which is now stale (real code exists on this branch,
+   though unmerged and CI-unconfirmed) — updated in this same pass, see that file's own edit.
+5. Once CI/on-device both confirm, this branch should be evaluated by the person as a normal PR
+   against `main` — not merged as part of this pass.

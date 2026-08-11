@@ -1,7 +1,7 @@
 package com.disciplineos.domain.usecase
 
 import androidx.room.withTransaction
-import com.disciplineos.data.dao.MissionDao
+import com.disciplineos.data.dao.EnforcementSessionDao
 import com.disciplineos.data.dao.UserDao
 import com.disciplineos.data.db.DisciplineOsDatabase
 import com.disciplineos.data.entity.Tier
@@ -94,7 +94,7 @@ import java.util.UUID
 class ApplyReputationDecayUseCase(
     private val database: DisciplineOsDatabase,
     private val userDao: UserDao,
-    private val missionDao: MissionDao,
+    private val missionDao: EnforcementSessionDao,
     private val ledgerDao: LedgerDao,
     private val tierTransitionUseCase: TierTransitionUseCase,
     private val policy: ReputationDecayPolicy,

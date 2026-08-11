@@ -62,7 +62,7 @@ class RecordViolationUseCaseTest {
         useCase = RecordViolationUseCase(
             database = db,
             violationDao = db.violationDao(),
-            missionDao = db.missionDao(),
+            missionDao = db.enforcementSessionDao(),
             userDao = db.userDao(),
             ledgerDao = db.ledgerDao(),
             consequencePolicy = HypothesisConsequencePolicy(),
@@ -85,11 +85,12 @@ class RecordViolationUseCaseTest {
                 onboardingConsentVersion = "v1",
             )
         )
-        db.missionDao().insert(
+        db.enforcementSessionDao().insert(
             EnforcementSession(
                 id = missionId,
                 userId = userId,
-                goalMissionId = null,
+                missionId = UUID.randomUUID(),
+                missionPeriodId = null,
                 scheduledStart = null,
                 actualStart = Instant.now(),
                 actualEnd = Instant.now(),

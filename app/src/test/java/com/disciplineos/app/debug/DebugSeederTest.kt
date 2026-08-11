@@ -78,7 +78,7 @@ class DebugSeederTest {
         assertNull(second) // signals "skipped," per seedIfNeeded's own kdoc contract
 
         // The real assertion: exactly one Mission exists, not two.
-        val activeMission = db.missionDao().activeMissionFor(first!!.userId)
+        val activeMission = db.enforcementSessionDao().activeMissionFor(first!!.userId)
         assertNotNull(activeMission)
         assertEquals(first.id, activeMission!!.id)
     }

@@ -50,7 +50,7 @@ class TierTransitionUseCaseTest {
             database = db,
             userDao = db.userDao(),
             tierDao = db.tierDao(),
-            missionDao = db.missionDao(),
+            missionDao = db.enforcementSessionDao(),
         )
     }
 
@@ -83,7 +83,8 @@ class TierTransitionUseCaseTest {
         val mission = EnforcementSession(
             id = missionId,
             userId = userId,
-            goalMissionId = null,
+            missionId = UUID.randomUUID(),
+            missionPeriodId = null,
             scheduledStart = null,
             actualStart = Instant.now(),
             actualEnd = null,
@@ -93,7 +94,7 @@ class TierTransitionUseCaseTest {
             blocklist = emptyList(),
             missionProfileId = UUID.randomUUID(),
         )
-        db.missionDao().insert(mission)
+        db.enforcementSessionDao().insert(mission)
         return mission
     }
 
@@ -214,7 +215,7 @@ class TierTransitionUseCaseTest {
         assertNull(event.reasonNote) // no reason entry, per spec
 
         assertEquals(Tier.RECRUIT, db.userDao().get(userId)!!.currentTier)
-        assertEquals(MissionStatus.ABORTED_CRISIS_EXIT, db.missionDao().get(missionId)!!.status)
+        assertEquals(MissionStatus.ABORTED_CRISIS_EXIT, db.enforcementSessionDao().get(missionId)!!.status)
         assertNotNull(db.userDao().get(userId)!!.debtAccrualPausedUntil)
     }
 
@@ -237,7 +238,7 @@ class TierTransitionUseCaseTest {
         val recordViolation = RecordViolationUseCase(
             database = db,
             violationDao = db.violationDao(),
-            missionDao = db.missionDao(),
+            missionDao = db.enforcementSessionDao(),
             userDao = db.userDao(),
             ledgerDao = db.ledgerDao(),
             consequencePolicy = com.disciplineos.domain.policy.HypothesisConsequencePolicy(),

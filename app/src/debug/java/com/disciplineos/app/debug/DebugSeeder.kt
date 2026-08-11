@@ -1,8 +1,14 @@
 package com.disciplineos.app.debug
 
 import com.disciplineos.data.db.DisciplineOsDatabase
+import com.disciplineos.data.entity.CadenceType
 import com.disciplineos.data.entity.EnforcementSession
+import com.disciplineos.data.entity.GoalMission
+import com.disciplineos.data.entity.LifecycleStage
+import com.disciplineos.data.entity.MeasurementSource
+import com.disciplineos.data.entity.MissionArchetype
 import com.disciplineos.data.entity.MissionStatus
+import com.disciplineos.data.entity.ResetMode
 import com.disciplineos.data.entity.Tier
 import com.disciplineos.data.entity.User
 import java.time.Instant
@@ -24,7 +30,7 @@ import java.util.UUID
  * - An instrumented test via `adb shell am instrument` is out: Termux and the target device
  *   are the same physical phone, and `adb` has no "device talking to itself" path.
  * - So: a small, dedicated, debug-only seed class that calls the real [DisciplineOsDatabase]
- *   DAOs — the same `UserDao`/`MissionDao` insert methods every use-case in this codebase
+ *   DAOs — the same `UserDao`/`EnforcementSessionDao` insert methods every use-case in this codebase
  *   already relies on — rather than any new or hand-rolled persistence logic.
  *
  * **Why this lives under `src/debug/`, not `src/main/`:** Gradle's `debug` source set is
@@ -46,7 +52,7 @@ import java.util.UUID
  * without needing Iron's calibration-gate prerequisites just to see an interception at all)
  * and one [EnforcementSession] with `status = ACTIVE` and a non-empty
  * [EnforcementSession.blocklist], so `MissionAccessibilityService.activeMissionFor(userId)`
- * (see `MissionDao`'s kdoc on that query) finds a real row to enforce against. Tier can be
+ * (see `EnforcementSessionDao`'s kdoc on that query) finds a real row to enforce against. Tier can be
  * changed by re-seeding with a different [Tier] once Recruit/Operator/Iron passes are also
  * needed (ROADMAP.md §4(c) step 7 calls for testing all three interception-relevant tiers
  * separately) — this class supports that by taking `tier` as a parameter rather than
@@ -87,12 +93,13 @@ object DebugSeeder {
      * @return the seeded [EnforcementSession], or null if seeding was skipped because one
      *   already existed (the idempotent no-op path) — callers that only care about "is there
      *   something to trigger interception against now" can treat both outcomes the same way by
-     *   re-reading via `MissionDao.activeMissionFor`, but the return value lets a caller (or
+     *   re-reading via `EnforcementSessionDao.activeMissionFor`, but the return value lets a caller (or
      *   [DebugSeederTest]) distinguish "created now" from "already there" directly.
      */
     suspend fun seedIfNeeded(database: DisciplineOsDatabase, tier: Tier = Tier.WARDEN): EnforcementSession? {
         val userDao = database.userDao()
-        val missionDao = database.missionDao()
+        val enforcementSessionDao = database.enforcementSessionDao()
+        val goalMissionDao = database.goalMissionDao()
 
         val existingUser = userDao.getSingleLocalUser()
         val userId = existingUser?.id ?: UUID.randomUUID()
@@ -113,15 +120,39 @@ object DebugSeeder {
 
         // Idempotency check: an ACTIVE Mission for this user already existing means seeding
         // already happened (or the real app created one) — never insert a second one.
-        if (missionDao.activeMissionFor(userId) != null) {
+        if (enforcementSessionDao.activeMissionFor(userId) != null) {
             return null
         }
 
         val now = Instant.now()
+        // Minimal auto-created parent GoalMission — same shape as
+        // FirstMissionSchedulingFragment's real fix (Integration Plan §3.1), since an
+        // EnforcementSession can no longer exist without one (v10, EnforcementSession.missionId
+        // is non-null).
+        val goalMission = GoalMission(
+            id = UUID.randomUUID(),
+            userId = userId,
+            title = "Debug Seed Session",
+            archetype = MissionArchetype.BEHAVIOR_DRIVEN,
+            targetDirection = null,
+            targetValue = null,
+            unit = null,
+            cadenceType = CadenceType.NONE,
+            resetMode = ResetMode.ROLLING_WINDOW,
+            measurementSource = MeasurementSource.AUTOMATIC,
+            lifecycleStage = LifecycleStage.ENFORCING,
+            adherenceScore = null,
+            adherenceWindow = null,
+            createdAt = now,
+            archivedAt = null,
+        )
+        goalMissionDao.insert(goalMission)
+
         val mission = EnforcementSession(
             id = UUID.randomUUID(),
             userId = userId,
-            goalMissionId = null,
+            missionId = goalMission.id,
+            missionPeriodId = null,
             scheduledStart = null,
             actualStart = now,
             actualEnd = null,
@@ -131,7 +162,7 @@ object DebugSeeder {
             blocklist = listOf(SEEDED_BLOCKED_PACKAGE),
             missionProfileId = UUID.randomUUID(),
         )
-        missionDao.insert(mission)
+        enforcementSessionDao.insert(mission)
         return mission
     }
 }

@@ -9,35 +9,30 @@ import com.disciplineos.data.entity.Milestone
 import com.disciplineos.data.entity.MissionLogEntry
 import com.disciplineos.data.entity.MissionPeriod
 import com.disciplineos.data.entity.Trigger
+import java.time.Instant
 import java.util.UUID
 
 /**
  * Backs [GoalMission] (Goal-Oriented Mission Model, ROADMAP.md §5.32). Kept as its own `@Dao`
  * matching every other entity-scoped DAO in this file/module (`TierDao`, `MissionProfileDao`) —
- * a distinct table with its own query shape, not folded into `MissionDao` just because the two
- * entities are related (same reasoning `MissionProfileDao`'s own kdoc already states for the
- * identical question about itself).
+ * a distinct table with its own query shape, not folded into `EnforcementSessionDao` just
+ * because the two entities are related (same reasoning `MissionProfileDao`'s own kdoc already
+ * states for the identical question about itself).
  *
- * **Deliberately minimal for Batch G1** — this batch is additive schema only, zero behavior
- * change (`BUILD_PLAN.md` Batch G1's own stated scope). `insert`/`get`/`update` and the two
- * lookups Batch G2 will need immediately (`FirstMissionSchedulingFragment`'s real fix,
- * `06_GOAL_ORIENTED_MISSION_MODEL_INTEGRATION_PLAN.md` §3) are included now since G2 is the very
- * next batch and there's no real call site benefit to splitting "add the DAO" from "add the two
- * obvious methods its first real caller needs" across two separate batches. Anything past that
- * — e.g. per-status filtering, a real profile-picker-style listing — is deferred to whichever
- * batch (G3–G6) actually needs it first, matching `MissionProfileDao`'s stated "no `@Update` yet"
- * precedent for the same kind of restraint.
+ * Method set matches Integration Plan §2.2 exactly: `insert`/`get`/`forUser`/`mostRecentFor`,
+ * deliberately no `@Update` yet — no call site needs one as of this pass, matching
+ * `MissionProfileDao`'s stated "no `@Update` yet" precedent for the same kind of restraint.
  */
 @Dao
 interface GoalMissionDao {
     @Insert
     suspend fun insert(goalMission: GoalMission)
 
-    @Update
-    suspend fun update(goalMission: GoalMission)
-
     @Query("SELECT * FROM goal_missions WHERE id = :id")
     suspend fun get(id: UUID): GoalMission?
+
+    @Query("SELECT * FROM goal_missions WHERE userId = :userId")
+    suspend fun forUser(userId: UUID): List<GoalMission>
 
     /**
      * Backs Batch G2's re-entry-guard requirement — same "did this user already create one"
@@ -52,58 +47,57 @@ interface GoalMissionDao {
 }
 
 /**
- * Backs [MissionPeriod]. Deliberately minimal for Batch G1 — see [GoalMissionDao]'s kdoc for
- * the shared reasoning. No query beyond basic CRUD exists yet because no call site needs one
- * until Batch G2 (creation) and later batches (actually generating sessions from an active
- * period) land.
+ * Backs [MissionPeriod]. Method set matches Integration Plan §2.2: `insert`, `forMission
+ * (missionId)`.
  */
 @Dao
 interface MissionPeriodDao {
     @Insert
     suspend fun insert(missionPeriod: MissionPeriod)
 
-    @Update
-    suspend fun update(missionPeriod: MissionPeriod)
-
-    @Query("SELECT * FROM mission_periods WHERE id = :id")
-    suspend fun get(id: UUID): MissionPeriod?
-
-    @Query("SELECT * FROM mission_periods WHERE goalMissionId = :goalMissionId AND active = 1")
-    suspend fun activeForGoal(goalMissionId: UUID): List<MissionPeriod>
+    @Query("SELECT * FROM mission_periods WHERE missionId = :missionId")
+    suspend fun forMission(missionId: UUID): List<MissionPeriod>
 }
 
 /**
- * Backs [MissionLogEntry]. Deliberately minimal for Batch G1 — see [GoalMissionDao]'s kdoc for
- * the shared reasoning.
+ * Backs [MissionLogEntry]. Method set matches Integration Plan §2.2: `insert`, `forMission
+ * (missionId)`, `forMissionSince(missionId, since)` — the latter is what Adherence's
+ * rolling-window computation in Batch G3 needs (`ApplyAdherenceDecayUseCase`, Integration Plan
+ * §4.1), added now so G3 doesn't need its own DAO-layer PR.
  */
 @Dao
 interface MissionLogEntryDao {
     @Insert
     suspend fun insert(entry: MissionLogEntry)
 
-    @Query("SELECT * FROM mission_log_entries WHERE goalMissionId = :goalMissionId ORDER BY createdAt ASC")
-    suspend fun forGoal(goalMissionId: UUID): List<MissionLogEntry>
+    @Query("SELECT * FROM mission_log_entries WHERE missionId = :missionId ORDER BY createdAt ASC")
+    suspend fun forMission(missionId: UUID): List<MissionLogEntry>
+
+    @Query(
+        "SELECT * FROM mission_log_entries WHERE missionId = :missionId AND createdAt >= :since " +
+            "ORDER BY createdAt ASC"
+    )
+    suspend fun forMissionSince(missionId: UUID, since: Instant): List<MissionLogEntry>
 }
 
 /**
- * Backs [Trigger]. Deliberately minimal for Batch G1 — see [GoalMissionDao]'s kdoc for the
- * shared reasoning. Real condition-evaluation queries are Batch G5 scope.
+ * Backs [Trigger]. Method set matches Integration Plan §2.2: `insert`, `forMission(missionId)`.
+ * Real condition-evaluation queries are Batch G5 scope.
  */
 @Dao
 interface TriggerDao {
     @Insert
     suspend fun insert(trigger: Trigger)
 
-    @Update
-    suspend fun update(trigger: Trigger)
-
-    @Query("SELECT * FROM triggers WHERE goalMissionId = :goalMissionId AND active = 1")
-    suspend fun activeForGoal(goalMissionId: UUID): List<Trigger>
+    @Query("SELECT * FROM triggers WHERE missionId = :missionId AND active = 1")
+    suspend fun forMission(missionId: UUID): List<Trigger>
 }
 
 /**
- * Backs [Milestone]. Deliberately minimal for Batch G1 — see [GoalMissionDao]'s kdoc for the
- * shared reasoning. Real progress-tracking queries are Batch G6 scope.
+ * Backs [Milestone]. Method set matches Integration Plan §2.2: `insert`, `forMission(missionId)`,
+ * `update` — Milestone is the one new entity that needs `@Update`, since `achievedAt` is set
+ * after creation per base doc §3.5/§4.4 — a real, motivated exception to the "no `@Update` yet"
+ * pattern the other new DAOs in this file follow, not an unconsidered one.
  */
 @Dao
 interface MilestoneDao {
@@ -113,6 +107,6 @@ interface MilestoneDao {
     @Update
     suspend fun update(milestone: Milestone)
 
-    @Query("SELECT * FROM milestones WHERE goalMissionId = :goalMissionId ORDER BY id ASC")
-    suspend fun forGoal(goalMissionId: UUID): List<Milestone>
+    @Query("SELECT * FROM milestones WHERE missionId = :missionId ORDER BY id ASC")
+    suspend fun forMission(missionId: UUID): List<Milestone>
 }

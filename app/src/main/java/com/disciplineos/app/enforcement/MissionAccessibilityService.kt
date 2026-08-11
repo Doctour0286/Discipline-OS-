@@ -119,7 +119,7 @@ class MissionAccessibilityService : AccessibilityService() {
     private suspend fun handleForegroundChange(packageName: String) {
         val userId = singleLocalUserId() ?: return // no onboarded user yet — nothing to enforce.
         val database = AppContainer.database(applicationContext)
-        val mission = database.missionDao().activeMissionFor(userId) ?: return // no active
+        val mission = database.enforcementSessionDao().activeMissionFor(userId) ?: return // no active
         // Mission — Contextual Enforcement (§9) only applies "during a Mission."
 
         if (packageName !in mission.blocklist) return // allowed app, or an app the Mission

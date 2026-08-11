@@ -161,7 +161,15 @@ pass before Phase 5, but doesn't block any batch below.
 
 ## Batch G1 — Goal-Oriented Mission Model: rename + additive schema (structural only, zero behavior change)
 
-**Status: NOT STARTED.**
+**Status: SHIPPED TO MAIN, BUT DIVERGED FROM THIS SPEC — CONFORMANCE PASS IN PROGRESS ON
+`goal-oriented-mission-model-g1-conform-to-plan` (unmerged).** `main` (PR #27) implemented a
+version of this batch that diverged from §2 below in three ways (nullable `goalMissionId`
+instead of non-null `missionId`; kept the `MissionDao` interface name instead of renaming it;
+an extra `missionProfileId` field on `GoalMission`) — see `ROADMAP.md` §5.33 for the full
+account of what diverged and why it wasn't caught before merge. The conformance branch brings
+the code back in line with this spec exactly and additionally implements Batch G2 (below) in
+the same pass. That branch has not been through CI or on-device verification yet — treat this
+batch as still open until a PR from that branch merges to `main` with both confirmed.
 
 **Full detail:** `Documents/06_GOAL_ORIENTED_MISSION_MODEL_INTEGRATION_PLAN.md` §2 — that
 document verified every entity/DAO/database change and every existing call site directly
@@ -204,7 +212,13 @@ reviewable as "did the rename break anything" in isolation.
 
 ## Batch G2 — Mission creation: the real `FirstMissionSchedulingFragment` fix
 
-**Status: NOT STARTED. Depends on G1.**
+**Status: IMPLEMENTED on `goal-oriented-mission-model-g1-conform-to-plan` (unmerged, same
+branch as G1's conformance pass — see that batch's status note above). CI/on-device
+unconfirmed.** `FirstMissionSchedulingFragment.createMissionAndFinish` now does the real
+three-row transactional insert this section describes. The §3.3 open questions below
+(`resetMode`, `MissionPeriod.periodType` mismatch) were implemented exactly as flagged —
+`ROLLING_WINDOW` and `FIXED_WINDOW`-with-null-bounds respectively — not resolved; both remain
+genuinely open per `ROADMAP.md` §5.33.
 
 **Full detail:** Integration Plan §3, including §3.3's "new open questions this batch surfaces"
 — read those before starting, they're real open judgment calls (double-run creating two

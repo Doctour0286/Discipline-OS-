@@ -16,18 +16,23 @@ enum class MissionStatus { ACTIVE, COMPLETED, VIOLATED, DISPUTED, ABORTED_CRISIS
  * same table contents — renamed because the old name now describes something narrower than what
  * users mean by "Mission" in product copy: this row is one locked, monitored *enforcement
  * window*, as distinct from a [GoalMission] (the open-ended goal a session may or may not belong
- * to). See [GoalMission]'s kdoc for the full split rationale. `enum class MissionStatus`, the
- * `MissionDao` interface name, and the `missions` table name are all deliberately kept unchanged
- * in this rename — only the Kotlin entity class name changes, plus the handful of DAO method
- * signatures whose parameter/return types reference it. See `MissionDao`'s kdoc in
- * `CoreDaos.kt` for the low-churn reasoning behind keeping the interface and table names as-is.
+ * to). See [GoalMission]'s kdoc for the full split rationale. `enum class MissionStatus` and the
+ * `missions` table name are kept unchanged in this rename. The backing DAO, however, **is**
+ * renamed (`MissionDao` → `EnforcementSessionDao`, schema v10) — see `EnforcementSessionDao`'s
+ * kdoc in `CoreDaos.kt` for why that choice reversed the v9 low-churn "keep the DAO name"
+ * decision.
  *
- * [goalMissionId] is new in this pass — nullable, since a standalone session with no parent goal
- * remains a fully valid, independently meaningful row (not every timed enforcement window needs
- * to belong to a larger goal). Every pre-existing row from before this migration lands with
- * `goalMissionId = null` after the rename (destructive-fallback reinstall, per this project's
- * existing pre-launch migration policy — see `DisciplineOsDatabase.kt`'s own kdoc; no real
- * installed base exists yet for this to be a data-loss concern).
+ * [missionId] and [missionPeriodId] are new in this pass, per the Integration Plan §2.1.
+ * [missionId] is non-null — Batch G2's `FirstMissionSchedulingFragment` fix (Integration Plan
+ * §3.1) auto-creates a minimal parent [GoalMission] for every [EnforcementSession], so there is
+ * no longer a code path that creates a session with no parent goal to attach it to; a session
+ * existing with no [GoalMission] at all is not a state this schema represents. [missionPeriodId]
+ * stays nullable — a [MissionPeriod] is the recurring-schedule *template* an session can be
+ * generated from, not something every session strictly needs (an ad hoc, not-from-a-template
+ * session is still valid). Every pre-existing row from before this migration lands destructively
+ * dropped and recreated (destructive-fallback reinstall, per this project's existing pre-launch
+ * migration policy — see `DisciplineOsDatabase.kt`'s own kdoc; no real installed base exists yet
+ * for this to be a data-loss concern).
  *
  * [scheduledStart] null means ad hoc — feeds Self-Initiation Trend (§3.6).
  * [status] = ABORTED_CRISIS_EXIT is distinct from VIOLATED (Data Model §5, Iron crisis exit
@@ -42,7 +47,8 @@ enum class MissionStatus { ACTIVE, COMPLETED, VIOLATED, DISPUTED, ABORTED_CRISIS
 data class EnforcementSession(
     @PrimaryKey val id: UUID,
     val userId: UUID,
-    val goalMissionId: UUID?,
+    val missionId: UUID,
+    val missionPeriodId: UUID?,
     val scheduledStart: Instant?,
     val actualStart: Instant,
     val actualEnd: Instant?,
