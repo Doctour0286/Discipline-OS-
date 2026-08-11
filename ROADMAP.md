@@ -3390,3 +3390,95 @@ standing gaps" section already names (no compiler/toolchain reachable from the a
 sandbox) — not new information, but this batch is the first time that gap produced a real CI
 failure in production code specifically, not just test code, worth tracking as its own
 sub-category rather than folding silently into the existing note.
+
+### 5.43 Audit: `requireNotNull`-for-a-"structurally-impossible"-guard pattern across the codebase
+
+Follow-up to §5.42's second CI failure. That entry found `CreateConstraintTriggerUseCase` used
+`requireNotNull` for a missing-parent-row guard while its own kdoc claimed the resulting
+exception would be `IllegalStateException` — wrong; `requireNotNull` always throws
+`IllegalArgumentException`, `checkNotNull` is the stdlib function for the "structurally
+impossible" `IllegalStateException` posture. That entry flagged, but deliberately did not fix,
+the same pattern in five other files: `RecordViolationUseCase`, `ApplyReputationDecayUseCase`,
+`ResolveDisputeUseCase`, `TierTransitionUseCase`, `MissionInterceptionActivity`, and
+`TriggerCreationFragment`. This entry is that audit.
+
+**Method, for each file:** read every `requireNotNull` call site and its surrounding kdoc/comment
+in full, classify it as either (a) a missing-row / "should be structurally impossible" guard —
+the `checkNotNull` posture — or (b) genuine bad-caller-input / UI-should-have-prevented-this —
+the `require`/`requireNotNull` posture that's actually correct as-is; then grep each file's test
+suite for any existing assertion on the specific exception *type* thrown by that exact call site,
+so no fix is made blind to a test that might currently depend on the (wrong) behavior.
+
+**Five files, twelve call sites, all confirmed category (a) and fixed to `checkNotNull`:**
+
+- `RecordViolationUseCase.execute` — three sites: missing `Mission`, missing `User`, missing
+  `user.currentTier`. All three kdoc-adjacent comments already used "structurally impossible"
+  language. `RecordViolationUseCaseTest`'s only exception-type test
+  (`a crisis-exit mission must not go through this use-case`, `@Test(expected =
+  IllegalArgumentException::class)`) exercises the separate `require(mission.status != ...)`
+  call a few lines below these guards, not any of the three changed here — confirmed
+  unaffected before changing.
+- `ApplyReputationDecayUseCase.execute` — two sites: missing `User`, missing
+  `user.currentTier`. Both comments state the same posture ("should never run before
+  onboarding completes"). No test file for this class exists at all — no assertion risk.
+- `ResolveDisputeUseCase` — two sites, one each in `execute` and `fileDispute`: missing
+  `Violation`. `execute`'s own kdoc for the `violationId` parameter explicitly states a bad id
+  is "a caller bug (surfaced as `IllegalStateException`, not silently accepted)" — the fix
+  makes the code match its own documented intent. `ResolveDisputeUseCaseTest` has one real
+  `@Test(expected = IllegalStateException::class)` (`resolving a violation with no active
+  dispute fails loudly`) — traced and confirmed it exercises the separate `check
+  (violation.disputeStatus == ...)` call, using a real, successfully-created `Violation`, not
+  either changed `requireNotNull`. Unaffected.
+- `TierTransitionUseCase` — seven sites across `explicitDowngrade`, `crisisDowngrade`,
+  `ironCrisisExit`, `activateIron`, and the private `transition` helper, plus the shared
+  private `requireUser(userId)` helper five of those six call. Every site's surrounding
+  comment uses the same "precondition should already be satisfied by `selectInitialTier`" or
+  "structurally impossible" framing; none is a bad-caller-input case (those, e.g.
+  `ironCrisisExit`'s `require(currentTier == Tier.IRON)`, already correctly used `require`
+  and were left untouched). `TierTransitionUseCaseTest`'s several real exception-type tests
+  (cooldown-not-elapsed, tier-rejection, calibration-window) were each traced to their own
+  `check(...)`/`require(...)` calls, none of them the six `requireNotNull` sites or the shared
+  helper — confirmed unaffected. The helper itself renamed `requireUser` → `checkUser` for
+  the same reason `CreateConstraintTriggerUseCase`'s naming already implied it should be:
+  a function whose entire job is to throw `checkNotNull`'s exception type shouldn't carry
+  `require`'s name. All six call sites and the kdoc paragraph explaining why the helper
+  can't also assert `currentTier` non-null (a few lines below the helper) updated to match.
+- `MissionInterceptionActivity` — one site: missing `user.currentTier`, after `mission`/`user`
+  themselves are already null-checked separately via a plain `if (... == null) { finish() }`
+  (a different, deliberately-graceful path, left alone). The comment states the same
+  "structurally impossible... worth a loud crash" posture as the others. No test targets this
+  Activity directly — `InterceptionControllerTest` exercises a different class
+  (`InterceptionController`) entirely. No assertion risk.
+
+**One file, one site, confirmed category (b) and deliberately left unchanged:**
+
+- `TriggerCreationFragment`'s `requireNotNull(packageId)` guard. Unlike every site above, this
+  isn't a missing-DB-row case — `packageId` is a plain nullable function parameter, and the
+  comment states the precondition is enforced by `TriggerCreationScreen`'s own `canCreate` UI
+  gate, not by a database invariant. The sibling guard three lines above it
+  (`require(goalMission != null && goalMission.archetype == MissionArchetype.CONSTRAINT)`)
+  describes the identical "screen-enforced, defense-in-depth" posture and deliberately uses
+  `require`/`IllegalArgumentException`, and the class kdoc explicitly cites
+  `TierSelectionFragment`'s `require(tier != Tier.IRON)` as the matching precedent for this
+  exact pattern. Changing this one guard to `checkNotNull` while its neighbor stays `require`
+  would split one function's two structurally-identical guards into two different exception
+  types for no reason grounded in either guard's actual posture — left as `requireNotNull`,
+  correctly, as-is.
+
+**One stale cross-reference fixed as a side effect:** `CreateConstraintTriggerUseCase`'s own
+kdoc (written in §5.42, before this audit existed) stated as fact that `RecordViolationUseCase`
+"actually uses `requireNotNull`... not fixed... flagged as a real, separate follow-up." That
+claim is no longer true as of this entry — updated to describe the audit as completed rather
+than pending, and to name all five fixed files rather than singling out
+`RecordViolationUseCase` alone.
+
+**Not run: an actual compile.** Same standing gap as every other entry in this log — no
+Kotlin/Gradle toolchain reachable from this sandbox (Gradle's own bootstrap fails outward
+network calls here). Verification for this pass was manual: every changed call site's
+surrounding kdoc/comment read in full before changing it, every test file in scope grepped for
+exception-type assertions and each hit traced to confirm which specific `require`/`check`/
+`requireNotNull` call it actually exercises (never assumed from proximity alone), and a brace-
+balance check across all six touched files after editing. This is the same posture as every
+prior entry's caveat — real, not closed by this pass, worth remaining on `STATUS.md`'s known
+standing gaps list as a general sandbox limitation even though this specific finding is now
+resolved.
