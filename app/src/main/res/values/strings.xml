@@ -355,6 +355,16 @@
     <string name="mission_detail_relationship_title">Behavior and outcome</string>
     <string name="mission_detail_relationship_not_enough_data">Log a few more entries to see how your behavior and outcome relate.</string>
 
+    <!--
+        Batch G6 — milestones card on Mission Detail, Integration Plan §7 / Addendum §B.2.
+        Descriptive-only progress checkpoints; achievement is computed from log entries crossing
+        a target, or set by hand for ordinal-only (no numeric target) milestones.
+    -->
+    <string name="mission_detail_milestones_title">Milestones</string>
+    <string name="mission_detail_milestones_empty">No milestones set for this mission yet.</string>
+    <string name="mission_detail_milestones_add_button">Add a milestone</string>
+    <string name="mission_detail_milestones_target_value">Target: %1$s</string>
+
     <string name="mission_detail_behavior_on_track">On track this window.</string>
     <string name="mission_detail_behavior_near_miss">Close — just under this window\'s pace, but not far off.</string>
     <string name="mission_detail_behavior_not_followed">The behavior isn\'t happening consistently this window.</string>
@@ -433,5 +443,22 @@
     <!-- §3.5: "two options not one" — deliberately separate, never a single "Dismiss". -->
     <string name="predictive_alert_dismiss_not_accurate">Not accurate</string>
     <string name="predictive_alert_dismiss_got_it">Got it</string>
+
+    <!--
+        Batch G6 — milestone creation form, Integration Plan §7 / Addendum §B.2. Person-authored
+        only (no auto-generation — see MilestoneCreationScreen.kt's own kdoc for why). label is
+        the only required field; targetValue is optional free text parsed as a Double at the
+        call site (unparseable non-blank text is treated as invalid, matching
+        TriggerCreationScreen's own validation posture).
+    -->
+    <string name="milestone_creation_title">Add a milestone</string>
+    <string name="milestone_creation_intro">A milestone is a checkpoint on the way to your goal — a specific point you can look back on and say you\'ve reached. Give it a name, and optionally a numeric target to auto-detect when you\'ve crossed it.</string>
+    <string name="milestone_creation_label_label">What\'s the checkpoint?</string>
+    <string name="milestone_creation_label_placeholder">e.g. Halfway there</string>
+    <string name="milestone_creation_target_value_label">Target value (optional)</string>
+    <string name="milestone_creation_target_value_placeholder">e.g. 70</string>
+    <string name="milestone_creation_target_value_help">If set, this milestone is marked achieved automatically once a logged entry crosses it. Leave blank for a checkpoint you\'ll mark by hand.</string>
+    <string name="milestone_creation_create_button">Create milestone</string>
+    <string name="milestone_creation_back_button">Cancel</string>
 
 </resources>

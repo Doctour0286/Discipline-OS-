@@ -174,7 +174,18 @@ import net.sqlcipher.database.SupportFactory
     // GoalMission.kt's own kdoc for the full reasoning, including why this doesn't mirror
     // PredictiveFailureAlertDismissal's shape. Same fallbackToDestructiveMigration reasoning as
     // every bump above: still pre-launch, still no real installed base.
-    version = 13,
+    // v14 (Batch G6, Integration Plan §7 / base design doc Addendum §B.2): `Milestone` corrected
+    // to the Addendum's actual field list — `targetValue` was `String?` since the original G1
+    // pass (interpretation deferred to the parent GoalMission's target shape, per the old
+    // in-code comment) but the spec always calls for `Double?`; same "diverged from the document
+    // it was meant to summarize, caught only while implementing the batch that needed the real
+    // shape" pattern v11/v12 already found twice (MissionLogEntry, Trigger). `targetDate:
+    // Instant?` added — present in the Addendum's field list but missing entirely pre-fix. See
+    // Milestone's own kdoc in GoalMission.kt for the full account. No prior code constructed a
+    // Milestone anywhere in the codebase (MilestoneDao's insert/update/forMission existed but
+    // were called nowhere), so nothing else changes and no data is lost under this project's
+    // still-in-effect fallbackToDestructiveMigration() policy.
+    version = 14,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

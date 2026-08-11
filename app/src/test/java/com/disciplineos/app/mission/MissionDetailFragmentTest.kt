@@ -1,6 +1,7 @@
 package com.disciplineos.app.mission
 
 import com.disciplineos.app.ui.mission.BehaviorReadClassification
+import com.disciplineos.app.ui.mission.MilestoneUiItem
 import com.disciplineos.app.ui.mission.RelationshipQuadrant
 import com.disciplineos.data.entity.CadenceType
 import com.disciplineos.data.entity.GoalMission
@@ -365,5 +366,66 @@ class MissionDetailFragmentTest {
             hasExistingTrigger = false,
         )
         assertFalse(state.showTriggerPrompt)
+    }
+
+    // --- Batch G6: milestones / targetDirection pass-through ---
+
+    @Test
+    fun `milestones empty by default when omitted (pre-G6 call sites unaffected)`() {
+        // Same "omission is correct, not accidental" guarantee the G5 hasExistingTrigger default
+        // test above states for its own parameter — every test above this section predates
+        // milestones and doesn't pass it.
+        val state = computeMissionDetailState(
+            goalMission = goalMission(),
+            adherenceResult = result(hitRate = 0.5),
+            logEntries = emptyList(),
+            hitRateThreshold = HIT_RATE_THRESHOLD,
+        )
+        assertTrue(state.milestones.isEmpty())
+    }
+
+    @Test
+    fun `milestones passed in are carried through to state unchanged`() {
+        val milestone = MilestoneUiItem(
+            id = UUID.randomUUID(),
+            label = "Halfway there",
+            targetValue = 50.0,
+            targetDate = null,
+            achieved = false,
+        )
+        val state = computeMissionDetailState(
+            goalMission = goalMission(),
+            adherenceResult = result(hitRate = 0.5),
+            logEntries = emptyList(),
+            hitRateThreshold = HIT_RATE_THRESHOLD,
+            milestones = listOf(milestone),
+        )
+        assertEquals(listOf(milestone), state.milestones)
+    }
+
+    @Test
+    fun `targetDirection is passed through from the GoalMission onto the state`() {
+        val state = computeMissionDetailState(
+            goalMission = goalMission(
+                archetype = MissionArchetype.OUTCOME_DRIVEN,
+                targetDirection = TargetDirection.DECREASE,
+                targetValue = 70.0,
+            ),
+            adherenceResult = result(hitRate = 0.5),
+            logEntries = emptyList(),
+            hitRateThreshold = HIT_RATE_THRESHOLD,
+        )
+        assertEquals(TargetDirection.DECREASE, state.targetDirection)
+    }
+
+    @Test
+    fun `null targetDirection on the GoalMission carries through as null on the state`() {
+        val state = computeMissionDetailState(
+            goalMission = goalMission(targetDirection = null),
+            adherenceResult = result(hitRate = 0.5),
+            logEntries = emptyList(),
+            hitRateThreshold = HIT_RATE_THRESHOLD,
+        )
+        assertNull(state.targetDirection)
     }
 }

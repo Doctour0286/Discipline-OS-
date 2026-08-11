@@ -14,17 +14,21 @@ import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
 import com.disciplineos.app.ui.mission.BehaviorReadClassification
+import com.disciplineos.app.ui.mission.MilestoneUiItem
 import com.disciplineos.app.ui.mission.MissionDetailScreen
 import com.disciplineos.app.ui.mission.MissionDetailUiState
 import com.disciplineos.app.ui.mission.RelationshipQuadrant
 import com.disciplineos.app.ui.mission.RelationshipView
 import com.disciplineos.app.ui.theme.themedComposeView
+import com.disciplineos.data.db.DisciplineOsDatabase
 import com.disciplineos.data.entity.GoalMission
 import com.disciplineos.data.entity.LifecycleStage
+import com.disciplineos.data.entity.Milestone
 import com.disciplineos.data.entity.MissionArchetype
 import com.disciplineos.data.entity.MissionLogEntry
 import com.disciplineos.data.entity.TargetDirection
 import com.disciplineos.data.metrics.hypothesizingStageSatisfied
+import com.disciplineos.data.metrics.milestoneAchievementSatisfied
 import com.disciplineos.domain.usecase.ApplyAdherenceDecayUseCase
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -88,6 +92,17 @@ import java.util.UUID
  * ([GoalMission.triggerPromptDismissedAt]) — see [computeMissionDetailState]'s own doc for the
  * exact rule. Placement (Mission Detail, not Home) and "shown once" semantics are Integration
  * Plan §6 / base doc §4.3's own resolved position, recorded in `ROADMAP.md`.
+ *
+ * **Batch G6 addition — milestone achievement check on load.** Integration Plan §7 / Addendum
+ * §B.2: "`achievedAt` computed when a new `MissionLogEntry` crosses the threshold." No production
+ * code path writes a [MissionLogEntry] yet (checked at implementation time — only a test
+ * constructs one), so there is no real "log entry write" path to hook the check into as the Plan
+ * assumes. Given that gap, the check runs here instead, on the same load pass that already reads
+ * every [MissionLogEntry] for this mission for the outcome-trend computation above — see
+ * [checkAndPersistMilestoneAchievements], shared between this Fragment's load and
+ * dismiss-trigger-prompt paths. [MissionDetailUiState.Loaded.milestones] additionally supports a
+ * manual "mark achieved" toggle (see [markMilestoneAchieved]) for ordinal-only milestones (no
+ * numeric target), which [milestoneAchievementSatisfied] can never auto-compute a crossing for.
  */
 class MissionDetailFragment : Fragment() {
 
@@ -124,6 +139,19 @@ class MissionDetailFragment : Fragment() {
                 onDismissTriggerPrompt = {
                     if (missionId != null) {
                         dismissTriggerPrompt(missionId) { state -> uiState = state }
+                    }
+                },
+                onAddMilestone = {
+                    if (missionId != null) {
+                        findNavController().navigate(
+                            R.id.action_missionDetail_to_milestoneCreation,
+                            bundleOf(MilestoneCreationFragment.ARG_MISSION_ID to missionId.toString()),
+                        )
+                    }
+                },
+                onMarkMilestoneAchieved = { milestoneId ->
+                    if (missionId != null) {
+                        markMilestoneAchieved(missionId, milestoneId) { state -> uiState = state }
                     }
                 },
             )
@@ -167,6 +195,18 @@ class MissionDetailFragment : Fragment() {
             val hitRateThreshold = AppContainer.adherenceDecayPolicy().hitRateThreshold()
             val hasExistingTrigger = database.triggerDao().forMission(missionId).isNotEmpty()
 
+            // Batch G6, Integration Plan §7 — this is "the same code path that already reads
+            // MissionLogEntry rows for this mission" (see class kdoc's Batch G6 section below
+            // and MissionDetailFragment's own history: no production write path for
+            // MissionLogEntry existed to hook into directly, so the achievement check runs here,
+            // on read, rather than on a still-nonexistent log-entry-write path).
+            val milestones = checkAndPersistMilestoneAchievements(
+                database = database,
+                missionId = missionId,
+                targetDirection = goalMission.targetDirection,
+                logEntries = logEntries,
+            )
+
             onLoaded(
                 computeMissionDetailState(
                     goalMission = goalMission,
@@ -174,6 +214,7 @@ class MissionDetailFragment : Fragment() {
                     logEntries = logEntries,
                     hitRateThreshold = hitRateThreshold,
                     hasExistingTrigger = hasExistingTrigger,
+                    milestones = milestones,
                 ),
             )
         }
@@ -198,6 +239,12 @@ class MissionDetailFragment : Fragment() {
             val logEntries = database.missionLogEntryDao().forMission(missionId)
             val hitRateThreshold = AppContainer.adherenceDecayPolicy().hitRateThreshold()
             val hasExistingTrigger = database.triggerDao().forMission(missionId).isNotEmpty()
+            val milestones = checkAndPersistMilestoneAchievements(
+                database = database,
+                missionId = missionId,
+                targetDirection = updated.targetDirection,
+                logEntries = logEntries,
+            )
 
             onLoaded(
                 computeMissionDetailState(
@@ -206,6 +253,54 @@ class MissionDetailFragment : Fragment() {
                     logEntries = logEntries,
                     hitRateThreshold = hitRateThreshold,
                     hasExistingTrigger = hasExistingTrigger,
+                    milestones = milestones,
+                ),
+            )
+        }
+    }
+
+    /**
+     * Batch G6 — manual "mark achieved" path, the only write path for an ordinal-only milestone
+     * ([Milestone.targetValue] null) since [milestoneAchievementSatisfied] can never compute a
+     * crossing for one (see that function's own kdoc). Also reachable for a numeric-target
+     * milestone the auto-check hasn't caught yet (e.g. a person knows they've hit it before the
+     * next log entry confirms it) — same "person can always confirm by hand" posture
+     * [MilestoneCreationScreen]'s own kdoc states for why a target-less milestone remains
+     * creatable at all.
+     *
+     * A plain [com.disciplineos.data.dao.MilestoneDao.update] — no use-case, same trivial-write
+     * posture [MilestoneCreationFragment]'s own kdoc states for milestone creation.
+     */
+    private fun markMilestoneAchieved(
+        missionId: UUID,
+        milestoneId: UUID,
+        onLoaded: (MissionDetailUiState) -> Unit,
+    ) {
+        lifecycleScope.launch {
+            val context = requireContext().applicationContext
+            val database = AppContainer.database(context)
+            val goalMission = database.goalMissionDao().get(missionId) ?: return@launch
+
+            val existing = database.milestoneDao().forMission(missionId).find { it.id == milestoneId }
+            if (existing != null && existing.achievedAt == null) {
+                database.milestoneDao().update(existing.copy(achievedAt = Instant.now()))
+            }
+
+            val useCase = AppContainer.applyAdherenceDecayUseCase(context)
+            val adherenceResult = useCase.execute(missionId, Instant.now())
+            val logEntries = database.missionLogEntryDao().forMission(missionId)
+            val hitRateThreshold = AppContainer.adherenceDecayPolicy().hitRateThreshold()
+            val hasExistingTrigger = database.triggerDao().forMission(missionId).isNotEmpty()
+            val milestones = database.milestoneDao().forMission(missionId).map { it.toUiItem() }
+
+            onLoaded(
+                computeMissionDetailState(
+                    goalMission = goalMission,
+                    adherenceResult = adherenceResult,
+                    logEntries = logEntries,
+                    hitRateThreshold = hitRateThreshold,
+                    hasExistingTrigger = hasExistingTrigger,
+                    milestones = milestones,
                 ),
             )
         }
@@ -216,6 +311,47 @@ class MissionDetailFragment : Fragment() {
         const val ARG_MISSION_ID = "missionId"
     }
 }
+
+/**
+ * Batch G6, Integration Plan §7 — runs [milestoneAchievementSatisfied] for every not-yet-achieved
+ * [Milestone] on this mission and persists any newly-satisfied ones via
+ * [com.disciplineos.data.dao.MilestoneDao.update], returning the resulting
+ * [MilestoneUiItem] list (post-write, so the caller's state reflects the just-persisted change
+ * without a second read). Shared between [MissionDetailFragment.loadMissionDetailState] and
+ * [MissionDetailFragment.dismissTriggerPrompt] — both already load [logEntries] for this mission
+ * and both need the same check re-run, so this is pulled out rather than duplicated at each call
+ * site (same "reused rather than re-derived at each call site" posture Integration Plan §6 asks
+ * of [hypothesizingStageSatisfied]'s own call sites).
+ */
+private suspend fun checkAndPersistMilestoneAchievements(
+    database: DisciplineOsDatabase,
+    missionId: UUID,
+    targetDirection: TargetDirection?,
+    logEntries: List<MissionLogEntry>,
+): List<MilestoneUiItem> {
+    val milestoneDao = database.milestoneDao()
+    val current = milestoneDao.forMission(missionId)
+
+    val updated = current.map { milestone ->
+        if (milestoneAchievementSatisfied(milestone, targetDirection, logEntries)) {
+            val achieved = milestone.copy(achievedAt = Instant.now())
+            milestoneDao.update(achieved)
+            achieved
+        } else {
+            milestone
+        }
+    }
+
+    return updated.map { it.toUiItem() }
+}
+
+private fun Milestone.toUiItem(): MilestoneUiItem = MilestoneUiItem(
+    id = id,
+    label = label,
+    targetValue = targetValue,
+    targetDate = targetDate,
+    achieved = achievedAt != null,
+)
 
 // [HYPOTHESIS] — base doc §5 step 2 names "a small number, e.g. 2-3" with the exact value left
 // unfixed. Picking 3, same "round number, no derivation" posture every other placeholder
@@ -238,6 +374,11 @@ private const val HYPOTHESIZING_LOG_THRESHOLD = 3
  *   which pass this parameter) keeps compiling and passing unmodified — the default is chosen
  *   to make their omission of it *correct* (no trigger data existed to omit) rather than
  *   accidentally always-true/false.
+ * @param milestones Batch G6 — every [MilestoneUiItem] for [goalMission], achievement already
+ *   resolved by the caller (see [checkAndPersistMilestoneAchievements]). Defaults to an empty
+ *   list for the same reason [hasExistingTrigger] defaults to `false` — every pre-G6 call site
+ *   (including existing [MissionDetailFragmentTest] tests) keeps compiling unmodified, and an
+ *   empty default is the *correct* value for a mission with no milestones defined, not a stand-in.
  */
 fun computeMissionDetailState(
     goalMission: GoalMission,
@@ -245,6 +386,7 @@ fun computeMissionDetailState(
     logEntries: List<MissionLogEntry>,
     hitRateThreshold: Double,
     hasExistingTrigger: Boolean = false,
+    milestones: List<MilestoneUiItem> = emptyList(),
 ): MissionDetailUiState.Loaded {
     val behaviorRead = behaviorReadFor(result = adherenceResult, hitRateThreshold = hitRateThreshold)
 
@@ -281,6 +423,8 @@ fun computeMissionDetailState(
         behaviorRead = behaviorRead?.classification,
         relationshipView = relationshipView,
         showTriggerPrompt = showTriggerPrompt,
+        targetDirection = goalMission.targetDirection,
+        milestones = milestones,
     )
 }
 

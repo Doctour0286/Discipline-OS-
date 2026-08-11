@@ -1,7 +1,9 @@
 package com.disciplineos.app.ui.mission
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -10,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -17,11 +20,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.disciplineos.app.R
 import com.disciplineos.data.entity.MissionArchetype
+import com.disciplineos.data.entity.TargetDirection
+import java.time.Instant
 import java.util.UUID
 
 /**
@@ -47,6 +53,15 @@ sealed interface MissionDetailUiState {
      *   [com.disciplineos.data.entity.LifecycleStage.HYPOTHESIZING] and no Trigger has been
      *   attached or dismissed yet. See [com.disciplineos.app.mission.MissionDetailFragment]'s
      *   class kdoc, "Batch G5 addition" section, for the full placement/dismissal reasoning.
+     * @param targetDirection Batch G6 — the parent [GoalMission]'s [TargetDirection], passed
+     *   through so the milestone-creation form can be hidden entirely for a
+     *   [TargetDirection.MAINTAIN] mission or one with no target set at all (Addendum §B.3:
+     *   ordinal-only milestones remain creatable regardless, but a numeric target milestone has
+     *   no well-defined "crossing" without a real direction — see
+     *   [com.disciplineos.data.metrics.milestoneAchievementSatisfied]'s own kdoc).
+     * @param milestones Batch G6, Integration Plan §7 — every [MilestoneUiItem] for this mission,
+     *   in creation order. Empty list (not null) when none exist yet — a real, displayable state
+     *   ("no milestones set" card), not the same as [Loading]/[NotFound].
      */
     data class Loaded(
         val missionId: UUID,
@@ -58,8 +73,26 @@ sealed interface MissionDetailUiState {
         val behaviorRead: BehaviorReadClassification?,
         val relationshipView: RelationshipView?,
         val showTriggerPrompt: Boolean = false,
+        val targetDirection: TargetDirection? = null,
+        val milestones: List<MilestoneUiItem> = emptyList(),
     ) : MissionDetailUiState
 }
+
+/**
+ * Batch G6 — one row in [MissionDetailUiState.Loaded.milestones]. Presentation-shaped subset of
+ * [com.disciplineos.data.entity.Milestone]: [id] kept (needed for the update call when the
+ * Fragment marks one achieved), [achieved] flattened from `achievedAt != null` since the screen
+ * only ever needs the boolean, never the timestamp itself — same "presentation state carries
+ * only what rendering needs" split [MissionDetailUiState.Loaded] already draws elsewhere in this
+ * file (e.g. [BehaviorReadClassification] over a raw hit-rate double).
+ */
+data class MilestoneUiItem(
+    val id: UUID,
+    val label: String,
+    val targetValue: Double?,
+    val targetDate: Instant?,
+    val achieved: Boolean,
+)
 
 /**
  * Behavior-axis classification only — see [com.disciplineos.app.mission.MissionDetailFragment]'s
@@ -106,6 +139,8 @@ fun MissionDetailScreen(
     modifier: Modifier = Modifier,
     onAttachTrigger: () -> Unit = {},
     onDismissTriggerPrompt: () -> Unit = {},
+    onAddMilestone: () -> Unit = {},
+    onMarkMilestoneAchieved: (UUID) -> Unit = {},
 ) {
     Scaffold(modifier = modifier.fillMaxSize()) { contentPadding ->
         Column(
@@ -135,6 +170,8 @@ fun MissionDetailScreen(
                         state = uiState,
                         onAttachTrigger = onAttachTrigger,
                         onDismissTriggerPrompt = onDismissTriggerPrompt,
+                        onAddMilestone = onAddMilestone,
+                        onMarkMilestoneAchieved = onMarkMilestoneAchieved,
                     )
                 }
             }
@@ -156,6 +193,8 @@ private fun MissionDetailContent(
     state: MissionDetailUiState.Loaded,
     onAttachTrigger: () -> Unit,
     onDismissTriggerPrompt: () -> Unit,
+    onAddMilestone: () -> Unit,
+    onMarkMilestoneAchieved: (UUID) -> Unit,
 ) {
     Text(
         text = state.title,
@@ -243,6 +282,52 @@ private fun MissionDetailContent(
         }
     }
 
+    // Batch G6, Integration Plan §7, Addendum §B.2 — descriptive-only progress checkpoints,
+    // shown regardless of archetype (unlike the relationship view above, which is
+    // outcome-driven only) since a Milestone's targetValue is meaningful against any GoalMission
+    // shape a person chooses to define one for, not only OUTCOME_DRIVEN missions. Placed after
+    // the Adherence/relationship cards, same "a person's own progress data is the primary
+    // content" ordering the trigger-prompt card below states for itself.
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 16.dp),
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = stringResource(R.string.mission_detail_milestones_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+            if (state.milestones.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.mission_detail_milestones_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
+            } else {
+                state.milestones.forEach { milestone ->
+                    MilestoneRow(
+                        milestone = milestone,
+                        onMarkAchieved = { onMarkMilestoneAchieved(milestone.id) },
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+            }
+            OutlinedButton(
+                onClick = onAddMilestone,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+            ) {
+                Text(stringResource(R.string.mission_detail_milestones_add_button))
+            }
+        }
+    }
+
     // Batch G5, Integration Plan §6, base doc §4.3 — "shown once per Mission during
     // Hypothesizing... offered more assertively than a bare mention but never mandatory."
     // Placed after the Adherence/relationship cards (a person's own progress data is the
@@ -283,6 +368,79 @@ private fun MissionDetailContent(
                 ) {
                     Text(stringResource(R.string.mission_detail_trigger_prompt_dismiss_button))
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Batch G6 — strips a trailing ".0" for whole-number target values (e.g. "70" not "70.0"),
+ * keeps real decimals as typed otherwise (e.g. "12.5"). Plain [String] formatting, not
+ * `@Composable`, so it stays testable without a Compose host — same posture this file's own
+ * kdoc already states for [BehaviorReadClassification] staying free of `stringResource`.
+ */
+internal fun formatMilestoneTargetValue(value: Double): String =
+    if (value == value.toLong().toDouble()) value.toLong().toString() else value.toString()
+
+/**
+ * Batch G6 — one row in the milestones card. Descriptive only, same boundary
+ * [MilestoneUiItem]'s own kdoc states for the entity it's shaped from: checking [achieved] here
+ * never touches Reputation, Discipline Debt, or any [com.disciplineos.data.ledger.LedgerEntry].
+ *
+ * [Checkbox] rather than a plain achieved/unachieved [Text] label, matching the closest existing
+ * toggleable-row precedent in this project
+ * ([com.disciplineos.app.ui.onboarding.AppPickerScreen]'s `AppRow`) — a person can mark an
+ * ordinal-only milestone (no [MilestoneUiItem.targetValue]) achieved by hand, since
+ * [com.disciplineos.data.metrics.milestoneAchievementSatisfied] can never auto-compute a
+ * crossing for one (see that function's own kdoc). [onMarkAchieved] is only ever wired to fire a
+ * one-directional "mark achieved" write, never an "un-achieve" — matching that same pure
+ * function's "once hit, always hit" contract; the checkbox is disabled once [milestone.achieved]
+ * is already true so tapping it can't imply a reversible toggle that doesn't actually exist.
+ */
+@Composable
+private fun MilestoneRow(
+    milestone: MilestoneUiItem,
+    onMarkAchieved: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (!milestone.achieved) {
+                    Modifier.clickable(onClick = onMarkAchieved)
+                } else {
+                    Modifier
+                },
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Checkbox(
+            checked = milestone.achieved,
+            onCheckedChange = { if (!milestone.achieved) onMarkAchieved() },
+            enabled = !milestone.achieved,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = milestone.label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            if (milestone.targetValue != null) {
+                // %1$s, not %1$f — a Double formatted via stringResource's own %f defaults to
+                // the device locale's decimal separator and a fixed 6 decimal places (Java's
+                // String.format behavior), neither of which is what a person entered as free
+                // text on MilestoneCreationScreen. Pre-formatting to a plain string here keeps
+                // the displayed value matching what was typed (e.g. "70" not "70.000000").
+                Text(
+                    text = stringResource(
+                        R.string.mission_detail_milestones_target_value,
+                        formatMilestoneTargetValue(milestone.targetValue),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

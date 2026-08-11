@@ -266,7 +266,11 @@
 
          **New outgoing action, Batch G5:** action_missionDetail_to_triggerCreation, added this
          pass — the "attach a Trigger?" prompt (base doc §4.3/Integration Plan §6) and any
-         direct "add another trigger" action both navigate here. -->
+         direct "add another trigger" action both navigate here.
+
+         **New outgoing action, Batch G6:** action_missionDetail_to_milestoneCreation — the
+         milestones card's "Add a milestone" button (Integration Plan §7 / Addendum §B.2),
+         same one-directional shape as the G5 trigger action added above. -->
     <fragment
         android:id="@+id/missionDetailFragment"
         android:name="com.disciplineos.app.mission.MissionDetailFragment"
@@ -277,6 +281,9 @@
         <action
             android:id="@+id/action_missionDetail_to_triggerCreation"
             app:destination="@id/triggerCreationFragment" />
+        <action
+            android:id="@+id/action_missionDetail_to_milestoneCreation"
+            app:destination="@id/milestoneCreationFragment" />
     </fragment>
 
     <!-- Trigger Creation — Batch G5 (Integration Plan §6, base doc §3.4/§4.3). Reached only
@@ -287,6 +294,19 @@
         android:id="@+id/triggerCreationFragment"
         android:name="com.disciplineos.app.mission.TriggerCreationFragment"
         android:label="Add a Trigger">
+        <argument
+            android:name="missionId"
+            app:argType="string" />
+    </fragment>
+
+    <!-- Milestone Creation — Batch G6 (Integration Plan §7, base doc Addendum §B.2). Reached
+         only from missionDetailFragment's "Add a milestone" action, same shape as Trigger
+         Creation above. missionId is a String argument, same convention as every other
+         destination in this graph. -->
+    <fragment
+        android:id="@+id/milestoneCreationFragment"
+        android:name="com.disciplineos.app.mission.MilestoneCreationFragment"
+        android:label="Add a Milestone">
         <argument
             android:name="missionId"
             app:argType="string" />
