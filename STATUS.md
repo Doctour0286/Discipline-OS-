@@ -44,7 +44,16 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-11 (through §5.34 — PR #28 merged to `main` (commit
+**Last synced to ROADMAP.md:** 2026-08-11 (through §5.35 — a DAO-level linkage test was added
+for Batch G2's open verification-checklist item (`FirstMissionSchedulingFragmentTest`, `:app`):
+new tests mirror `createMissionAndFinish`'s real transaction and assert `GoalMission` →
+`MissionPeriod` → `EnforcementSession` resolve to each other correctly, not just to some
+non-null id. **Not yet CI-confirmed** (no compiler reachable from the authoring sandbox, same
+standing gap noted elsewhere in this file) **and does not close on-device confirmation** — those
+are two different open checklist rows now, not one, per §5.35's own stated distinction. See that
+section for exactly what is and isn't confirmed by this pass.
+
+**Sync prior to this (2026-08-11, §5.34)** — PR #28 merged to `main` (commit
 `cdde397`), CI confirmed green. This closes out the Batch G1 divergence §5.33 documented: `main`
 now has `EnforcementSession.missionId: UUID` non-null and the real `EnforcementSessionDao`
 rename, spot-checked directly against `main` post-merge, not just trusted from the merge itself.
@@ -166,7 +175,7 @@ on-device pass, not a logic change needing separate re-verification.
 | Behavioral Fingerprint + Predictive Failure Alerts | ⬜ | Phase 4, not started |
 | Unsupervised Reliability (opt-in tracking) | ✅ | Schema isolated (Phase 0); opt-in flow (`UnsupervisedReliabilityOptInFragment`, §2.7) merged and confirmed CI + on-device (PR #16) — writes `User.unsupervisedReliabilityOptIn`/`optInAt`. No capture pipeline (actual passive signal collection into `UnsupervisedSignalDao`) built yet — this pass is the consent/opt-in screen only, not the measurement pipeline itself. |
 | Daily / Weekly Reports | ⬜ | Not started |
-| Goal-Oriented Mission Model (`GoalMission`/`EnforcementSession` split) | 🟢 | **On `main` (PR #28, CI green, §5.34).** G1 (schema/DAO rename + additive entities) and G2 (`FirstMissionSchedulingFragment`'s real auto-create-parent-`GoalMission` fix) both merged and confirmed compiling. On-device: partial — completed onboarding on a real device without a crash (confirms the insert executes), but nothing in the app's UI surfaces the written rows or their linkage, so "correctly linked" per Batch G2's own verification checklist remains unconfirmed (§5.34 names what would close this — none built yet). Not part of PRD §41's MVP bar (post-v3.6 addition). Tracked as `BUILD_PLAN.md` Batches G1–G6 (G3–G6 not started), separate from the A–F sequence above. See `Documents/01_DATA_MODEL_AND_SCHEMA.md` §2.2a for the accepted shape, §5.34 for current real status. |
+| Goal-Oriented Mission Model (`GoalMission`/`EnforcementSession` split) | 🟢 | **On `main` (PR #28, CI green, §5.34).** G1 (schema/DAO rename + additive entities) and G2 (`FirstMissionSchedulingFragment`'s real auto-create-parent-`GoalMission` fix) both merged and confirmed compiling. **Linkage: a DAO-level Robolectric test now confirms `GoalMission`→`MissionPeriod`→`EnforcementSession` resolve correctly, mirroring the real transaction (§5.35) — not yet CI-run, and on-device confirmation is still a separate open item** (real device, real file-backed DB; §5.35 explains why the two aren't the same claim). Not part of PRD §41's MVP bar (post-v3.6 addition). Tracked as `BUILD_PLAN.md` Batches G1–G6 (G3–G6 not started), separate from the A–F sequence above. See `Documents/01_DATA_MODEL_AND_SCHEMA.md` §2.2a for the accepted shape, §5.35 for current real status. |
 
 ---
 

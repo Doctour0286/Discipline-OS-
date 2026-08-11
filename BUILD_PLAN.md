@@ -256,13 +256,23 @@ about `EnforcementSession`, not `GoalMission`.
 
 **Verification checklist:**
 - [x] CI green — PR #28, merged.
-- [ ] On-device confirmed: complete onboarding, confirm exactly one `GoalMission` and one
-      `EnforcementSession` row exist, correctly linked — **partially done, per this batch's
-      status note above:** onboarding was completed on a real device without crashing, which is
-      necessary but not sufficient for this checklist item. Nothing in the app currently
-      surfaces the rows themselves, so "correctly linked" specifically remains unconfirmed.
-      Needs a debug DB inspector, added logging, or an instrumented test reading the rows back
-      before this can be checked off.
+- [x] **Linkage confirmed at the DAO/Robolectric level, this pass** — see ROADMAP.md §5.35.
+      `FirstMissionSchedulingFragmentTest` (`:app`) now has tests that mirror
+      `createMissionAndFinish`'s real `withTransaction` block field-for-field and assert
+      `EnforcementSession.missionId`/`missionPeriodId` resolve to the exact `GoalMission`/
+      `MissionPeriod` created alongside it, not just to some non-null id. **This is the
+      instrumented-test option §5.34 named as what would close the gap — it is not yet CI-run
+      (no compiler reachable from the authoring sandbox, standing gap) and it is not the
+      on-device row below**, which is a different claim (real device, real Room file-backed DB,
+      real nav graph) that this test cannot make on its own. Don't treat this box and the one
+      below as redundant — they check different things.
+- [ ] On-device confirmed: complete onboarding on a real device, confirm exactly one
+      `GoalMission` and one `EnforcementSession` row exist, correctly linked — **still open.**
+      Onboarding was completed on a real device without crashing (necessary, not sufficient),
+      and the DAO-level test above now gives strong reason to expect the linkage is correct
+      in-memory, but neither substitutes for reading the actual on-device rows back. A debug DB
+      inspector, added logging, or an on-device instrumented test would close this row
+      specifically; none of those have been run against a real device yet.
 - [ ] §3.3's open questions either resolved (with a `ROADMAP.md` §5 entry) or explicitly
       deferred with a stated reason — not silently left unaddressed. **Implemented exactly as
       flagged, not resolved:** `resetMode = ROLLING_WINDOW` and `MissionPeriod.periodType =

@@ -2867,3 +2867,60 @@ an instrumented test) — none started yet, no owner assigned in this pass. Item
 (the Integration Plan's own open questions) remains untouched by this pass, exactly as it was
 left before — still genuinely open, not implicitly resolved by CI passing or the app not
 crashing.
+
+---
+
+### 5.35 — DAO-level linkage test added for Batch G2's open verification-checklist item; not yet CI-confirmed, does not close the on-device row
+
+**Closes part of item 5 above, precisely stated.** §5.34 named three options that would let
+"the three rows were written correctly and linked correctly" (Batch G2's own checklist wording)
+actually be checked instead of assumed from "no exception was thrown": a debug DB inspector,
+added logging, or an instrumented test reading the rows back. This pass takes the third option,
+consistent with this module's existing convention (`fragment-testing` deliberately removed —
+`app/build.gradle.kts` — so every screen-level test file in this package is already a
+Robolectric + in-memory-Room DAO test, not an on-device instrumented test).
+
+**What was built:** `FirstMissionSchedulingFragmentTest` (`:app`) gained a private
+`insertGoalMissionChain` helper that mirrors `createMissionAndFinish`'s real
+`database.withTransaction { }` block field-for-field — same `GoalMission` field values
+(`archetype = BEHAVIOR_DRIVEN`, `resetMode = ROLLING_WINDOW`, same known `MissionPeriod`
+`FIXED_WINDOW`/null-window mismatch §3.3/§7.4 already flagged, not silently fixed by the test),
+same insert order, real generated ids threaded through rather than fabricated random ones (the
+pre-existing tests in this file insert a standalone `EnforcementSession` with a random
+disconnected `missionId` — they never exercised the real chain and could not have caught a
+wrong-parent-id bug). Four new test cases use it:
+
+- Exactly one `GoalMission` and one `EnforcementSession` exist after one call, and the full
+  chain resolves correctly both ways — `EnforcementSession.missionId` → the real `GoalMission`,
+  `EnforcementSession.missionPeriodId` → a real `MissionPeriod` whose own `missionId` points
+  back to that same `GoalMission`. This is the specific claim §5.34 left unconfirmed.
+- `GoalMission.title`/`MissionPeriod.enforcementProfileId`/`EnforcementSession.missionProfileId`
+  and allow/blocklist carry-over from the `MissionProfile` all match, matching this file's
+  existing style of checking field carry-over explicitly rather than assuming it.
+- The known, flagged (not fixed) no-re-entry-guard gap now covers the full three-row chain, not
+  just a standalone `EnforcementSession` as the pre-existing test checked — two calls produce
+  two distinct `GoalMission` rows, documenting rather than resolving Integration Plan §7.3's
+  open question.
+- The Schedule-Mission (`scheduledStart` non-null) path links identically to Start-now —
+  `scheduledStart` only changes which button path was taken, not the chain's shape.
+
+**What this does and does not confirm — stated precisely, same standard §5.34 set:** this test
+runs against an in-memory Room database under Robolectric, not a real device, and has not yet
+been run through a real compiler or CI (no Gradle/Android toolchain reachable from the authoring
+sandbox — confirmed again this pass: `./gradlew --version` fails with an HTTP 403 fetching the
+Gradle distribution, network egress is domain-allowlisted and `services.gradle.org` isn't on
+it). It gives strong reason to expect the real transaction links correctly, since the test
+mirrors that transaction's code verbatim rather than testing a hand-simplified stand-in — but
+"passes a mirrored test, once it's actually run" and "confirmed against real on-device rows" are
+still two different claims, and this pass only has grounds to make progress on the first. The
+on-device checklist row in `BUILD_PLAN.md` Batch G2 stays open.
+
+**`BUILD_PLAN.md` updated to match, same pass:** Batch G2's linkage checklist item is split into
+two rows instead of one — the DAO-level test (now checked, with the precise caveat above) and
+the on-device confirmation (still open) — rather than checking one box that would blur the two
+claims together, the same mistake §5.34 itself was written to correct.
+
+**Still open:** on-device confirmation itself (debug DB inspector, logging, or an on-device
+instrumented test, per §5.34's original list — the DAO-level test doesn't substitute for any of
+the three); this test's own first real CI run; Integration Plan §7.3's open question (whether a
+re-entry guard should exist at all), left exactly as open as §5.34 found it.
