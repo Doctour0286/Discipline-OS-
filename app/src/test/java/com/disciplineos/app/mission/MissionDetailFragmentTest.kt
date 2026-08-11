@@ -41,6 +41,8 @@ class MissionDetailFragmentTest {
         targetDirection: TargetDirection? = null,
         targetValue: Double? = null,
         adherenceScore: Double? = null,
+        lifecycleStage: LifecycleStage = LifecycleStage.ENFORCING,
+        triggerPromptDismissedAt: Instant? = null,
     ): GoalMission = GoalMission(
         id = UUID.randomUUID(),
         userId = UUID.randomUUID(),
@@ -52,11 +54,12 @@ class MissionDetailFragmentTest {
         cadenceType = CadenceType.DAILY,
         resetMode = ResetMode.ROLLING_WINDOW,
         measurementSource = MeasurementSource.MANUAL_LOG,
-        lifecycleStage = LifecycleStage.ENFORCING,
+        lifecycleStage = lifecycleStage,
         adherenceScore = adherenceScore,
         adherenceWindow = 7,
         createdAt = Instant.EPOCH,
         archivedAt = null,
+        triggerPromptDismissedAt = triggerPromptDismissedAt,
     )
 
     private fun result(hitRate: Double?, isSecondary: Boolean? = false): ApplyAdherenceDecayUseCase.Result =
@@ -295,5 +298,72 @@ class MissionDetailFragmentTest {
         assertEquals(42.0, state.adherenceScore)
         assertEquals(0.5, state.hitRate)
         assertFalse(state.isSecondary)
+    }
+
+    // --- Batch G5: trigger prompt visibility ---
+
+    @Test
+    fun `trigger prompt hidden by default when hasExistingTrigger is omitted (pre-G5 call sites unaffected)`() {
+        // Every test above this line predates hasExistingTrigger and doesn't pass it — this
+        // confirms the default keeps them meaningful rather than silently always-true/false in
+        // a way that would make their omission of the parameter accidental rather than correct.
+        val state = computeMissionDetailState(
+            goalMission = goalMission(),
+            adherenceResult = result(hitRate = 0.5),
+            logEntries = emptyList(),
+            hitRateThreshold = HIT_RATE_THRESHOLD,
+        )
+        assertFalse(state.showTriggerPrompt)
+    }
+
+    @Test
+    fun `trigger prompt shown while Hypothesizing with no existing trigger and not dismissed`() {
+        val state = computeMissionDetailState(
+            goalMission = goalMission(lifecycleStage = LifecycleStage.HYPOTHESIZING),
+            adherenceResult = result(hitRate = 0.5),
+            logEntries = emptyList(),
+            hitRateThreshold = HIT_RATE_THRESHOLD,
+            hasExistingTrigger = false,
+        )
+        assertTrue(state.showTriggerPrompt)
+    }
+
+    @Test
+    fun `trigger prompt hidden outside Hypothesizing regardless of trigger state`() {
+        val state = computeMissionDetailState(
+            goalMission = goalMission(lifecycleStage = LifecycleStage.OBSERVING),
+            adherenceResult = result(hitRate = 0.5),
+            logEntries = emptyList(),
+            hitRateThreshold = HIT_RATE_THRESHOLD,
+            hasExistingTrigger = false,
+        )
+        assertFalse(state.showTriggerPrompt)
+    }
+
+    @Test
+    fun `trigger prompt hidden once a Trigger already exists, even while Hypothesizing`() {
+        val state = computeMissionDetailState(
+            goalMission = goalMission(lifecycleStage = LifecycleStage.HYPOTHESIZING),
+            adherenceResult = result(hitRate = 0.5),
+            logEntries = emptyList(),
+            hitRateThreshold = HIT_RATE_THRESHOLD,
+            hasExistingTrigger = true,
+        )
+        assertFalse(state.showTriggerPrompt)
+    }
+
+    @Test
+    fun `trigger prompt hidden once dismissed, even while Hypothesizing with no existing trigger`() {
+        val state = computeMissionDetailState(
+            goalMission = goalMission(
+                lifecycleStage = LifecycleStage.HYPOTHESIZING,
+                triggerPromptDismissedAt = Instant.EPOCH,
+            ),
+            adherenceResult = result(hitRate = 0.5),
+            logEntries = emptyList(),
+            hitRateThreshold = HIT_RATE_THRESHOLD,
+            hasExistingTrigger = false,
+        )
+        assertFalse(state.showTriggerPrompt)
     }
 }

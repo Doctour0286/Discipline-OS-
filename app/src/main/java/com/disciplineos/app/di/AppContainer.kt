@@ -10,6 +10,7 @@ import com.disciplineos.domain.policy.HypothesisBehavioralFingerprintPolicy
 import com.disciplineos.domain.policy.HypothesisConsequencePolicy
 import com.disciplineos.domain.usecase.ApplyAdherenceDecayUseCase
 import com.disciplineos.domain.usecase.ComputeBehavioralFingerprintUseCase
+import com.disciplineos.domain.usecase.CreateConstraintTriggerUseCase
 import com.disciplineos.domain.usecase.RecordViolationUseCase
 import com.disciplineos.domain.usecase.TierTransitionUseCase
 import com.disciplineos.domain.voice.WardenVoiceGenerator
@@ -96,6 +97,22 @@ object AppContainer {
             enforcementSessionDao = db.enforcementSessionDao(),
             adherenceLedgerDao = db.adherenceLedgerDao(),
             policy = adherenceDecayPolicy(),
+        )
+    }
+
+    /**
+     * Batch G5 — first real call site, wired for the Trigger creation screen's `APP_OPEN`-on-
+     * `CONSTRAINT` path. See [CreateConstraintTriggerUseCase]'s own kdoc for the full
+     * MissionProfile-sourcing reasoning.
+     */
+    fun createConstraintTriggerUseCase(context: Context): CreateConstraintTriggerUseCase {
+        val db = database(context)
+        return CreateConstraintTriggerUseCase(
+            database = db,
+            goalMissionDao = db.goalMissionDao(),
+            missionPeriodDao = db.missionPeriodDao(),
+            missionProfileDao = db.missionProfileDao(),
+            triggerDao = db.triggerDao(),
         )
     }
 

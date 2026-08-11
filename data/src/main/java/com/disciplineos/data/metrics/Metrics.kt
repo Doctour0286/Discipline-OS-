@@ -1,5 +1,6 @@
 package com.disciplineos.data.metrics
 
+import com.disciplineos.data.entity.LifecycleStage
 import com.disciplineos.data.entity.Tier
 import kotlin.math.max
 import kotlin.math.min
@@ -58,4 +59,47 @@ fun ironCalibrationSatisfied(
     if (tier != Tier.IRON) return true // gate only applies to Iron
     val windowMillis = calibrationWindowDays * 24L * 60 * 60 * 1000
     return nowEpochMilli >= tierSelectedAtEpochMilli + windowMillis
+}
+
+/**
+ * Batch G5 (BUILD_PLAN.md), Integration Plan §6 / base design doc §5 ("Mission lifecycle:
+ * observe -> hypothesize -> enforce -> review"). Answers "should this GoalMission move from
+ * OBSERVING to HYPOTHESIZING as of now" — a pure read, same "does not mutate anything, caller
+ * decides what to do with the result" contract [ironCalibrationSatisfied] already establishes
+ * for this file, and the same reuse Integration Plan §6 explicitly asks for ("computed the same
+ * way ironCalibrationSatisfied is today — a pure function, reused rather than re-derived at each
+ * call site").
+ *
+ * Base doc §5, step 2: "after a minimum number of outcome logs with no behavior attached (a
+ * small number, e.g. 2-3 -- exact threshold is `[HYPOTHESIS]`, not fixed here), the app may
+ * surface a single, dismissible, non-scored prompt to attach a behavior." Two conditions from
+ * that sentence, both required:
+ * - the mission is still in [LifecycleStage.OBSERVING] (step 1's own state) — a mission already
+ *   past Observing has nothing to transition *into* Hypothesizing from; re-firing this check on
+ *   an already-Hypothesizing or already-Enforcing mission must be a no-op, not a downgrade.
+ * - [outcomeLogCount] (count of [com.disciplineos.data.entity.MissionLogEntry] rows for this
+ *   mission) has reached [threshold], with no behavior attached yet.
+ *
+ * "No behavior attached yet" is represented here as [hasAnyBehaviorAttached] rather than this
+ * function inspecting [com.disciplineos.data.entity.MissionPeriod] rows itself — same
+ * DB-free-pure-function boundary this file's own kdoc states; the caller (a use-case or Fragment
+ * with real DAO access) resolves that existence check (`MissionPeriodDao.forMission(missionId)
+ * .isNotEmpty()`) and passes in the boolean.
+ *
+ * [threshold] has no default here (unlike [ironCalibrationSatisfied]'s implicit reliance on a
+ * caller-supplied [Int] with no built-in fallback either) — the placeholder value itself lives
+ * at the call site as a flagged `[HYPOTHESIS]` constant, matching every other unstated-in-spec
+ * number in this codebase (`NEAR_MISS_MARGIN`, `MIN_ENTRIES_FOR_TREND`, etc.) rather than being
+ * silently baked into this shared function where a future real value would require an API
+ * change to plug in.
+ */
+fun hypothesizingStageSatisfied(
+    currentStage: LifecycleStage,
+    hasAnyBehaviorAttached: Boolean,
+    outcomeLogCount: Int,
+    threshold: Int,
+): Boolean {
+    if (currentStage != LifecycleStage.OBSERVING) return false
+    if (hasAnyBehaviorAttached) return false
+    return outcomeLogCount >= threshold
 }

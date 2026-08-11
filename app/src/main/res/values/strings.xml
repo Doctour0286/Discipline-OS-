@@ -365,6 +365,39 @@
     <string name="mission_detail_quadrant_skipped_but_moving">The outcome is moving even without the behavior happening consistently. Worth reconsidering whether this behavior is really what\'s driving it.</string>
 
     <!--
+        Batch G5 — "attach a Trigger?" prompt on Mission Detail, base doc §4.3 / Integration
+        Plan §6: shown once per Mission during HYPOTHESIZING, "offered more assertively than a
+        bare mention but never mandatory." Copy aims for that register directly, not a bare
+        one-liner nudge.
+    -->
+    <string name="mission_detail_trigger_prompt_title">Give this a cue</string>
+    <string name="mission_detail_trigger_prompt_body">You\'ve been logging outcomes for a while without a specific behavior attached. A trigger — a simple if-then plan — can make it easier to actually follow through.</string>
+    <string name="mission_detail_trigger_prompt_attach_button">Add a trigger</string>
+    <string name="mission_detail_trigger_prompt_dismiss_button">Not now</string>
+
+    <!--
+        Batch G5 — Trigger creation form, base doc §3.4/§4.3. cue_type_app_open is only shown
+        as a real option for CONSTRAINT-archetype missions (see TriggerCreationScreen.kt's own
+        kdoc); the string itself is archetype-agnostic.
+    -->
+    <string name="trigger_creation_title">Add a trigger</string>
+    <string name="trigger_creation_intro">A trigger is a simple if-then plan: when a specific cue happens, you do a specific response. Naming both in advance makes it easier to follow through in the moment.</string>
+    <string name="trigger_creation_cue_type_label">What kind of cue?</string>
+    <string name="trigger_cue_type_time_of_day">A time of day</string>
+    <string name="trigger_cue_type_preceding_event">Something that happens right before</string>
+    <string name="trigger_cue_type_location">Being in a certain place</string>
+    <string name="trigger_cue_type_app_open">Opening a specific app</string>
+    <string name="trigger_cue_type_manual">Something else</string>
+    <string name="trigger_creation_cue_description_label">Describe the cue</string>
+    <string name="trigger_creation_cue_description_placeholder">e.g. right after I finish dinner</string>
+    <string name="trigger_creation_response_description_label">What will you do instead?</string>
+    <string name="trigger_creation_response_description_placeholder">e.g. open the reading app</string>
+    <string name="trigger_creation_package_label">App to block</string>
+    <string name="trigger_creation_package_placeholder">Package name, e.g. com.example.app</string>
+    <string name="trigger_creation_create_button">Create trigger</string>
+    <string name="trigger_creation_back_button">Cancel</string>
+
+    <!--
         Iron Calibration — PRD §12.6 / Data Model §5. The real destination for an existing
         user reaching Iron after their calibrationWindowDays window elapses, via
         TierTransitionUseCase.activateIron(). Distinct from the onboarding-time-only

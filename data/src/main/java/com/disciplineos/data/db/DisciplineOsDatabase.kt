@@ -166,7 +166,15 @@ import net.sqlcipher.database.SupportFactory
     // kdoc for the full account. No prior code read or wrote the old shape (`TriggerDao.insert`/
     // `forMission` exist but were called nowhere), so nothing else changes and no data is lost
     // under this project's still-in-effect fallbackToDestructiveMigration() policy.
-    version = 12,
+    // v13 (Batch G5): `GoalMission` gains `triggerPromptDismissedAt: Instant? = null` — a small
+    // motivated addition, same category as v11's `consecutiveWindowsBelowThreshold`. Backs the
+    // "attach a Trigger?" prompt's "shown once per Mission during HYPOTHESIZING" requirement
+    // (base doc §4.3/Integration Plan §6) — a per-Mission current-state fact, not an event log,
+    // so a nullable field on the existing row is simpler than a new dismissal table. See
+    // GoalMission.kt's own kdoc for the full reasoning, including why this doesn't mirror
+    // PredictiveFailureAlertDismissal's shape. Same fallbackToDestructiveMigration reasoning as
+    // every bump above: still pre-launch, still no real installed base.
+    version = 13,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
