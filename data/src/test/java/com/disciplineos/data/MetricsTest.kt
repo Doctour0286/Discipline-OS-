@@ -1,9 +1,11 @@
 package com.disciplineos.data
 
+import com.disciplineos.data.entity.LifecycleStage
 import com.disciplineos.data.entity.Tier
 import com.disciplineos.data.metrics.clampToDebtCeiling
 import com.disciplineos.data.metrics.debtCeiling
 import com.disciplineos.data.metrics.debtQuartileMarkers
+import com.disciplineos.data.metrics.hypothesizingStageSatisfied
 import com.disciplineos.data.metrics.ironCalibrationSatisfied
 import com.disciplineos.data.metrics.reliabilityIndex
 import org.junit.Assert.assertEquals
@@ -73,6 +75,82 @@ class MetricsTest {
                 tierSelectedAtEpochMilli = 0L,
                 calibrationWindowDays = 10,
                 nowEpochMilli = 0L, // no time elapsed at all
+            ),
+        )
+    }
+
+    @Test
+    fun `hypothesizing stage not satisfied below the threshold`() {
+        assertFalse(
+            hypothesizingStageSatisfied(
+                currentStage = LifecycleStage.OBSERVING,
+                hasAnyBehaviorAttached = false,
+                outcomeLogCount = 2,
+                threshold = 3,
+            ),
+        )
+    }
+
+    @Test
+    fun `hypothesizing stage satisfied once outcome log count reaches the threshold`() {
+        assertTrue(
+            hypothesizingStageSatisfied(
+                currentStage = LifecycleStage.OBSERVING,
+                hasAnyBehaviorAttached = false,
+                outcomeLogCount = 3,
+                threshold = 3,
+            ),
+        )
+        // Past the threshold, not just at it, should also satisfy.
+        assertTrue(
+            hypothesizingStageSatisfied(
+                currentStage = LifecycleStage.OBSERVING,
+                hasAnyBehaviorAttached = false,
+                outcomeLogCount = 5,
+                threshold = 3,
+            ),
+        )
+    }
+
+    @Test
+    fun `hypothesizing stage never satisfied once a behavior is already attached`() {
+        // Even with plenty of outcome logs, a mission that already has a behavior attached
+        // has nothing left to transition into Hypothesizing for.
+        assertFalse(
+            hypothesizingStageSatisfied(
+                currentStage = LifecycleStage.OBSERVING,
+                hasAnyBehaviorAttached = true,
+                outcomeLogCount = 10,
+                threshold = 3,
+            ),
+        )
+    }
+
+    @Test
+    fun `hypothesizing stage never satisfied outside Observing`() {
+        // Already Hypothesizing, Enforcing, or Reviewing — nothing to transition from.
+        assertFalse(
+            hypothesizingStageSatisfied(
+                currentStage = LifecycleStage.HYPOTHESIZING,
+                hasAnyBehaviorAttached = false,
+                outcomeLogCount = 10,
+                threshold = 3,
+            ),
+        )
+        assertFalse(
+            hypothesizingStageSatisfied(
+                currentStage = LifecycleStage.ENFORCING,
+                hasAnyBehaviorAttached = false,
+                outcomeLogCount = 10,
+                threshold = 3,
+            ),
+        )
+        assertFalse(
+            hypothesizingStageSatisfied(
+                currentStage = LifecycleStage.REVIEWING,
+                hasAnyBehaviorAttached = false,
+                outcomeLogCount = 10,
+                threshold = 3,
             ),
         )
     }
