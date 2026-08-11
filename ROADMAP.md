@@ -3142,9 +3142,6 @@ out of scope. `ApplyAdherenceDecayUseCaseTest`'s scope-gating block updated to m
 "BEHAVIOR_DRIVEN with a session is out of scope" test is now "...still computes but is flagged
 secondary," asserting `inScope == true`, `isSecondary == true`, and a non-null `hitRate`.
 
-No G4 code exists yet to consume `isSecondary` (G4 hasn't started) — this fix is purely G3-side,
-correcting the computation/`Result` shape before anything is built against it.
-
 ### 5.39 G4: Mission Detail screen + Home entry point (Integration Plan §5/§7.6, base doc §4.1/§4.2)
 
 Builds on §5.38's corrected `Result` shape. New: `MissionDetailFragment`/`MissionDetailScreen`
@@ -3175,3 +3172,35 @@ function, no Robolectric), matching `HomeFragmentTest`'s precedent — behavior-
 classification at and around the threshold/near-miss boundary, all four relationship quadrants,
 the `MAINTAIN` tolerance band, and the never-evaluated (`null` hitRate) case.
 
+### 5.40 Doc sync: PR #35 (G4, Mission Detail screen) merged, CI green, confirmed installed
+
+`BUILD_PLAN.md`'s G4 checklist and status line still said "NOT STARTED"/unchecked after the PR
+actually merged — same category of stale-doc gap §5.36's entry closed out for G3. Updates both
+to match reality:
+
+- CI failed on the first push: `Unresolved reference: RelationshipView` at
+  `MissionDetailFragment.kt:157`. Root cause was a missing import, not a logic error —
+  `RelationshipView` (a `data class` in `com.disciplineos.app.ui.mission`, `MissionDetailScreen.kt`)
+  was used directly in `computeMissionDetailState` but never imported into
+  `MissionDetailFragment.kt`, even though every sibling type from that same package
+  (`BehaviorReadClassification`, `MissionDetailScreen`, `MissionDetailUiState`,
+  `RelationshipQuadrant`) was. Extensive manual pre-push review (schema/DAO/policy method
+  existence, enum value spelling, string-resource key matching, constructor-signature
+  cross-checks) caught the file's *only other* real defect — a stale hardcoded threshold
+  constant left over from a mid-session refactor — but missed this one. Second push, CI green.
+- Confirmed installed on-device: Mission list card visible on Home, Mission Detail screen
+  reachable and rendering.
+- `BUILD_PLAN.md`'s G4 checklist: all three rows checked off (CI green, on-device confirmed,
+  entry-point decision recorded — Home Mission list, per Integration Plan §7.6, logged in
+  §5.39 above). G5's status note updated to reflect both its dependencies (G1's `Trigger`
+  entity, G4's screen) as now satisfied.
+
+**Same reflection §5.36 already recorded for G3, worth restating rather than treating as a
+one-off:** manual review without a real compiler in the loop reliably catches schema/contract
+mismatches (wrong field names, wrong enum values, signature drift) but is a weak substitute for
+actually compiling when the defect is a plain missing import — a category of error that's
+trivial for a compiler to catch and easy for a human read-through to skip past, especially in a
+file with a long import block where the missing entry is one line among many that are all
+otherwise correct. Doesn't change the practice (this project still can't run Gradle in the
+authoring environment), but is worth naming again as a known, recurring blind spot rather than
+assuming §5.36's finding was a one-time fluke.

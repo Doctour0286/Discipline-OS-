@@ -61,10 +61,10 @@ Batch G2 (Mission creation: real FirstMissionSchedulingFragment fix)
 Batch G3 (Adherence engine: ApplyAdherenceDecayUseCase)
         │
         ▼
-Batch G4 (Mission detail screen)  ◄── needs a real entry point; see G4's own note
+Batch G4 (Mission detail screen)  ◄── DONE, PR #35 — entry point: Home Mission list
         │
         ▼
-Batch G5 (Trigger UI + lifecycle prompts)
+Batch G5 (Trigger UI + lifecycle prompts)  ◄── next up
         │
         ▼
 Batch G6 (Milestone UI)  ◄── sequenced last, per the base design doc's own §F
@@ -324,32 +324,29 @@ nullability) and the one real CI-caught bug (a test timing issue, not production
 
 ## Batch G4 — Mission detail screen (§4.1 relationship view)
 
-**Status: NOT STARTED. Depends on G1–G3 for real data to render.**
+**Status: DONE. Merged (PR #35), CI green, confirmed installed on-device.**
 
 **Full detail:** Integration Plan §5.
 
 **Scope:** a real detail screen showing a `GoalMission`'s relationship to its
 `EnforcementSession`s, `MissionPeriod`s, and log entries — Integration Plan §5's own framing.
 
-**Needs a real entry point — this is not automatic.** Integration Plan §7.6 flags that nothing
-in the base design doc's §8 names where this screen is reached *from*. `HomeScreen.kt`
-currently shows "current tier + Iron eligibility card only" (§5.31) — deliberately minimal, not
-a dashboard. This batch needs an explicit decision (product-owner sign-off, same pattern as
-every other open fork in this project) on whether the entry point is a Home screen addition, a
-new nav destination reachable some other way, or something else — do not silently invent one.
+**Entry-point decision:** Mission list/card added to `HomeScreen` (not a new standalone
+destination) — Integration Plan §7.6's own stated resolution, recorded in `ROADMAP.md` §5.39.
 
 **Verification checklist:**
-- [ ] CI green
-- [ ] On-device confirmed
-- [ ] Entry-point decision recorded in `ROADMAP.md` §5 before/alongside this batch, not
-      improvised inside the PR with no record of why
+- [x] CI green — PR #35. First push failed (`Unresolved reference: RelationshipView` — a
+      missing import, not a logic bug); second push green. See `ROADMAP.md` §5.40.
+- [x] On-device confirmed — cards render in-app.
+- [x] Entry-point decision recorded in `ROADMAP.md` §5.39 before/alongside this batch.
 
 ---
 
 ## Batch G5 — Trigger UI + lifecycle prompts
 
-**Status: NOT STARTED. Depends on G1 (needs the `Trigger` entity) and G4 (needs a screen to
-surface prompts from/into).**
+**Status: NOT STARTED. Depends on G1 (needs the `Trigger` entity, already shipped) and G4
+(needs a screen to surface prompts from/into — shipped, PR #35). Both dependencies now satisfied;
+this is the next batch in sequence.**
 
 **Full detail:** Integration Plan §6.
 
