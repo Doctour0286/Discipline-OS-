@@ -5,7 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.disciplineos.data.db.DisciplineOsDatabase
 import com.disciplineos.data.entity.DisputeStatus
-import com.disciplineos.data.entity.Mission
+import com.disciplineos.data.entity.EnforcementSession
 import com.disciplineos.data.entity.MissionStatus
 import com.disciplineos.data.entity.PredictiveFailureAlertDismissal
 import com.disciplineos.data.entity.PredictiveFailureAlertOutcome
@@ -102,9 +102,10 @@ class ComputeBehavioralFingerprintUseCaseTest {
     ): UUID {
         val missionId = UUID.randomUUID()
         db.missionDao().insert(
-            Mission(
+            EnforcementSession(
                 id = missionId,
                 userId = userId,
+                goalMissionId = null,
                 scheduledStart = null,
                 actualStart = actualStart,
                 actualEnd = actualStart.plusSeconds(60),
@@ -393,9 +394,10 @@ class ComputeBehavioralFingerprintUseCaseTest {
     private suspend fun seedResolvedMission(actualStart: Instant, durationMinutes: Long, status: MissionStatus): UUID {
         val missionId = UUID.randomUUID()
         db.missionDao().insert(
-            Mission(
+            EnforcementSession(
                 id = missionId,
                 userId = userId,
+                goalMissionId = null,
                 scheduledStart = null,
                 actualStart = actualStart,
                 actualEnd = actualStart.plusSeconds(durationMinutes * 60),

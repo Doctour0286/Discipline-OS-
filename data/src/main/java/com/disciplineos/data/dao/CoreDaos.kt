@@ -5,7 +5,7 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
 import com.disciplineos.data.entity.DisputeStatus
-import com.disciplineos.data.entity.Mission
+import com.disciplineos.data.entity.EnforcementSession
 import com.disciplineos.data.entity.MissionProfile
 import com.disciplineos.data.entity.MissionStatus
 import com.disciplineos.data.entity.OnboardingScreenEvent
@@ -102,16 +102,27 @@ interface OnboardingEventDao {
     suspend fun countByOutcome(screenId: String, outcome: OnboardingScreenEventOutcome): Int
 }
 
+/**
+ * Backs [EnforcementSession] (renamed from `Mission`, ROADMAP.md §5.32 — see that entity's own
+ * kdoc for the full rationale). The interface name `MissionDao`, every method name, the
+ * `missions` table name, and the `MissionStatus` enum are all deliberately kept unchanged in
+ * that rename — only the entity type each method returns/accepts changed, from `Mission` to
+ * [EnforcementSession]. Renaming the DAO interface and its methods too would be pure churn
+ * across every call site in `:app`/`:domain` with no semantic gain (same reasoning
+ * `OutputArtifact.missionId` and the `missions` table name are kept unchanged for, see
+ * [EnforcementSession]'s kdoc) — the type that flows through these methods is what changed,
+ * not what they're called or how they're queried.
+ */
 @Dao
 interface MissionDao {
     @Insert
-    suspend fun insert(mission: Mission)
+    suspend fun insert(mission: EnforcementSession)
 
     @Update
-    suspend fun update(mission: Mission)
+    suspend fun update(mission: EnforcementSession)
 
     @Query("SELECT * FROM missions WHERE id = :id")
-    suspend fun get(id: UUID): Mission?
+    suspend fun get(id: UUID): EnforcementSession?
 
     /**
      * Phase 2 (Accessibility Service, ROADMAP.md) needs this to answer "is there an active
@@ -125,13 +136,13 @@ interface MissionDao {
      * Assumes at most one ACTIVE Mission per user at a time. Nothing in the PRD or Data Model
      * doc states this explicitly, but §7 (Mission Launch Protocol) and §14 (Distraction
      * Interception) both describe Mission state in the singular ("the device enters a Mission
-     * Environment"), and `Mission.status` has no schema-level uniqueness constraint enforcing
+     * Environment"), and `EnforcementSession.status` has no schema-level uniqueness constraint enforcing
      * it — so this is a real, currently-unenforced assumption, not a spec-derived guarantee.
      * `LIMIT 1` is defensive (never crash the enforcement loop on this query), not a claim that
      * a second concurrent ACTIVE row is an expected or handled case. Logged in ROADMAP.md §5.
      */
     @Query("SELECT * FROM missions WHERE userId = :userId AND status = 'ACTIVE' LIMIT 1")
-    suspend fun activeMissionFor(userId: UUID): Mission?
+    suspend fun activeMissionFor(userId: UUID): EnforcementSession?
 
     /**
      * Rolling window query backing Reliability Index (Data Model §3.2) and Debt Ceiling's
@@ -146,7 +157,7 @@ interface MissionDao {
         ORDER BY actualStart ASC
         """
     )
-    suspend fun resolvedMissionsSince(userId: UUID, since: Instant): List<Mission>
+    suspend fun resolvedMissionsSince(userId: UUID, since: Instant): List<EnforcementSession>
 
     @Insert
     suspend fun insertOutputArtifact(artifact: OutputArtifact)
@@ -245,7 +256,8 @@ interface MissionDao {
 
 /**
  * Backs [MissionProfile] (see that file's kdoc for why this table exists at all — closes a
- * pre-existing gap, `Mission.missionProfileId` had nothing to point at before this). Kept as
+ * pre-existing gap, `EnforcementSession.missionProfileId` had nothing to point at before this).
+ * Kept as
  * its own `@Dao` matching [TierDao]'s own stated reasoning: a distinct table with its own
  * query shape, not folded into [MissionDao] just because the two entities are related.
  *

@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.disciplineos.data.db.DisciplineOsDatabase
-import com.disciplineos.data.entity.Mission
+import com.disciplineos.data.entity.EnforcementSession
 import com.disciplineos.data.entity.MissionProfile
 import com.disciplineos.data.entity.MissionStatus
 import com.disciplineos.data.entity.User
@@ -33,7 +33,7 @@ import java.util.UUID
  * `scheduledStart` being null for "Start now" versus a real future [Instant] for "Schedule
  * Mission", mirroring [FirstMissionSchedulingFragment.createMissionAndFinish] exactly — plus
  * the allowlist/blocklist/missionProfileId carry-over from the existing [MissionProfile], and
- * the missing-profile edge case producing no [Mission] row rather than crashing.
+ * the missing-profile edge case producing no [EnforcementSession] row rather than crashing.
  */
 @RunWith(RobolectricTestRunner::class)
 class FirstMissionSchedulingFragmentTest {
@@ -90,9 +90,10 @@ class FirstMissionSchedulingFragmentTest {
 
         // Mirrors createMissionAndFinish(scheduledStart = null).
         db.missionDao().insert(
-            Mission(
+            EnforcementSession(
                 id = UUID.randomUUID(),
                 userId = userId,
+                goalMissionId = null,
                 scheduledStart = null,
                 actualStart = Instant.now(),
                 actualEnd = null,
@@ -124,9 +125,10 @@ class FirstMissionSchedulingFragmentTest {
         // Mirrors createMissionAndFinish(scheduledStart = futureInstant) after a successful
         // parseScheduledTime call.
         db.missionDao().insert(
-            Mission(
+            EnforcementSession(
                 id = UUID.randomUUID(),
                 userId = userId,
+                goalMissionId = null,
                 scheduledStart = futureInstant,
                 actualStart = Instant.now(),
                 actualEnd = null,
@@ -173,9 +175,10 @@ class FirstMissionSchedulingFragmentTest {
 
         repeat(2) {
             db.missionDao().insert(
-                Mission(
+                EnforcementSession(
                     id = UUID.randomUUID(),
                     userId = userId,
+                    goalMissionId = null,
                     scheduledStart = null,
                     actualStart = Instant.now(),
                     actualEnd = null,

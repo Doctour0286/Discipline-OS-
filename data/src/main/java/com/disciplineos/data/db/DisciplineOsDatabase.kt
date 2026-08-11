@@ -5,19 +5,29 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.disciplineos.data.dao.GoalMissionDao
+import com.disciplineos.data.dao.MilestoneDao
 import com.disciplineos.data.dao.MissionDao
+import com.disciplineos.data.dao.MissionLogEntryDao
+import com.disciplineos.data.dao.MissionPeriodDao
 import com.disciplineos.data.dao.MissionProfileDao
 import com.disciplineos.data.dao.OnboardingEventDao
 import com.disciplineos.data.dao.PredictiveFailureAlertDismissalDao
 import com.disciplineos.data.dao.TierDao
+import com.disciplineos.data.dao.TriggerDao
 import com.disciplineos.data.dao.UserDao
 import com.disciplineos.data.dao.ViolationDao
-import com.disciplineos.data.entity.Mission
+import com.disciplineos.data.entity.EnforcementSession
+import com.disciplineos.data.entity.GoalMission
+import com.disciplineos.data.entity.Milestone
+import com.disciplineos.data.entity.MissionLogEntry
+import com.disciplineos.data.entity.MissionPeriod
 import com.disciplineos.data.entity.MissionProfile
 import com.disciplineos.data.entity.OnboardingScreenEvent
 import com.disciplineos.data.entity.OutputArtifact
 import com.disciplineos.data.entity.PredictiveFailureAlertDismissal
 import com.disciplineos.data.entity.TierEvent
+import com.disciplineos.data.entity.Trigger
 import com.disciplineos.data.entity.User
 import com.disciplineos.data.entity.Violation
 import com.disciplineos.data.ledger.LedgerDao
@@ -25,7 +35,8 @@ import com.disciplineos.data.ledger.LedgerEntry
 import net.sqlcipher.database.SupportFactory
 
 /**
- * Scoring/consequence database: User, Mission, Violation, LedgerEntry, OutputArtifact.
+ * Scoring/consequence database: User, EnforcementSession (formerly Mission), GoalMission and
+ * its supporting entities, Violation, LedgerEntry, OutputArtifact.
  *
  * This database and [UnsupervisedDatabase] (see separate file in this package) are
  * DELIBERATELY separate Room databases — separate files, separate SQLite connections —
@@ -42,7 +53,7 @@ import net.sqlcipher.database.SupportFactory
 @Database(
     entities = [
         User::class,
-        Mission::class,
+        EnforcementSession::class,
         Violation::class,
         LedgerEntry::class,
         OutputArtifact::class,
@@ -50,6 +61,11 @@ import net.sqlcipher.database.SupportFactory
         MissionProfile::class,
         OnboardingScreenEvent::class,
         PredictiveFailureAlertDismissal::class,
+        GoalMission::class,
+        MissionPeriod::class,
+        MissionLogEntry::class,
+        Trigger::class,
+        Milestone::class,
     ],
     // v2 (Phase 1): LedgerEntry.pausedAt added for §26.4 dispute-pause semantics.
     // v3 (Phase 1, TierTransitionUseCase): TierEvent table added; User gained
@@ -90,7 +106,21 @@ import net.sqlcipher.database.SupportFactory
     // needs a durable FingerprintSignal row, only the accuracy log does. Same
     // fallbackToDestructiveMigration reasoning applies unchanged; still no real installed
     // base.
-    version = 8,
+    // v9 (Goal-Oriented Mission Model, ROADMAP.md §5.32/§G1): `Mission` renamed to
+    // `EnforcementSession` (same `missions` table, same columns, plus one new nullable
+    // `goalMissionId` column — see EnforcementSession.kt kdoc). Four new tables added:
+    // `goal_missions`, `mission_periods`, `mission_log_entries`, `triggers`, `milestones` —
+    // see GoalMission.kt kdoc for all five entities' full rationale. No real Migration
+    // written, same fallbackToDestructiveMigration reasoning as every bump above — still
+    // pre-launch, still no real installed base. This is the first bump where that
+    // reasoning is being deliberately re-confirmed rather than just inherited: this rename
+    // touches a table with real seeded/test data flowing through it in every existing
+    // Phase 2+ on-device verification pass, but "real seeded/test data" is exactly what
+    // destructive fallback is already understood to discard on every reinstall in this
+    // project's existing dev workflow — DebugSeeder already assumes a fresh install re-seeds
+    // from scratch. Revisit this reasoning at the same trigger point already named above:
+    // before the first real pilot install (Phase 5).
+    version = 9,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -103,6 +133,11 @@ abstract class DisciplineOsDatabase : RoomDatabase() {
     abstract fun missionProfileDao(): MissionProfileDao
     abstract fun onboardingEventDao(): OnboardingEventDao
     abstract fun predictiveFailureAlertDismissalDao(): PredictiveFailureAlertDismissalDao
+    abstract fun goalMissionDao(): GoalMissionDao
+    abstract fun missionPeriodDao(): MissionPeriodDao
+    abstract fun missionLogEntryDao(): MissionLogEntryDao
+    abstract fun triggerDao(): TriggerDao
+    abstract fun milestoneDao(): MilestoneDao
 
     companion object {
         private const val DB_NAME = "disciplineos_core.db"

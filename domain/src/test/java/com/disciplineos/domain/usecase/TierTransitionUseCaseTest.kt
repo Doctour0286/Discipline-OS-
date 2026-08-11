@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.disciplineos.data.db.DisciplineOsDatabase
-import com.disciplineos.data.entity.Mission
+import com.disciplineos.data.entity.EnforcementSession
 import com.disciplineos.data.entity.MissionStatus
 import com.disciplineos.data.entity.Tier
 import com.disciplineos.data.entity.TierEventKind
@@ -79,10 +79,11 @@ class TierTransitionUseCaseTest {
         )
     }
 
-    private suspend fun seedMission(missionId: UUID, status: MissionStatus = MissionStatus.ACTIVE): Mission {
-        val mission = Mission(
+    private suspend fun seedMission(missionId: UUID, status: MissionStatus = MissionStatus.ACTIVE): EnforcementSession {
+        val mission = EnforcementSession(
             id = missionId,
             userId = userId,
+            goalMissionId = null,
             scheduledStart = null,
             actualStart = Instant.now(),
             actualEnd = null,

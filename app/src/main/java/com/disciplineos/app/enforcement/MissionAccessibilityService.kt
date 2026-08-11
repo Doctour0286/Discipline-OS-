@@ -5,7 +5,7 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.disciplineos.app.di.AppContainer
-import com.disciplineos.data.entity.Mission
+import com.disciplineos.data.entity.EnforcementSession
 import com.disciplineos.data.entity.User
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -108,7 +108,7 @@ class MissionAccessibilityService : AccessibilityService() {
 
     /**
      * Core decision: is there an active Mission for the current user, and if so, is
-     * [packageName] outside its allowlist / inside its blocklist? [Mission.blocklist] is the
+     * [packageName] outside its allowlist / inside its blocklist? [EnforcementSession.blocklist] is the
      * authoritative source per Data Model doc §2.2 — PRD §9's "only apps explicitly approved
      * for that Mission remain accessible; everything else is blocked" describes an allowlist
      * *model*, but the schema stores both lists explicitly (not "allowlist implies everything
@@ -139,7 +139,7 @@ class MissionAccessibilityService : AccessibilityService() {
      * constructs its own `InterceptionController` from these primitive extras for exactly that
      * reason — see that Activity's kdoc.
      */
-    private suspend fun launchInterception(mission: Mission, userId: UUID, packageName: String) {
+    private suspend fun launchInterception(mission: EnforcementSession, userId: UUID, packageName: String) {
         val clusterKey = mission.id to packageName
         val attemptNumber = (attemptCountByMissionAndPackage[clusterKey] ?: 0) + 1
         attemptCountByMissionAndPackage[clusterKey] = attemptNumber

@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.disciplineos.data.db.DisciplineOsDatabase
-import com.disciplineos.data.entity.Mission
+import com.disciplineos.data.entity.EnforcementSession
 import com.disciplineos.data.entity.MissionStatus
 import com.disciplineos.data.entity.Tier
 import com.disciplineos.data.entity.User
@@ -106,7 +106,7 @@ class InterceptionControllerTest {
         db.close()
     }
 
-    private suspend fun seedUserAndMission(tier: Tier): Mission {
+    private suspend fun seedUserAndMission(tier: Tier): EnforcementSession {
         db.userDao().insert(
             User(
                 id = userId,
@@ -117,9 +117,10 @@ class InterceptionControllerTest {
                 onboardingConsentVersion = "v1",
             ),
         )
-        val mission = Mission(
+        val mission = EnforcementSession(
             id = missionId,
             userId = userId,
+            goalMissionId = null,
             scheduledStart = null,
             actualStart = Instant.now(),
             actualEnd = null,
@@ -137,7 +138,7 @@ class InterceptionControllerTest {
      * the generator rather than skipping straight to the fallback bank on a healthy path. */
     private val alwaysSucceedsGenerator = WardenVoiceGenerator { _, _ -> "Present-you opened a blocked app. Present-you can still choose to return." }
 
-    private fun controllerFor(mission: Mission, tier: Tier, attemptNumber: Int = 1, generator: WardenVoiceGenerator = alwaysSucceedsGenerator) =
+    private fun controllerFor(mission: EnforcementSession, tier: Tier, attemptNumber: Int = 1, generator: WardenVoiceGenerator = alwaysSucceedsGenerator) =
         InterceptionController(
             mission = mission,
             tier = tier,
