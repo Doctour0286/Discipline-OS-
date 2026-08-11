@@ -344,23 +344,37 @@ destination) — Integration Plan §7.6's own stated resolution, recorded in `RO
 
 ## Batch G5 — Trigger UI + lifecycle prompts
 
-**Status: NOT STARTED. Depends on G1 (needs the `Trigger` entity, already shipped) and G4
-(needs a screen to surface prompts from/into — shipped, PR #35). Both dependencies now satisfied;
-this is the next batch in sequence.**
+**Status: IN REVIEW. Pushed to `g5-trigger-ui-lifecycle-prompts`, PR open (#38 on GitHub) — not
+yet merged.** Two CI rounds so far, both fixed:
+- Run #151 failed on two test-authoring bugs in `CreateConstraintTriggerUseCaseTest` (an
+  `Instant` DB-round-trip precision mismatch, and a nested-`runTest`-inside-`assertThrows`
+  exception-propagation bug) — fixed in commit `1907e49`.
+- Run #154 failed on a real production bug: `CreateConstraintTriggerUseCase` used
+  `requireNotNull` for a guard whose kdoc claimed it throws `IllegalStateException` —
+  `requireNotNull` actually always throws `IllegalArgumentException` in Kotlin; `checkNotNull`
+  is the correct stdlib call for that posture. Fixed in commit `208f0bc`. The same latent pattern
+  was found (not fixed) in five other files — see `ROADMAP.md` §5.42 and `STATUS.md`'s known
+  standing gaps.
+
+CI re-run pending as of this update. Full account: `ROADMAP.md` §5.42.
 
 **Full detail:** Integration Plan §6.
 
 **Scope:** UI for the `Trigger` entity's condition-based prompts and `GoalMission` lifecycle
-transitions (active → completed/abandoned) — see Integration Plan §6 for the exact prompt
-copy/timing requirements it specifies.
+transitions (`OBSERVING` → `HYPOTHESIZING`, per base doc §5 — this line previously said "active →
+completed/abandoned," which doesn't match the real `LifecycleStage` enum
+(`OBSERVING`/`HYPOTHESIZING`/`ENFORCING`/`REVIEWING`); corrected as part of this sync, another
+instance of the stale-summary-line pattern this project keeps finding and fixing elsewhere) —
+see Integration Plan §6 for the exact prompt copy/timing requirements it specifies.
 
 **Verification checklist:**
-- [ ] CI green
+- [ ] CI green — pending re-run after §5.42's fixes (two test-authoring bugs, one real
+      `requireNotNull`/`checkNotNull` production bug)
 - [ ] On-device confirmed
-- [ ] Trigger-fired prompts confirmed not to collide with the Predictive Failure Alert card
-      pattern's own home-screen surface (Batch C §3.5) — two different systems independently
-      wanting the same visual real estate is exactly the kind of surprise this checklist item
-      exists to catch before it ships, not after
+- [x] Trigger-fired prompts confirmed not to collide with the Predictive Failure Alert card
+      pattern's own home-screen surface (Batch C §3.5) — trivially satisfied: the trigger prompt
+      lives on Mission Detail, not Home, confirmed directly rather than assumed (`ROADMAP.md`
+      §5.42)
 
 ---
 

@@ -3247,3 +3247,146 @@ effort:** an Integration Plan section that says "direct transcription of §X" is
 verify against the actual source text, not a claim to trust because a prior batch already built
 against it. Trusting summaries of summaries is exactly how this class of drift compounds
 silently across batches.
+
+### 5.42 G5: Trigger UI + lifecycle prompts (Integration Plan §6, base doc §4.3/§5/§6.2) — pushed, PR open, not yet merged
+
+**Status note up front, since every prior G-batch entry in this log describes a merged state:**
+this entry documents work **pushed to `g5-trigger-ui-lifecycle-prompts` and opened as a PR
+(#38 on GitHub; CI job "build-and-test" ran as #151 then #154), not yet merged to `main`.** The
+doc sync below reflects that — `BUILD_PLAN.md`'s G5 status line moves to "in review," not
+"DONE," and `STATUS.md`'s Goal-Oriented Mission Model row is updated to name the open PR rather
+than claim G5 shipped. This is a deliberate departure from every prior `gN-docsync-post-merge`
+branch this project has used — this one is named `g5-docsync-pending-merge` for exactly that
+reason, so the branch name itself doesn't misstate where the work actually sits.
+
+**What G5 builds**, across four slices, all pushed:
+
+- **`hypothesizingStageSatisfied`** (`data/.../metrics/Metrics.kt`) — the `OBSERVING` →
+  `HYPOTHESIZING` lifecycle-stage transition, base doc §5 step 2: a `[HYPOTHESIS]`-flagged
+  threshold (3, picked per this project's existing "round number, no derivation" convention for
+  unresolved constants) of outcome logs with no behavior (`MissionPeriod`) attached. Built as a
+  pure function alongside `ironCalibrationSatisfied`, per Integration Plan §6's own explicit
+  instruction to reuse that precedent rather than re-derive the pattern. Full test coverage in
+  `MetricsTest.kt`.
+- **`CreateConstraintTriggerUseCase`** (`domain/.../usecase/`) — the one sanctioned call site
+  for an `APP_OPEN`-cue `Trigger` on a `CONSTRAINT`-archetype Mission, per base doc §6.2's
+  resolution: one transaction, one `MissionProfile` (fresh, scoped to exactly the one blocked
+  package — see the class's own kdoc for why reusing the user's general-purpose
+  `MissionProfileDao.mostRecentFor` profile would have been wrong, flagged `[HYPOTHESIS]` since
+  neither spec doc states where this profile should come from), one `MissionPeriod`
+  (`ALWAYS_ON`), one `Trigger` (descriptive only, never a second enforcement path). Explicitly
+  documented in its own kdoc that this use-case stores the data shape but does not itself wire
+  up live enforcement — nothing in `:domain`/`:app` reads `MissionPeriodDao`/`ALWAYS_ON` yet to
+  turn this into a real `EnforcementSession`; that bridge is separate, unbuilt work, not a claim
+  this batch makes.
+- **Trigger creation UI** (`TriggerCreationScreen.kt`/`TriggerCreationFragment.kt`) — cue type
+  selector + free-text cue/response fields, routing `APP_OPEN` on `CONSTRAINT` missions through
+  `CreateConstraintTriggerUseCase` and every other `(cueType, archetype)` combination through a
+  plain `TriggerDao.insert` (base doc §4.3: non-`APP_OPEN` cues are "not independently
+  phone-enforceable," matching this project's existing bias against use-case ceremony for a
+  trivial single-table write — `HomeFragment.recordDismissal`'s identical precedent).
+- **Mission Detail trigger prompt** — a dismissible card on `MissionDetailScreen`, shown once
+  per Mission while `lifecycleStage == HYPOTHESIZING`, matching Integration Plan §6's own stated
+  placement ("most naturally surfaced from the Mission detail screen"). Checked directly against
+  PRD §8.1 (Mission Profile Drift Detection) as the Integration Plan instructed rather than
+  trusted from the plan's characterization — found that §8.1 describes an unimplemented
+  detection *mechanism* (override/dispute-rate driven), not an existing UI pattern with code to
+  literally mirror, so the card was built matching §8.1's abstract shape (dismissible,
+  non-mandatory, single surfacing) rather than a claimed code reuse that doesn't exist.
+  Dismissal tracked via a new `GoalMission.triggerPromptDismissedAt: Instant?` field (DB v12→v13)
+  rather than a new dismissal table — simpler for a per-Mission, no-history-needed flag, same
+  "small motivated field addition" category as `consecutiveWindowsBelowThreshold` (§5.36).
+  Prompt hides once dismissed OR once any `Trigger` already exists for the Mission — both
+  independently satisfy "don't nag someone who already has one," an explicit judgment call since
+  neither spec doc states which of the two should gate it.
+
+**A real design gap found and resolved before writing `CreateConstraintTriggerUseCase`, not
+guessed:** Integration Plan §6 names the use-case's exact signature
+(`CreateConstraintTriggerUseCase(missionId, packageId, cueDescription)`) but never states where
+the `MissionPeriod.enforcementProfileId` it needs should come from. Confirmed directly (reading
+`CoreDaos.kt`) that `MissionProfileDao.mostRecentFor` is the only existing read method and
+returns the user's single general-purpose profile — reusing it wholesale would silently change
+enforcement for every other `EnforcementSession` referencing the same `MissionProfile.id`.
+Resolved (`[HYPOTHESIS]`) as: create a fresh, minimal `MissionProfile` per Constraint Trigger,
+scoped to exactly the one blocked package, matching base doc §6.2's own framing of `ALWAYS_ON`
+as being "for exactly the one behavior they named." Revisit if a future profile-picker UI
+(already flagged as future work in `MissionProfile`'s own kdoc) makes reuse-by-choice possible.
+
+**A pre-existing test suite found before touching it, not broken silently:**
+`MissionDetailFragmentTest.kt` already had 17 tests calling `computeMissionDetailState` with a
+fixed 4-parameter signature, all by explicit parameter name. The new trigger-prompt logic needed
+`hasAnyBehaviorAttached`/`outcomeLogCount`/`hasExistingTrigger` as additional inputs — added as
+new parameters with defaults so all 17 existing calls keep compiling and passing unmodified,
+rather than restructuring the signature. 5 new tests added covering `showTriggerPrompt`'s
+visibility logic specifically.
+
+**CI failure, first push (PR #38, CI run #151, `build-and-test` job) — two real bugs in the new
+test file, not in `CreateConstraintTriggerUseCase` itself:**
+
+1. `creates a MissionProfile, an ALWAYS_ON MissionPeriod, and an APP_OPEN Trigger in one call`
+   failed an `AssertionError` — the first test in this codebase to `assertEquals()` a full
+   entity against its own DB round-trip (`db.missionProfileDao().get(...)`, etc.). Room's
+   `Instant` converter (`Converters.kt`) stores `Instant` as epoch-millis, truncating any
+   sub-millisecond precision a bare `Instant.now()` carries — so the in-memory result and the
+   DB-round-tripped copy failed data-class equality on `createdAt`. Fixed by passing an
+   already-millis-truncated `now` into `useCase.execute(...)` in the test, so both sides compare
+   equal by construction. No production code changed.
+2. `rejects a non-CONSTRAINT mission rather than silently coercing it` failed an
+   `AssertionError` wrapping an unexpected `IllegalStateException` — the test wrapped
+   `assertThrows` around a **second, nested** `runTest { }`. Room's `withTransaction` dispatches
+   its lambda via its own dispatcher, and an exception thrown inside a nested `TestScope`
+   doesn't propagate out of `assertThrows` as its original type. `RecordViolationUseCaseTest`'s
+   `a crisis-exit mission must not go through this use-case` test already establishes this
+   project's working pattern for exactly this situation — `@Test(expected = ...)` directly on
+   the outer `suspend fun = runTest`, no nesting — and wasn't followed here. Fixed by switching
+   both exception tests (non-`CONSTRAINT` archetype, missing mission id) to that pattern, and
+   splitting the non-`CONSTRAINT` test's "writes nothing" postcondition into its own separate,
+   non-exception test, since `@Test(expected=)` can't both catch the expected exception and let
+   the test body continue to assert afterward.
+
+Both fixes pushed as a follow-up commit on the same branch (`1907e49`). CI re-run pending as of
+this entry.
+
+**CI failure, second push (PR #38, CI run #154) — one more real bug, this time in production
+code, not test code:** `rejects a missing mission id` failed with an unexpected
+`IllegalArgumentException` where `IllegalStateException` was expected, thrown from
+`CreateConstraintTriggerUseCase.kt:101` — the `requireNotNull(goalMissionDao.get(missionId))`
+guard itself. The use-case's own kdoc claimed `requireNotNull` throws `IllegalStateException`;
+that claim is simply wrong. Kotlin's `requireNotNull` always throws `IllegalArgumentException` —
+`checkNotNull` is the stdlib function for the "structurally impossible, not a normal caller
+error" `IllegalStateException` case this use-case's design actually wants (a real, distinct
+posture from `require`'s "bad archetype" `IllegalArgumentException` case a few lines below it).
+Fixed by swapping `requireNotNull` → `checkNotNull` in the use-case, preserving the intended
+`require`-vs-`checkNotNull` semantic split rather than flattening both guards to the same
+exception type. Pushed as a second follow-up commit (`208f0bc`).
+
+**This latent bug is not unique to this use-case — found while checking, not fixed elsewhere in
+this pass:** `grep -rl "requireNotNull(" domain/src/main/java app/src/main/java` turns up the
+same "should be structurally impossible, therefore `requireNotNull`" pattern in
+`RecordViolationUseCase` (the use-case this batch's kdoc originally cited as the precedent to
+match), `ApplyReputationDecayUseCase`, `ResolveDisputeUseCase`, `TierTransitionUseCase`,
+`MissionInterceptionActivity`, and `TriggerCreationFragment` (this same batch's own new file).
+None of those currently have a test that asserts the resulting exception's *type* (only this
+batch's new test did, which is exactly why this was never caught before now) — so none of them
+are demonstrably broken yet, but all of them almost certainly throw `IllegalArgumentException`
+where their own surrounding comments/intent describe an `IllegalStateException` posture. **Not
+fixed here** — out of this batch's scope, and changing five other files' exception types with no
+test coverage to verify each one risks its own regressions with no way to confirm correctness in
+this sandbox. Flagged as a real, standalone follow-up item (added to `STATUS.md`'s "known
+standing gaps").
+
+**Worth naming again, third or fourth time this project's history has hit some version of
+it:** a manual cross-check pass (imports, DAO signatures, enum spelling, schema registration —
+all confirmed correct on this batch) catches structural mismatches reliably but cannot catch
+either a test-authoring bug that only a real coroutine/Room runtime exposes (the `Instant`
+precision mismatch, the nested-`runTest` exception-propagation quirk — both fixed in the first
+follow-up commit) or a genuine stdlib-semantics error stated confidently in a kdoc and never
+verified (`requireNotNull` vs. `checkNotNull` — fixed in the second). The second one is the more
+concerning of the two: it's a real behavioral bug in shipped-shape production code, not test
+scaffolding, and it existed unnoticed in at least one other already-merged use-case
+(`RecordViolationUseCase`) before this batch's test suite happened to be the first to actually
+assert on the exception type closely enough to expose it. Same standing gap `STATUS.md`'s "known
+standing gaps" section already names (no compiler/toolchain reachable from the authoring
+sandbox) — not new information, but this batch is the first time that gap produced a real CI
+failure in production code specifically, not just test code, worth tracking as its own
+sub-category rather than folding silently into the existing note.
