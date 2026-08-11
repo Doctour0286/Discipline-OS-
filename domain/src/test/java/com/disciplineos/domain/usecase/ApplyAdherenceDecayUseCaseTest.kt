@@ -146,7 +146,8 @@ class ApplyAdherenceDecayUseCaseTest {
 
     @Test
     fun `a nonexistent GoalMission is out of scope`() = runTest {
-        val result = useCase.execute(UUID.randomUUID())
+        val now = Instant.now()
+        val result = useCase.execute(UUID.randomUUID(), now)
 
         assertFalse(result.inScope)
         assertEquals(emptyList<Any>(), result.entries)
@@ -156,37 +157,41 @@ class ApplyAdherenceDecayUseCaseTest {
 
     @Test
     fun `an OUTCOME_DRIVEN mission is always in scope`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(archetype = MissionArchetype.OUTCOME_DRIVEN)
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertTrue(result.inScope)
     }
 
     @Test
     fun `a CONSTRAINT mission is always in scope`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(archetype = MissionArchetype.CONSTRAINT, targetDirection = null, targetValue = null)
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertTrue(result.inScope)
     }
 
     @Test
     fun `a BEHAVIOR_DRIVEN mission with no attached EnforcementSession is in scope`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(archetype = MissionArchetype.BEHAVIOR_DRIVEN)
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertTrue(result.inScope)
     }
 
     @Test
     fun `a BEHAVIOR_DRIVEN mission with an attached EnforcementSession is out of scope`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(archetype = MissionArchetype.BEHAVIOR_DRIVEN)
         seedEnforcementSession(mission.id)
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertFalse(result.inScope)
         assertEquals(emptyList<Any>(), result.entries)
@@ -196,90 +201,99 @@ class ApplyAdherenceDecayUseCaseTest {
 
     @Test
     fun `didOccur true counts as a hit regardless of numericValue`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(cadenceType = CadenceType.NONE, targetDirection = null, targetValue = null)
-        seedLogEntry(mission.id, Instant.now().minus(1, ChronoUnit.DAYS), didOccur = true)
+        seedLogEntry(mission.id, now.minus(1, ChronoUnit.DAYS), didOccur = true)
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertEquals(1.0, result.hitRate!!, 0.0001)
     }
 
     @Test
     fun `didOccur false is a miss even with a qualifying numericValue`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(cadenceType = CadenceType.NONE, targetDirection = TargetDirection.INCREASE, targetValue = 1.0)
-        seedLogEntry(mission.id, Instant.now().minus(1, ChronoUnit.DAYS), didOccur = false, numericValue = 5.0)
+        seedLogEntry(mission.id, now.minus(1, ChronoUnit.DAYS), didOccur = false, numericValue = 5.0)
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertEquals(0.0, result.hitRate!!, 0.0001)
     }
 
     @Test
     fun `INCREASE direction hits when numericValue is at or above target`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(cadenceType = CadenceType.NONE, targetDirection = TargetDirection.INCREASE, targetValue = 10.0)
-        seedLogEntry(mission.id, Instant.now().minus(1, ChronoUnit.DAYS), numericValue = 10.0)
+        seedLogEntry(mission.id, now.minus(1, ChronoUnit.DAYS), numericValue = 10.0)
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertEquals(1.0, result.hitRate!!, 0.0001)
     }
 
     @Test
     fun `INCREASE direction misses when numericValue is below target`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(cadenceType = CadenceType.NONE, targetDirection = TargetDirection.INCREASE, targetValue = 10.0)
-        seedLogEntry(mission.id, Instant.now().minus(1, ChronoUnit.DAYS), numericValue = 5.0)
+        seedLogEntry(mission.id, now.minus(1, ChronoUnit.DAYS), numericValue = 5.0)
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertEquals(0.0, result.hitRate!!, 0.0001)
     }
 
     @Test
     fun `DECREASE direction hits when numericValue is at or below target`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(cadenceType = CadenceType.NONE, targetDirection = TargetDirection.DECREASE, targetValue = 10.0)
-        seedLogEntry(mission.id, Instant.now().minus(1, ChronoUnit.DAYS), numericValue = 8.0)
+        seedLogEntry(mission.id, now.minus(1, ChronoUnit.DAYS), numericValue = 8.0)
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertEquals(1.0, result.hitRate!!, 0.0001)
     }
 
     @Test
     fun `MAINTAIN direction hits within tolerance and misses outside it`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(cadenceType = CadenceType.NONE, targetDirection = TargetDirection.MAINTAIN, targetValue = 100.0)
         // Within 10% tolerance (90-110)
-        seedLogEntry(mission.id, Instant.now().minus(1, ChronoUnit.DAYS), numericValue = 105.0)
+        seedLogEntry(mission.id, now.minus(1, ChronoUnit.DAYS), numericValue = 105.0)
 
-        val withinResult = useCase.execute(mission.id)
+        val withinResult = useCase.execute(mission.id, now)
         assertEquals(1.0, withinResult.hitRate!!, 0.0001)
     }
 
     @Test
     fun `MAINTAIN direction misses outside tolerance`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(cadenceType = CadenceType.NONE, targetDirection = TargetDirection.MAINTAIN, targetValue = 100.0)
-        seedLogEntry(mission.id, Instant.now().minus(1, ChronoUnit.DAYS), numericValue = 150.0)
+        seedLogEntry(mission.id, now.minus(1, ChronoUnit.DAYS), numericValue = 150.0)
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertEquals(0.0, result.hitRate!!, 0.0001)
     }
 
     @Test
     fun `a numericValue entry with no targetValue set is a hit by presence alone`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(cadenceType = CadenceType.NONE, targetDirection = TargetDirection.INCREASE, targetValue = null)
-        seedLogEntry(mission.id, Instant.now().minus(1, ChronoUnit.DAYS), numericValue = 1.0)
+        seedLogEntry(mission.id, now.minus(1, ChronoUnit.DAYS), numericValue = 1.0)
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertEquals(1.0, result.hitRate!!, 0.0001)
     }
 
     @Test
     fun `a note-only entry counts toward neither hits nor expected count`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(cadenceType = CadenceType.NONE, targetDirection = null, targetValue = null)
-        seedLogEntry(mission.id, Instant.now().minus(1, ChronoUnit.DAYS), note = "just a check-in")
+        seedLogEntry(mission.id, now.minus(1, ChronoUnit.DAYS), note = "just a check-in")
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         // NONE cadence expects 1 entry; the note-only entry doesn't count as a hit, so 0/1.
         assertEquals(0.0, result.hitRate!!, 0.0001)
@@ -287,10 +301,11 @@ class ApplyAdherenceDecayUseCaseTest {
 
     @Test
     fun `entries outside the window are excluded`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(cadenceType = CadenceType.NONE, targetDirection = null, targetValue = null, adherenceWindow = 7)
-        seedLogEntry(mission.id, Instant.now().minus(30, ChronoUnit.DAYS), didOccur = true)
+        seedLogEntry(mission.id, now.minus(30, ChronoUnit.DAYS), didOccur = true)
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertEquals(0.0, result.hitRate!!, 0.0001)
     }
@@ -299,46 +314,50 @@ class ApplyAdherenceDecayUseCaseTest {
 
     @Test
     fun `DAILY cadence expects one entry per window day`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(cadenceType = CadenceType.DAILY, targetDirection = null, targetValue = null, adherenceWindow = 7)
         // 7 hits out of 7 expected (one per day) = 1.0
         for (i in 1..7) {
-            seedLogEntry(mission.id, Instant.now().minus(i.toLong(), ChronoUnit.DAYS), didOccur = true)
+            seedLogEntry(mission.id, now.minus(i.toLong(), ChronoUnit.DAYS), didOccur = true)
         }
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertEquals(1.0, result.hitRate!!, 0.0001)
     }
 
     @Test
     fun `WEEKLY cadence expects ceil(windowDays div 7)`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(cadenceType = CadenceType.WEEKLY, targetDirection = null, targetValue = null, adherenceWindow = 7)
         // Expected = ceil(7/7.0) = 1. One hit -> 1/1 = 1.0
-        seedLogEntry(mission.id, Instant.now().minus(1, ChronoUnit.DAYS), didOccur = true)
+        seedLogEntry(mission.id, now.minus(1, ChronoUnit.DAYS), didOccur = true)
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertEquals(1.0, result.hitRate!!, 0.0001)
     }
 
     @Test
     fun `NONE cadence expects only one entry total regardless of window length`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(cadenceType = CadenceType.NONE, targetDirection = null, targetValue = null, adherenceWindow = 30)
-        seedLogEntry(mission.id, Instant.now().minus(1, ChronoUnit.DAYS), didOccur = true)
+        seedLogEntry(mission.id, now.minus(1, ChronoUnit.DAYS), didOccur = true)
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertEquals(1.0, result.hitRate!!, 0.0001)
     }
 
     @Test
     fun `hit rate is capped at 1_0 even with more hits than expected`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(cadenceType = CadenceType.NONE, targetDirection = null, targetValue = null)
-        seedLogEntry(mission.id, Instant.now().minus(1, ChronoUnit.DAYS), didOccur = true)
-        seedLogEntry(mission.id, Instant.now().minus(2, ChronoUnit.DAYS), didOccur = true)
-        seedLogEntry(mission.id, Instant.now().minus(3, ChronoUnit.DAYS), didOccur = true)
+        seedLogEntry(mission.id, now.minus(1, ChronoUnit.DAYS), didOccur = true)
+        seedLogEntry(mission.id, now.minus(2, ChronoUnit.DAYS), didOccur = true)
+        seedLogEntry(mission.id, now.minus(3, ChronoUnit.DAYS), didOccur = true)
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertEquals(1.0, result.hitRate!!, 0.0001)
     }
@@ -347,6 +366,7 @@ class ApplyAdherenceDecayUseCaseTest {
 
     @Test
     fun `a single missed window increments the counter but writes no ledger entry`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(
             cadenceType = CadenceType.DAILY,
             targetDirection = null,
@@ -356,7 +376,7 @@ class ApplyAdherenceDecayUseCaseTest {
         )
         // No log entries at all in the window -> hitRate 0.0, below 0.7 threshold.
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertFalse(result.thresholdCrossing)
         assertEquals(0, result.entries.size)
@@ -365,6 +385,7 @@ class ApplyAdherenceDecayUseCaseTest {
 
     @Test
     fun `reaching the consecutive-windows threshold writes a decay entry and resets the counter`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(
             cadenceType = CadenceType.DAILY,
             targetDirection = null,
@@ -373,7 +394,7 @@ class ApplyAdherenceDecayUseCaseTest {
             consecutiveWindowsBelowThreshold = 1, // already 1 below; this call is the 2nd (policy threshold = 2)
         )
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertTrue(result.thresholdCrossing)
         assertEquals(1, result.entries.size)
@@ -387,6 +408,7 @@ class ApplyAdherenceDecayUseCaseTest {
 
     @Test
     fun `a met window resets a nonzero counter to zero and writes nothing`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(
             cadenceType = CadenceType.NONE,
             targetDirection = null,
@@ -394,9 +416,9 @@ class ApplyAdherenceDecayUseCaseTest {
             adherenceWindow = 7,
             consecutiveWindowsBelowThreshold = 1,
         )
-        seedLogEntry(mission.id, Instant.now().minus(1, ChronoUnit.DAYS), didOccur = true) // NONE expects 1 -> hitRate 1.0
+        seedLogEntry(mission.id, now.minus(1, ChronoUnit.DAYS), didOccur = true) // NONE expects 1 -> hitRate 1.0
 
-        val result = useCase.execute(mission.id)
+        val result = useCase.execute(mission.id, now)
 
         assertFalse(result.thresholdCrossing)
         assertEquals(0, result.entries.size)
@@ -405,21 +427,23 @@ class ApplyAdherenceDecayUseCaseTest {
 
     @Test
     fun `the first call establishes adherenceScore as 0_0 rather than leaving it null`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(
             cadenceType = CadenceType.NONE,
             targetDirection = null,
             targetValue = null,
             adherenceScore = null,
         )
-        seedLogEntry(mission.id, Instant.now().minus(1, ChronoUnit.DAYS), didOccur = true)
+        seedLogEntry(mission.id, now.minus(1, ChronoUnit.DAYS), didOccur = true)
 
-        useCase.execute(mission.id)
+        useCase.execute(mission.id, now)
 
         assertEquals(0.0, db.goalMissionDao().get(mission.id)!!.adherenceScore!!, 0.0001)
     }
 
     @Test
     fun `adherenceScore always reflects the current ledger sum even when this call writes nothing`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(cadenceType = CadenceType.NONE, targetDirection = null, targetValue = null)
         // Directly seed a prior ledger entry, bypassing decay math, to simulate an existing score.
         db.adherenceLedgerDao().insert(
@@ -427,13 +451,13 @@ class ApplyAdherenceDecayUseCaseTest {
                 id = UUID.randomUUID(),
                 goalMissionId = mission.id,
                 delta = -10.0,
-                appliedAt = Instant.now().minus(20, ChronoUnit.DAYS),
+                appliedAt = now.minus(20, ChronoUnit.DAYS),
                 thresholdCrossing = true,
             )
         )
-        seedLogEntry(mission.id, Instant.now().minus(1, ChronoUnit.DAYS), didOccur = true) // met window this call
+        seedLogEntry(mission.id, now.minus(1, ChronoUnit.DAYS), didOccur = true) // met window this call
 
-        useCase.execute(mission.id)
+        useCase.execute(mission.id, now)
 
         // No new entry written this call, but adherenceScore should reflect the prior -10.0 sum.
         assertEquals(-10.0, db.goalMissionDao().get(mission.id)!!.adherenceScore!!, 0.0001)
@@ -441,6 +465,7 @@ class ApplyAdherenceDecayUseCaseTest {
 
     @Test
     fun `never writes to the shared LedgerDao`() = runTest {
+        val now = Instant.now()
         val mission = seedGoalMission(
             cadenceType = CadenceType.DAILY,
             targetDirection = null,
@@ -449,7 +474,7 @@ class ApplyAdherenceDecayUseCaseTest {
             consecutiveWindowsBelowThreshold = 1,
         )
 
-        useCase.execute(mission.id) // fires a threshold crossing
+        useCase.execute(mission.id, now) // fires a threshold crossing
 
         assertEquals(0.0, db.ledgerDao().currentValue(userId, com.disciplineos.data.ledger.LedgerMetric.REPUTATION), 0.0001)
         assertEquals(0.0, db.ledgerDao().currentValue(userId, com.disciplineos.data.ledger.LedgerMetric.DEBT), 0.0001)
