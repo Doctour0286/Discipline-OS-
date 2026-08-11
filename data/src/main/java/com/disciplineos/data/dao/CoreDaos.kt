@@ -144,6 +144,18 @@ interface EnforcementSessionDao {
     suspend fun activeMissionFor(userId: UUID): EnforcementSession?
 
     /**
+     * Added ROADMAP.md §5.36/Batch G3. Backs `ApplyAdherenceDecayUseCase`'s scope check (base
+     * doc §4.2: Adherence "applies to Outcome-driven and Constraint missions, and to
+     * Behavior-driven missions that have no attached EnforcementSession") — a Behavior-driven
+     * `GoalMission` is in scope for Adherence only if this returns empty for its id. Existence-
+     * only, not `forMission`-style full-row retrieval (no other call site needs the rows
+     * themselves, only whether any exist), so `COUNT(*) > 0` rather than a `List` return keeps
+     * the query itself expressing exactly what's checked.
+     */
+    @Query("SELECT EXISTS(SELECT 1 FROM missions WHERE missionId = :goalMissionId)")
+    suspend fun hasAnySessionFor(goalMissionId: UUID): Boolean
+
+    /**
      * Rolling window query backing Reliability Index (Data Model §3.2) and Debt Ceiling's
      * avg_mission_duration_min (§3.4). Excludes ACTIVE missions — only resolved ones count.
      */
