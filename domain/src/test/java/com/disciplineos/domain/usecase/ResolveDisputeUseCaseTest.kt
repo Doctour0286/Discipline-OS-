@@ -5,7 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.disciplineos.data.db.DisciplineOsDatabase
 import com.disciplineos.data.entity.DisputeStatus
-import com.disciplineos.data.entity.Mission
+import com.disciplineos.data.entity.EnforcementSession
 import com.disciplineos.data.entity.MissionStatus
 import com.disciplineos.data.entity.Tier
 import com.disciplineos.data.entity.User
@@ -77,9 +77,10 @@ class ResolveDisputeUseCaseTest {
             )
         )
         db.missionDao().insert(
-            Mission(
+            EnforcementSession(
                 id = missionId,
                 userId = userId,
+                goalMissionId = null,
                 scheduledStart = null,
                 actualStart = Instant.now(),
                 actualEnd = Instant.now(),

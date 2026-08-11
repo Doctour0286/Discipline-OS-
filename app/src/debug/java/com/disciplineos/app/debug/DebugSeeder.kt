@@ -1,7 +1,7 @@
 package com.disciplineos.app.debug
 
 import com.disciplineos.data.db.DisciplineOsDatabase
-import com.disciplineos.data.entity.Mission
+import com.disciplineos.data.entity.EnforcementSession
 import com.disciplineos.data.entity.MissionStatus
 import com.disciplineos.data.entity.Tier
 import com.disciplineos.data.entity.User
@@ -10,8 +10,8 @@ import java.util.UUID
 
 /**
  * ROADMAP.md §4(c) — Phase 2 device verification. There is currently no way to create a
- * [Mission] row on-device: no UI exists yet (Phase 3), and no seed mechanism existed before
- * this file. Without a Mission, [com.disciplineos.app.enforcement.MissionAccessibilityService]
+ * [EnforcementSession] row on-device: no UI exists yet (Phase 3), and no seed mechanism existed
+ * before this file. Without one, [com.disciplineos.app.enforcement.MissionAccessibilityService]
  * has nothing to enforce, so real interception can never be triggered and observed on a real
  * device — the one remaining gap the roadmap calls out before Phase 2's exit criteria are
  * honestly checkable end-to-end.
@@ -34,23 +34,24 @@ import java.util.UUID
  * elsewhere to hard boundaries (e.g. `UnsupervisedSignal`'s physical database isolation,
  * Data Model doc §13.3) rather than a runtime flag alone.
  *
- * **Idempotency:** [seedIfNeeded] is a no-op if a Mission already exists for the seeded user.
- * It is meant to be called once, deliberately, from application start — not on every launch —
- * so re-opening the app after the first seed does not duplicate or re-create rows. Call-site
- * wiring lives in [com.disciplineos.app.DisciplineOsApplication.onCreate], gated behind
- * `BuildConfig.DEBUG` there (belt-and-suspenders with this source set's own debug-only
- * placement — see that file's kdoc for why both guards exist).
+ * **Idempotency:** [seedIfNeeded] is a no-op if an [EnforcementSession] already exists for the
+ * seeded user. It is meant to be called once, deliberately, from application start — not on
+ * every launch — so re-opening the app after the first seed does not duplicate or re-create
+ * rows. Call-site wiring lives in [com.disciplineos.app.DisciplineOsApplication.onCreate],
+ * gated behind `BuildConfig.DEBUG` there (belt-and-suspenders with this source set's own
+ * debug-only placement — see that file's kdoc for why both guards exist).
  *
  * **What gets seeded:** one [User] at [Tier.WARDEN] (the middle of the four tiers — enough to
  * exercise the Warden Voice branch of [com.disciplineos.domain.policy.InterceptionPolicy]
  * without needing Iron's calibration-gate prerequisites just to see an interception at all)
- * and one [Mission] with `status = ACTIVE` and a non-empty [Mission.blocklist], so
- * `MissionAccessibilityService.activeMissionFor(userId)` (see `MissionDao`'s kdoc on that
- * query) finds a real row to enforce against. Tier can be changed by re-seeding with a
- * different [Tier] once Recruit/Operator/Iron passes are also needed (ROADMAP.md §4(c) step 7
- * calls for testing all three interception-relevant tiers separately) — this class supports
- * that by taking `tier` as a parameter rather than hardcoding Warden, even though the current
- * one-line call site only exercises the Warden case by default.
+ * and one [EnforcementSession] with `status = ACTIVE` and a non-empty
+ * [EnforcementSession.blocklist], so `MissionAccessibilityService.activeMissionFor(userId)`
+ * (see `MissionDao`'s kdoc on that query) finds a real row to enforce against. Tier can be
+ * changed by re-seeding with a different [Tier] once Recruit/Operator/Iron passes are also
+ * needed (ROADMAP.md §4(c) step 7 calls for testing all three interception-relevant tiers
+ * separately) — this class supports that by taking `tier` as a parameter rather than
+ * hardcoding Warden, even though the current one-line call site only exercises the Warden case
+ * by default.
  *
  * **Explicitly test infrastructure, not silent scaffolding** (ROADMAP.md §4(c) step 6): once
  * on-device verification across all three tiers is complete, the roadmap calls for an explicit
@@ -74,21 +75,22 @@ object DebugSeeder {
     private const val SEEDED_BLOCKED_PACKAGE = "com.dp.logcatapp"
 
     /**
-     * Seeds one [User] and one ACTIVE [Mission] if — and only if — no Mission exists yet for
-     * that user. Safe to call on every app start; only the first call (per fresh install, or
-     * after this method's own idempotency check finds nothing) actually writes anything.
+     * Seeds one [User] and one ACTIVE [EnforcementSession] if — and only if — no session
+     * exists yet for that user. Safe to call on every app start; only the first call (per fresh
+     * install, or after this method's own idempotency check finds nothing) actually writes
+     * anything.
      *
      * @param tier which enforcement tier to seed the user at — determines which branch of
      *   [com.disciplineos.domain.policy.InterceptionPolicy] / the interception screen's
      *   tier-dependent content (Onboarding doc §3.1) gets exercised on trigger. Defaults to
      *   [Tier.WARDEN] per this file's own kdoc above.
-     * @return the seeded [Mission], or null if seeding was skipped because a Mission already
-     *   existed (the idempotent no-op path) — callers that only care about "is there something
-     *   to trigger interception against now" can treat both outcomes the same way by re-reading
-     *   via `MissionDao.activeMissionFor`, but the return value lets a caller (or
+     * @return the seeded [EnforcementSession], or null if seeding was skipped because one
+     *   already existed (the idempotent no-op path) — callers that only care about "is there
+     *   something to trigger interception against now" can treat both outcomes the same way by
+     *   re-reading via `MissionDao.activeMissionFor`, but the return value lets a caller (or
      *   [DebugSeederTest]) distinguish "created now" from "already there" directly.
      */
-    suspend fun seedIfNeeded(database: DisciplineOsDatabase, tier: Tier = Tier.WARDEN): Mission? {
+    suspend fun seedIfNeeded(database: DisciplineOsDatabase, tier: Tier = Tier.WARDEN): EnforcementSession? {
         val userDao = database.userDao()
         val missionDao = database.missionDao()
 
@@ -116,9 +118,10 @@ object DebugSeeder {
         }
 
         val now = Instant.now()
-        val mission = Mission(
+        val mission = EnforcementSession(
             id = UUID.randomUUID(),
             userId = userId,
+            goalMissionId = null,
             scheduledStart = null,
             actualStart = now,
             actualEnd = null,

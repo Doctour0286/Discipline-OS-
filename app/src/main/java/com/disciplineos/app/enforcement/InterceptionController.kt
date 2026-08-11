@@ -1,6 +1,6 @@
 package com.disciplineos.app.enforcement
 
-import com.disciplineos.data.entity.Mission
+import com.disciplineos.data.entity.EnforcementSession
 import com.disciplineos.data.entity.Tier
 import com.disciplineos.data.entity.Violation
 import com.disciplineos.data.entity.ViolationType
@@ -29,7 +29,7 @@ import java.util.UUID
  * unrelated interceptions of different apps.
  */
 class InterceptionController(
-    private val mission: Mission,
+    private val mission: EnforcementSession,
     private val tier: Tier,
     private val attemptNumber: Int,
     private val recordViolationUseCase: RecordViolationUseCase,

@@ -12,7 +12,7 @@ import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
 import com.disciplineos.app.ui.onboarding.FirstMissionSchedulingScreen
 import com.disciplineos.app.ui.theme.themedComposeView
-import com.disciplineos.data.entity.Mission
+import com.disciplineos.data.entity.EnforcementSession
 import com.disciplineos.data.entity.MissionStatus
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -29,8 +29,9 @@ import java.util.UUID
  * Fragment does not invent one" — that was accurate until this pass; STATUS.md's "what's
  * actually next" item 2 named the missing hand-off as a real gap, and it's closed here.
  *
- * **What this screen does:** creates the first real [Mission] row for the local user, from the
- * [com.disciplineos.data.entity.MissionProfile] Mission Profile Setup (§2.8) already wrote —
+ * **What this screen does:** creates the first real [EnforcementSession] row for the local
+ * user, from the [com.disciplineos.data.entity.MissionProfile] Mission Profile Setup (§2.8)
+ * already wrote —
  * either immediately ("Start now": `scheduledStart = null`, `actualStart = now()`, status
  * `ACTIVE`) or for a user-entered future time ("Schedule Mission": `scheduledStart` = that
  * time). No `:domain` use-case wraps this, same reasoning
@@ -39,7 +40,7 @@ import java.util.UUID
  * table needs to change in the same transaction, so introducing a use-case here would be the
  * same kind of premature structure the Data Model doc's §3.1 reasoning argues against.
  *
- * **`scheduledStart` is exactly the field [Mission]'s own kdoc already calls out**
+ * **`scheduledStart` is exactly the field [EnforcementSession]'s own kdoc already calls out**
  * ("null means ad hoc — feeds Self-Initiation Trend, §3.6") — this screen is the first and, as
  * of this pass, only call site that actually sets it meaningfully instead of leaving it an
  * always-null placeholder. §2.9's own text is explicit that this choice "doesn't affect this
@@ -47,7 +48,8 @@ import java.util.UUID
  * "recommended" one, and neither path is nudged toward; this screen's only job is to record
  * whichever choice the user actually makes, not to steer it.
  *
- * **"Start now" behavior:** [Mission.actualStart] is set to the moment the button is pressed,
+ * **"Start now" behavior:** [EnforcementSession.actualStart] is set to the moment the button is
+ * pressed,
  * status `ACTIVE` immediately. This is a genuine deviation from every other status in
  * [MissionStatus] being reached only through the (not-yet-built) real enforcement/interception
  * flow — for this pass, onboarding's own "first Mission" concept has no separate
@@ -56,8 +58,9 @@ import java.util.UUID
  * likely supersede this shortcut for every Mission *after* the first — flagged here rather
  * than silently assumed to generalize.
  *
- * **"Schedule Mission" behavior:** [Mission.scheduledStart] is the user-entered future time;
- * [Mission.actualStart] is still set to *now* (the row is created now, even though the Mission
+ * **"Schedule Mission" behavior:** [EnforcementSession.scheduledStart] is the user-entered
+ * future time; [EnforcementSession.actualStart] is still set to *now* (the row is created now,
+ * even though the Mission
  * itself hasn't started) and status is left `ACTIVE` — same shortcut as above, for the same
  * reason: no separate "scheduled, not yet started" status exists in [MissionStatus], and
  * inventing one is out of scope for this pass (not asked for by the Data Model doc, which only
@@ -87,7 +90,7 @@ import java.util.UUID
  * screen (e.g. Back then resubmit) creates a second real Mission row each time, which is
  * correct, not defended against.
  *
- * **Duration:** [Mission.plannedDurationMin] has no spec-mandated value anywhere in §2.9, the
+ * **Duration:** [EnforcementSession.plannedDurationMin] has no spec-mandated value anywhere in §2.9, the
  * Data Model doc, or the PRD — this pass uses a fixed default
  * ([DEFAULT_PLANNED_DURATION_MIN]) rather than adding a duration picker, since nothing in the
  * spec asks for one at this screen specifically. [HYPOTHESIS] / judgment call, logged here
@@ -146,9 +149,10 @@ class FirstMissionSchedulingFragment : Fragment() {
             }
 
             database.missionDao().insert(
-                Mission(
+                EnforcementSession(
                     id = UUID.randomUUID(),
                     userId = userId,
+                    goalMissionId = null,
                     scheduledStart = scheduledStart,
                     actualStart = Instant.now(),
                     actualEnd = null,
@@ -166,6 +170,11 @@ class FirstMissionSchedulingFragment : Fragment() {
             // graph this same pass (see that action's own comment for why: onboarding
             // previously had no real "complete" hand-off, which STATUS.md's "what's actually
             // next" item 2 named as a real gap, not a documentation nicety).
+            //
+            // goalMissionId is left null here, deliberately — Batch G1 (this rename) is
+            // additive-schema-only, zero behavior change (BUILD_PLAN.md). Wiring this screen
+            // to create a real GoalMission first is Batch G2's explicit scope
+            // (06_GOAL_ORIENTED_MISSION_MODEL_INTEGRATION_PLAN.md §3), not this batch's.
             findNavController().navigate(R.id.action_firstMissionScheduling_to_home)
         }
     }

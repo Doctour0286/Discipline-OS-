@@ -15,7 +15,7 @@ import androidx.lifecycle.lifecycleScope
 import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
 import com.disciplineos.app.voice.NoOpWardenVoiceGenerator
-import com.disciplineos.data.entity.Mission
+import com.disciplineos.data.entity.EnforcementSession
 import com.disciplineos.data.entity.Tier
 import com.disciplineos.domain.policy.InterceptionPolicy
 import kotlinx.coroutines.launch
@@ -235,7 +235,7 @@ class MissionInterceptionActivity : ComponentActivity() {
         Tier.RECRUIT -> null
     }
 
-    private fun wireButtons(controller: InterceptionController, mission: Mission, tier: Tier) {
+    private fun wireButtons(controller: InterceptionController, mission: EnforcementSession, tier: Tier) {
         returnButton.setOnClickListener {
             if (!isEarlyDismissalAllowedNow(controller)) return@setOnClickListener
             controller.returnToMission()

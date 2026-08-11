@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.disciplineos.data.db.DisciplineOsDatabase
-import com.disciplineos.data.entity.Mission
+import com.disciplineos.data.entity.EnforcementSession
 import com.disciplineos.data.entity.MissionStatus
 import com.disciplineos.data.entity.Tier
 import com.disciplineos.data.entity.TierEventKind
@@ -104,9 +104,10 @@ class ApplyReputationDecayUseCaseTest {
 
     private suspend fun seedMission(actualStart: Instant, status: MissionStatus) {
         db.missionDao().insert(
-            Mission(
+            EnforcementSession(
                 id = UUID.randomUUID(),
                 userId = userId,
+                goalMissionId = null,
                 scheduledStart = null,
                 actualStart = actualStart,
                 actualEnd = actualStart.plusSeconds(1800),
