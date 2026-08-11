@@ -2816,3 +2816,54 @@ not running it.
    though unmerged and CI-unconfirmed) — updated in this same pass, see that file's own edit.
 5. Once CI/on-device both confirm, this branch should be evaluated by the person as a normal PR
    against `main` — not merged as part of this pass.
+
+### 5.34 — PR #28 merged, CI green; on-device partially exercised, not fully confirmed
+
+**Closes item 5 above, partially.** The person confirmed CI compiled successfully on the
+`goal-oriented-mission-model-g1-conform-to-plan` branch and merged PR #28 to `main` (commit
+`cdde397`). Pulled and spot-checked directly against `main` rather than trusted from the merge
+alone: `EnforcementSession.missionId: UUID` (non-null) and `EnforcementSessionDao` are both
+confirmed present, and a full-repo grep on `main` itself confirms zero remaining
+`.missionDao()`/`goalMissionId`/bare `MissionDao`-type references outside correct historical
+kdoc prose. Batch G1's schema/DAO conformance is genuinely done, on `main`, CI-confirmed.
+
+**On-device, item 2 above — status update, not closure:** the person installed and opened the
+app on a real device and completed onboarding through `FirstMissionSchedulingFragment` without
+a crash, confirmed via the nav graph that this Fragment is reachable through the real onboarding
+flow (not just reachable in principle) — so the new three-row transactional insert did execute.
+**This is a real but partial result, stated precisely rather than rounded up:** "the flow
+completed without crashing" is not the same claim as "the three rows were written correctly and
+linked correctly," which is what Batch G2's verification checklist actually asks for. As of
+this pass, nothing in the app's UI surfaces a `GoalMission`, its `MissionPeriod`, or the linkage
+between either and the `EnforcementSession` they produced — there is no screen, debug panel, or
+log output a person could check right now even if they wanted to verify the row-level claim.
+The person noticed and named this gap directly rather than treating "it didn't crash" as
+sufficient — noted here because that's the right instinct and worth preserving as the standard
+for this project's on-device checks going forward, not just this one.
+
+**What would actually close this:** a debug DB inspector (Room has a stock one, or Android
+Studio's Database Inspector against a debug build), a temporary log line in
+`createMissionAndFinish` printing the three inserted ids, or an instrumented test reading the
+rows back post-flow — any of these would let "correctly linked" actually be checked rather than
+assumed from "no exception was thrown." None built yet; flagged as real remaining work, not
+busywork, since a get-parent-id-wrong bug in a `withTransaction` block would produce exactly
+this symptom (no crash, silently wrong `missionId`/`missionPeriodId` linkage) and nothing today
+would catch it before a much later, harder-to-trace symptom downstream (e.g. Batch G3's
+Adherence engine reading from a `GoalMission` that no `EnforcementSession` actually points at).
+
+**`BUILD_PLAN.md` updated to match, same pass:** G1's status line moved from "conformance pass
+in progress, unmerged" to "on `main`, CI green"; G1's verification checklist's stale real-
+`Migration` item struck through and annotated (the shipped code correctly uses
+`fallbackToDestructiveMigration()` per this project's standing pre-launch policy — the checklist
+item reflected the plan text's assumption, not what was actually decided or built). G2's status
+line updated to state the "ran without crashing, rows not confirmed" distinction explicitly,
+and its own checklist's on-device line marked partial rather than either fully checked or fully
+unchecked, with the specific remaining gap named rather than left as a bare unchecked box.
+`STATUS.md`'s sync line and MVP table row updated to match — see that file's own edit, this same
+pass.
+
+**Still open:** the "what would actually close this" list above (debug inspector, logging, or
+an instrumented test) — none started yet, no owner assigned in this pass. Item 3 from §5.33
+(the Integration Plan's own open questions) remains untouched by this pass, exactly as it was
+left before — still genuinely open, not implicitly resolved by CI passing or the app not
+crashing.

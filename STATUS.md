@@ -44,19 +44,24 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-11 (through §5.33 — Batch G1 shipped to `main` (PR #27)
-diverged from the checked-in Integration Plan §2 in three real ways (`goalMissionId: UUID?`
-instead of the plan's `missionId: UUID` non-null; `MissionDao` interface kept instead of
-renamed to `EnforcementSessionDao`; an extra `missionProfileId` field on `GoalMission` the plan
-doesn't have) — not caught before merge, then caught and a conformance pass started on branch
-`goal-oriented-mission-model-g1-conform-to-plan`. That branch's first commit (`c4b94ec`) fixed
-the schema/DAO/entity divergence and implemented the real Batch G2 fix, but left 9 test files
-broken (still referencing the old accessor/field names) as an explicit, flagged checkpoint. This
-pass fixed all 9 test files — full detail, including exactly which files and the verification
-performed (and its real limits — no compiler in this sandbox, nothing here is build-verified),
-in §5.33. **This branch is not yet on `main`** — CI has never run against it and it has had zero
-on-device verification; treat everything below this line describing the Goal-Oriented Mission
-Model as describing this unmerged branch's state, not `main`'s, until a PR from it merges. **Sync
+**Last synced to ROADMAP.md:** 2026-08-11 (through §5.34 — PR #28 merged to `main` (commit
+`cdde397`), CI confirmed green. This closes out the Batch G1 divergence §5.33 documented: `main`
+now has `EnforcementSession.missionId: UUID` non-null and the real `EnforcementSessionDao`
+rename, spot-checked directly against `main` post-merge, not just trusted from the merge itself.
+**On-device: partial, not fully confirmed.** The person installed the app and completed
+onboarding through `FirstMissionSchedulingFragment` on a real device without a crash, confirming
+the new three-row transactional insert (`GoalMission` → `MissionPeriod` → `EnforcementSession`)
+executes — but correctly noted there is currently no UI surface anywhere in the app that shows
+those rows or their linkage, so "didn't crash" and "wrote/linked the rows correctly" are
+different claims and only the first is checked. See §5.34 for what would actually close the
+second (a debug DB inspector, added logging, or an instrumented test) — none built yet. **Sync
+prior to this (2026-08-11, §5.33 — Batch G1 shipped to `main` (PR #27) diverged from the
+checked-in Integration Plan §2 in three real ways: `goalMissionId: UUID?` instead of the plan's
+`missionId: UUID` non-null; `MissionDao` interface kept instead of renamed to
+`EnforcementSessionDao`; an extra `missionProfileId` field on `GoalMission` the plan doesn't
+have) unchanged below, carried forward as-is:** not caught before merge, then caught and fixed
+via a conformance pass (`goal-oriented-mission-model-g1-conform-to-plan`, now merged as PR #28
+per this sync's own opening). **Sync
 prior to this (2026-08-11, §5.32 — Goal-Oriented Mission Model accepted and folded into the spec
 docs, docs-only, no code) unchanged below, carried forward as-is:** four uploaded documents
 (a base design doc, an engineering-ready integration plan, two now-superseded earlier drafts)
@@ -161,7 +166,7 @@ on-device pass, not a logic change needing separate re-verification.
 | Behavioral Fingerprint + Predictive Failure Alerts | ⬜ | Phase 4, not started |
 | Unsupervised Reliability (opt-in tracking) | ✅ | Schema isolated (Phase 0); opt-in flow (`UnsupervisedReliabilityOptInFragment`, §2.7) merged and confirmed CI + on-device (PR #16) — writes `User.unsupervisedReliabilityOptIn`/`optInAt`. No capture pipeline (actual passive signal collection into `UnsupervisedSignalDao`) built yet — this pass is the consent/opt-in screen only, not the measurement pipeline itself. |
 | Daily / Weekly Reports | ⬜ | Not started |
-| Goal-Oriented Mission Model (`GoalMission`/`EnforcementSession` split) | 🟡 | **Code exists (§5.33), but only on the unmerged `goal-oriented-mission-model-g1-conform-to-plan` branch — not on `main`.** `main` itself carries a Batch G1 that shipped diverged from the checked-in Integration Plan (see §5.33 for the exact deviations); the conformance branch fixes that and implements Batch G2's real auto-create logic, but has never been through CI or on-device verification. Not part of PRD §41's MVP bar (post-v3.6 addition). Tracked as `BUILD_PLAN.md` Batches G1–G6, separate from the A–F sequence above. See `Documents/01_DATA_MODEL_AND_SCHEMA.md` §2.2a for the accepted shape, §5.33 for current real status. |
+| Goal-Oriented Mission Model (`GoalMission`/`EnforcementSession` split) | 🟢 | **On `main` (PR #28, CI green, §5.34).** G1 (schema/DAO rename + additive entities) and G2 (`FirstMissionSchedulingFragment`'s real auto-create-parent-`GoalMission` fix) both merged and confirmed compiling. On-device: partial — completed onboarding on a real device without a crash (confirms the insert executes), but nothing in the app's UI surfaces the written rows or their linkage, so "correctly linked" per Batch G2's own verification checklist remains unconfirmed (§5.34 names what would close this — none built yet). Not part of PRD §41's MVP bar (post-v3.6 addition). Tracked as `BUILD_PLAN.md` Batches G1–G6 (G3–G6 not started), separate from the A–F sequence above. See `Documents/01_DATA_MODEL_AND_SCHEMA.md` §2.2a for the accepted shape, §5.34 for current real status. |
 
 ---
 
