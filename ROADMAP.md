@@ -3049,3 +3049,74 @@ divergence (flagged above, deliberately not fixed this pass — still true); Int
 real CI run (done, green, PR #31 merged); installed confirmation (done). Still true that no UI
 call site exists yet for this use-case, matching `ApplyReputationDecayUseCase`'s own
 still-unbuilt-scheduler state — Batch G4 (Mission detail screen) is the natural first caller.
+
+---
+
+### 5.37 — Batch G4 blocked, then unblocked: base design doc source material restored to git history for real; found and will fix a real G3 scope bug §4.2's full text exposed
+
+**Started while beginning Batch G4** (`BUILD_PLAN.md`), Integration Plan §5. Hit the same class
+of gap §5.36 hit for §4.2, this time for §4.1's "four-quadrant relationship view" — the
+Integration Plan *names* it ("Renders the four-quadrant read from base doc §4.1... combining
+`MissionLogEntryDao` outcome trend + `GoalMission.adherenceScore`") but never actually defines
+what the four quadrants are, what text each one produces, or how the two inputs combine into
+them. Checked `git log --all` for `06_GOAL_ORIENTED_MISSION_MODEL.md`: **its very first commit
+(`e35948a`) already contains the file pre-reduced to a pointer** — the fold-in that produced it
+was written from an earlier chat session's memory of four uploaded documents, not from those
+documents being committed to this repo first. That pointer's own text claimed the full content
+"lives in git history on this exact path if it's ever needed verbatim" — false. No commit, on
+any branch, ever contained the real text. Same root cause as §5.36's §4.2 gap, not a new kind of
+problem — just not yet fixed at the source the first time it was found.
+
+**Fixed properly this time, not just worked around for one section.** Rather than resolving only
+the immediate §4.1 blocker, the user supplied all four original documents (base doc, proposal,
+addendum, Integration Plan) and asked that they be verified and committed before G4 continued,
+so this gap can't recur for whichever section G5 or G6 need next. What was done, in order:
+
+1. Diffed the re-supplied Integration Plan against what's already checked in — byte-identical,
+   confirming this is the same document set, not a revised one.
+2. Restored `06_GOAL_ORIENTED_MISSION_MODEL.md` to its full original text (verbatim from the
+   upload), plus committed `06_GOAL_ORIENTED_MISSION_MODEL_PROPOSAL.md` and
+   `06a_GOAL_ORIENTED_MISSION_MODEL_ADDENDUM.md` in full — both previously deleted, per the base
+   doc's own "delete once reviewed" instruction, before any commit had captured their content.
+   This is a separate commit from the pointer re-reduction below, so "content restored" and
+   "pointer reduction re-applied" are independently auditable, matching this project's existing
+   preference (§5.35/§5.36) for not blurring two distinct claims into one commit/checkbox.
+3. Re-reduced the base doc back to a pointer in a second, separate commit — same convention the
+   doc's own §0 calls for — but this time the pointer's "recoverable from git history" claim is
+   actually true, and the pointer text says so explicitly rather than repeating the same
+   unverified claim.
+4. **Deliberately did not re-delete the proposal/addendum this pass.** The base doc's own
+   instruction says to delete them once reviewed; doing that literally is what caused this gap.
+   They stay checked in indefinitely — the cost of ~800 extra lines of superseded markdown is
+   far smaller than the cost of this investigation recurring for G5/G6.
+
+**Real bug found while reading the restored §4.2 text, not a documentation nicety.** Base doc
+§4.2, read in full for the first time this session (previously only reachable via the Integration
+Plan's partial paraphrase), says:
+
+> "A Behavior-driven mission with a `MissionPeriod` that *does* have `enforcementProfileId` set
+> already gets Reputation/Debt treatment via its sessions — **Adherence still computes for it**
+> (log-only days between scheduled sessions are real signal too), but is shown as a secondary
+> number, never substituted for Reputation on that mission."
+
+`ApplyAdherenceDecayUseCase`'s shipped scope-gate (Batch G3, §5.36) only implements the *first*
+half of this — a Behavior-driven mission with any attached `EnforcementSession` is currently
+treated as fully out of scope (`Result.outOfScope()`), silently dropping the Adherence signal
+entirely rather than computing it and marking it secondary. The prior session's own kdoc quoted
+"Behavior-driven missions that have no attached EnforcementSession" as base doc §4.2's "exact
+wording" — accurate as a fragment, but it was working from the Integration Plan's paraphrase,
+which itself never restates this scope rule at all (checked directly: Integration Plan §4's G3
+section describes the hit-rate/decay/ledger mechanics but has no scope-gating language of its
+own), and the base doc's own text was unreachable at the time. Not a documentation-only finding —
+`Result.inScope` is a real, tested boolean callers branch on, and every currently-passing
+`ApplyAdherenceDecayUseCaseTest` scope-gating test for the "BEHAVIOR_DRIVEN with a session"
+case encodes the narrower (wrong) behavior. **Fix scoped as a small follow-up, tracked here
+rather than silently folded into G4's own PR** — G4 depends on `adherenceScore` existing to
+render, and this bug means that score is currently `null`/absent for a real, valid mission
+shape the base doc says should have one. Will be fixed before or alongside G4, whichever the
+dependency graph makes cleaner once G4's actual screen work starts.
+
+**Still open, unchanged by this entry:** the CUSTOM_DAYS cadence schedule gap and
+`MissionPeriod.enforcementProfileId`'s nullability divergence, both already flagged in §5.36,
+remain exactly as open as that entry left them.
+
