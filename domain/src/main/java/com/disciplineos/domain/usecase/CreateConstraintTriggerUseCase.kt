@@ -83,17 +83,16 @@ class CreateConstraintTriggerUseCase(
      * transaction.
      *
      * @throws IllegalStateException if [missionId] doesn't resolve to any [GoalMission] —
-     *   `checkNotNull`, matching [RecordViolationUseCase.execute]'s intended "structurally
-     *   impossible, not a normal caller error" posture for a missing parent row. (Note:
-     *   `RecordViolationUseCase.execute` itself actually uses `requireNotNull` for this same
-     *   posture, which is a latent bug there too — Kotlin's `requireNotNull` throws
-     *   `IllegalArgumentException`, not `IllegalStateException`; `checkNotNull` is the stdlib
-     *   function for the "structurally impossible" `IllegalStateException` case. Caught here by
-     *   a real CI failure (`rejects a missing mission id`, PR #38/#151's second CI run) rather
-     *   than assumed correct from the cited precedent — see `ROADMAP.md` for the full account.
-     *   Not fixed in `RecordViolationUseCase` as part of this change, since that class has no
-     *   test currently exercising the distinction and changing it is out of this batch's scope;
-     *   flagged as a real, separate follow-up.)
+     *   `checkNotNull`, matching [RecordViolationUseCase.execute]'s "structurally impossible,
+     *   not a normal caller error" posture for a missing parent row. (Note: this distinction
+     *   — `checkNotNull`/`IllegalStateException` for a "should be impossible" missing-row
+     *   guard vs. `requireNotNull`/`IllegalArgumentException` for bad caller input — was
+     *   caught here by a real CI failure (`rejects a missing mission id`, PR #38/#151's
+     *   second CI run), which surfaced that `requireNotNull` actually throws
+     *   `IllegalArgumentException`, not `IllegalStateException` as an earlier kdoc here
+     *   assumed. A follow-up audit found and fixed the same latent `requireNotNull`-for-a-
+     *   "structurally-impossible"-guard pattern across five other files, including
+     *   `RecordViolationUseCase.execute` itself — see `ROADMAP.md` for the full account.)
      * @throws IllegalArgumentException if [missionId] resolves to a mission whose archetype
      *   isn't [MissionArchetype.CONSTRAINT] — this use-case exists specifically to prevent an
      *   `ALWAYS_ON` period being created for an archetype base doc §6.2's resolution never

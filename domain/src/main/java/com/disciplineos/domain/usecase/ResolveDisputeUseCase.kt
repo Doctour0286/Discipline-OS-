@@ -66,7 +66,7 @@ class ResolveDisputeUseCase(
         }
 
         database.withTransaction {
-            val violation = requireNotNull(violationDao.get(violationId)) {
+            val violation = checkNotNull(violationDao.get(violationId)) {
                 "No Violation found for id $violationId"
             }
             check(
@@ -112,7 +112,7 @@ class ResolveDisputeUseCase(
      */
     suspend fun fileDispute(violationId: UUID, flaggedAt: Instant = Instant.now()) {
         database.withTransaction {
-            val violation = requireNotNull(violationDao.get(violationId)) {
+            val violation = checkNotNull(violationDao.get(violationId)) {
                 "No Violation found for id $violationId"
             }
             check(violation.disputeStatus == DisputeStatus.NONE) {

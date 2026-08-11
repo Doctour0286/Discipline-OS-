@@ -137,7 +137,7 @@ class MissionInterceptionActivity : ComponentActivity() {
             // nullable to support GoalDefinitionFragment's earlier draft-row creation; this is
             // one of the four call sites checked and fixed when that change was made), not a
             // silent finish() that would hide a real bug behind what looks like a normal exit.
-            val currentTier = requireNotNull(user.currentTier) {
+            val currentTier = checkNotNull(user.currentTier) {
                 "MissionInterceptionActivity reached for user $userId with no currentTier — " +
                     "should be structurally impossible once a Mission/MissionProfile exist " +
                     "(User.kt kdoc, Batch B)"
