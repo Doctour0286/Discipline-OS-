@@ -2,10 +2,13 @@ package com.disciplineos.app.di
 
 import android.content.Context
 import com.disciplineos.data.db.DisciplineOsDatabase
+import com.disciplineos.domain.policy.AdherenceDecayPolicy
 import com.disciplineos.domain.policy.BehavioralFingerprintPolicy
 import com.disciplineos.domain.policy.ConsequencePolicy
+import com.disciplineos.domain.policy.HypothesisAdherenceDecayPolicy
 import com.disciplineos.domain.policy.HypothesisBehavioralFingerprintPolicy
 import com.disciplineos.domain.policy.HypothesisConsequencePolicy
+import com.disciplineos.domain.usecase.ApplyAdherenceDecayUseCase
 import com.disciplineos.domain.usecase.ComputeBehavioralFingerprintUseCase
 import com.disciplineos.domain.usecase.RecordViolationUseCase
 import com.disciplineos.domain.usecase.TierTransitionUseCase
@@ -76,6 +79,25 @@ object AppContainer {
      * [consequencePolicy] above, see that policy's own kdoc for the full reasoning restated.
      */
     fun behavioralFingerprintPolicy(): BehavioralFingerprintPolicy = HypothesisBehavioralFingerprintPolicy()
+
+    /**
+     * [HYPOTHESIS]: `HypothesisAdherenceDecayPolicy` — same posture as [consequencePolicy]
+     * above, see that policy's own kdoc for the full reasoning restated.
+     */
+    fun adherenceDecayPolicy(): AdherenceDecayPolicy = HypothesisAdherenceDecayPolicy()
+
+    /** Batch G3/G4 — first real call site, wired for [com.disciplineos.app.mission.MissionDetailFragment]. */
+    fun applyAdherenceDecayUseCase(context: Context): ApplyAdherenceDecayUseCase {
+        val db = database(context)
+        return ApplyAdherenceDecayUseCase(
+            database = db,
+            goalMissionDao = db.goalMissionDao(),
+            missionLogEntryDao = db.missionLogEntryDao(),
+            enforcementSessionDao = db.enforcementSessionDao(),
+            adherenceLedgerDao = db.adherenceLedgerDao(),
+            policy = adherenceDecayPolicy(),
+        )
+    }
 
     /** ROADMAP.md Phase 4 — F1–F5 rule implementations, wired the same manual-DI way as every other use-case in this file. */
     fun computeBehavioralFingerprintUseCase(context: Context): ComputeBehavioralFingerprintUseCase {

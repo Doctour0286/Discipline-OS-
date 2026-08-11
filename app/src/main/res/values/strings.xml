@@ -345,6 +345,24 @@
     <string name="home_iron_card_body_waiting">Iron becomes available in %d day(s), once your calibration window elapses.</string>
     <string name="home_iron_card_button_eligible">Review Iron calibration</string>
     <string name="home_iron_card_button_waiting">View calibration status</string>
+    <string name="home_missions_title">Your missions</string>
+
+    <string name="mission_detail_back_button">Back</string>
+    <string name="mission_detail_not_found">This mission couldn\'t be found.</string>
+    <string name="mission_detail_adherence_title">Adherence</string>
+    <string name="mission_detail_adherence_title_secondary">Adherence (secondary)</string>
+    <string name="mission_detail_adherence_no_data">Not enough data yet to show Adherence for this mission.</string>
+    <string name="mission_detail_relationship_title">Behavior and outcome</string>
+    <string name="mission_detail_relationship_not_enough_data">Log a few more entries to see how your behavior and outcome relate.</string>
+
+    <string name="mission_detail_behavior_on_track">On track this window.</string>
+    <string name="mission_detail_behavior_near_miss">Close — just under this window\'s pace, but not far off.</string>
+    <string name="mission_detail_behavior_not_followed">The behavior isn\'t happening consistently this window.</string>
+
+    <string name="mission_detail_quadrant_followed_and_moving">You\'re doing the behavior and the outcome is moving as expected. Keep going — no change needed.</string>
+    <string name="mission_detail_quadrant_followed_but_flat">You\'re doing the behavior consistently, but the outcome isn\'t moving. That\'s real information: the behavior may not be the right lever for this outcome, not a personal failure.</string>
+    <string name="mission_detail_quadrant_skipped_and_flat">The behavior isn\'t happening and the outcome isn\'t moving. Expected — tightening adherence is the lever here.</string>
+    <string name="mission_detail_quadrant_skipped_but_moving">The outcome is moving even without the behavior happening consistently. Worth reconsidering whether this behavior is really what\'s driving it.</string>
 
     <!--
         Iron Calibration — PRD §12.6 / Data Model §5. The real destination for an existing

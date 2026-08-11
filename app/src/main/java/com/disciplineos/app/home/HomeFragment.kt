@@ -7,13 +7,18 @@ import android.view.ViewGroup
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
+import com.disciplineos.app.mission.MissionDetailFragment
 import com.disciplineos.app.ui.home.HomeScreen
+import com.disciplineos.app.ui.home.MissionSummary
 import com.disciplineos.app.ui.theme.themedComposeView
+import com.disciplineos.data.entity.GoalMission
+import com.disciplineos.data.entity.MissionArchetype
 import com.disciplineos.data.entity.PredictiveFailureAlertDismissal
 import com.disciplineos.data.entity.PredictiveFailureAlertOutcome
 import com.disciplineos.data.entity.Tier
@@ -128,6 +133,7 @@ class HomeFragment : Fragment() {
         var ironEligibleNow by mutableStateOf(false)
         var daysRemaining by mutableStateOf(0L)
         var activeAlert by mutableStateOf<PredictiveFailureAlert?>(null)
+        var missions by mutableStateOf<List<MissionSummary>>(emptyList())
 
         loadHomeState { state ->
             currentTier = state.currentTier
@@ -136,6 +142,7 @@ class HomeFragment : Fragment() {
             daysRemaining = state.daysRemaining
         }
         loadPredictiveFailureAlert { alert -> activeAlert = alert }
+        loadMissions { loaded -> missions = loaded }
 
         return themedComposeView {
             HomeScreen(
@@ -155,6 +162,13 @@ class HomeFragment : Fragment() {
                         recordDismissal(dismissedRule.name, outcome)
                     }
                 },
+                missions = missions,
+                onOpenMissionDetail = { missionId ->
+                    findNavController().navigate(
+                        R.id.action_home_to_missionDetail,
+                        bundleOf(MissionDetailFragment.ARG_MISSION_ID to missionId.toString()),
+                    )
+                },
             )
         }
     }
@@ -166,6 +180,39 @@ class HomeFragment : Fragment() {
             val user = database.userDao().getSingleLocalUser()
             onLoaded(computeHomeState(user, Instant.now()))
         }
+    }
+
+    /**
+     * Batch G4 (Integration Plan §5/§7.6) — the Mission list that makes
+     * [com.disciplineos.app.mission.MissionDetailFragment] reachable at all. Plain summaries
+     * only ([MissionSummary]/[archetypeLabel]) — [adherenceScore] is whatever was last written
+     * to the [GoalMission] row by a prior `ApplyAdherenceDecayUseCase.execute()` call, not
+     * freshly recomputed here; this list is a lightweight index, not itself a place that runs
+     * decay evaluation (the detail screen does that on open, see that Fragment's own kdoc).
+     */
+    private fun loadMissions(onLoaded: (List<MissionSummary>) -> Unit) {
+        lifecycleScope.launch {
+            val context = requireContext().applicationContext
+            val database = AppContainer.database(context)
+            val user = database.userDao().getSingleLocalUser() ?: return@launch onLoaded(emptyList())
+            val goalMissions = database.goalMissionDao().forUser(user.id)
+            onLoaded(
+                goalMissions.map { mission ->
+                    MissionSummary(
+                        id = mission.id,
+                        title = mission.title,
+                        archetypeLabel = archetypeLabel(mission.archetype),
+                        adherenceScore = mission.adherenceScore,
+                    )
+                },
+            )
+        }
+    }
+
+    private fun archetypeLabel(archetype: MissionArchetype): String = when (archetype) {
+        MissionArchetype.OUTCOME_DRIVEN -> "Outcome"
+        MissionArchetype.BEHAVIOR_DRIVEN -> "Behavior"
+        MissionArchetype.CONSTRAINT -> "Constraint"
     }
 
     private fun loadPredictiveFailureAlert(onLoaded: (PredictiveFailureAlert?) -> Unit) {

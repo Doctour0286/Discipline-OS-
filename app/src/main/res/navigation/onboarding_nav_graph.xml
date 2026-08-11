@@ -240,6 +240,9 @@
         <action
             android:id="@+id/action_home_to_ironCalibration"
             app:destination="@id/ironCalibrationFragment" />
+        <action
+            android:id="@+id/action_home_to_missionDetail"
+            app:destination="@id/missionDetailFragment" />
     </fragment>
 
     <!-- Iron Calibration — added this pass. The real "existing user reaches Iron later via
@@ -251,5 +254,22 @@
         android:id="@+id/ironCalibrationFragment"
         android:name="com.disciplineos.app.home.IronCalibrationFragment"
         android:label="Iron Calibration" />
+
+    <!-- Mission Detail — Batch G4 (Integration Plan §5/§7.6). The real entry point this
+         section names explicitly: nothing before G4 lets a user reach a GoalMission's detail
+         screen at all. Reached only from homeFragment's new Mission list — see HomeScreen's
+         own comment on that list for why it lives on Home rather than a separate destination
+         (Integration Plan §7.6's own stated resolution). missionId is a String argument (a
+         serialized UUID, matching this graph's existing "primitive argType, parsed at the
+         Fragment boundary" pattern — tierConfirmationFragment's own `tier` argument does the
+         same for its enum instead of inventing a custom NavType for a one-destination need). -->
+    <fragment
+        android:id="@+id/missionDetailFragment"
+        android:name="com.disciplineos.app.mission.MissionDetailFragment"
+        android:label="Mission Detail">
+        <argument
+            android:name="missionId"
+            app:argType="string" />
+    </fragment>
 
 </navigation>
