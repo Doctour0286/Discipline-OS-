@@ -44,7 +44,21 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-11 (through §5.35 — a DAO-level linkage test was added
+**Last synced to ROADMAP.md:** 2026-08-11 (through §5.42 — Batch G5 (Trigger UI + lifecycle
+prompts) pushed to `g5-trigger-ui-lifecycle-prompts`, PR open (#38), **not yet merged.** Two CI
+rounds so far, both fixed: run #151 failed on two test-authoring bugs in
+`CreateConstraintTriggerUseCaseTest` (an `Instant`-precision DB-round-trip mismatch and a
+nested-`runTest`-inside-`assertThrows` exception-propagation bug), fixed in commit `1907e49`.
+Run #154 failed on a real production bug — `CreateConstraintTriggerUseCase` used `requireNotNull`
+where its own kdoc claimed an `IllegalStateException` posture, but `requireNotNull` always
+throws `IllegalArgumentException` in Kotlin; `checkNotNull` is correct for that posture — fixed
+in commit `208f0bc`. The same latent `requireNotNull`-for-a-"should-be-impossible"-guard pattern
+was found, not fixed, in five other files (see "known standing gaps" below). CI re-run pending
+as of this sync. See §5.42 for the full account, including the `MissionProfile`-sourcing
+judgment call and the PRD §8.1 mischaracterization caught and corrected before the UI was built
+against it.
+
+**Sync prior to this (2026-08-11, §5.35)** — a DAO-level linkage test was added
 for Batch G2's open verification-checklist item (`FirstMissionSchedulingFragmentTest`, `:app`):
 new tests mirror `createMissionAndFinish`'s real transaction and assert `GoalMission` →
 `MissionPeriod` → `EnforcementSession` resolve to each other correctly, not just to some
@@ -175,7 +189,7 @@ on-device pass, not a logic change needing separate re-verification.
 | Behavioral Fingerprint + Predictive Failure Alerts | ⬜ | Phase 4, not started |
 | Unsupervised Reliability (opt-in tracking) | ✅ | Schema isolated (Phase 0); opt-in flow (`UnsupervisedReliabilityOptInFragment`, §2.7) merged and confirmed CI + on-device (PR #16) — writes `User.unsupervisedReliabilityOptIn`/`optInAt`. No capture pipeline (actual passive signal collection into `UnsupervisedSignalDao`) built yet — this pass is the consent/opt-in screen only, not the measurement pipeline itself. |
 | Daily / Weekly Reports | ⬜ | Not started |
-| Goal-Oriented Mission Model (`GoalMission`/`EnforcementSession` split) | 🟢 | **On `main` (PR #28, CI green, §5.34).** G1 (schema/DAO rename + additive entities) and G2 (`FirstMissionSchedulingFragment`'s real auto-create-parent-`GoalMission` fix) both merged and confirmed compiling. **Linkage: a DAO-level Robolectric test now confirms `GoalMission`→`MissionPeriod`→`EnforcementSession` resolve correctly, mirroring the real transaction (§5.35) — not yet CI-run, and on-device confirmation is still a separate open item** (real device, real file-backed DB; §5.35 explains why the two aren't the same claim). Not part of PRD §41's MVP bar (post-v3.6 addition). Tracked as `BUILD_PLAN.md` Batches G1–G6 (G3–G6 not started), separate from the A–F sequence above. See `Documents/01_DATA_MODEL_AND_SCHEMA.md` §2.2a for the accepted shape, §5.35 for current real status. |
+| Goal-Oriented Mission Model (`GoalMission`/`EnforcementSession` split) | 🟡 | **G1–G4 on `main`, confirmed compiling** (G1 schema/DAO rename, G2 real auto-create-parent-`GoalMission` fix, G3 Adherence engine, G4 Mission Detail screen + Home entry point — PR #35, §5.39/§5.40 — plus a G1 `Trigger`-entity correctness fix, §5.41). **G5 (Trigger UI + lifecycle prompts) is written and pushed but not yet merged** — PR open (#38), two CI rounds so far (two test-authoring bugs, then one real `requireNotNull`/`checkNotNull` production bug), all fixed; CI re-run pending (§5.42). G6 (Milestone UI) not started. Not part of PRD §41's MVP bar (post-v3.6 addition). Tracked as `BUILD_PLAN.md` Batches G1–G6, separate from the A–F sequence above. See `Documents/01_DATA_MODEL_AND_SCHEMA.md` §2.2a for the accepted shape, §5.42 for current real status. |
 
 ---
 
@@ -229,6 +243,20 @@ position (Operator's floor = INCONSISTENT, Warden's = RELIABLE, Iron's = DISCIPL
   theme itself, since `MainActivity` has no Activity-level Compose tree to move it into without a
   Compose Navigation rewrite (see §5.29's own investigation). Low priority — no observed visual
   or functional issue from the mismatch, just a naming/consistency loose end.
+- **`requireNotNull` used where `checkNotNull` was intended, in five files beyond the one G5
+  fixed (§5.42).** `CreateConstraintTriggerUseCase` originally used `requireNotNull` for a
+  "missing parent row, should be structurally impossible" guard, with a kdoc claiming this
+  throws `IllegalStateException` — Kotlin's `requireNotNull` always throws
+  `IllegalArgumentException`; `checkNotNull` is the correct stdlib call for that posture. Fixed
+  there once a real CI failure exposed it (no test elsewhere in this codebase currently asserts
+  on the exception *type* closely enough to catch this). The same `requireNotNull`-for-a-
+  "should-be-impossible"-guard pattern also appears, unverified and unfixed, in
+  `RecordViolationUseCase`, `ApplyReputationDecayUseCase`, `ResolveDisputeUseCase`,
+  `TierTransitionUseCase`, `MissionInterceptionActivity`, and `TriggerCreationFragment` — each
+  should be checked against its own stated intent (does the surrounding comment/kdoc actually
+  want `IllegalArgumentException`, or does it want the "structurally impossible"
+  `IllegalStateException` posture `checkNotNull` provides) rather than assumed correct because
+  it compiles and no test has caught it yet.
 
 ---
 
