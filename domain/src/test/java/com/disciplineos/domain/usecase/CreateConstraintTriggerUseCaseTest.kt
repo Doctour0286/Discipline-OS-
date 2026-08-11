@@ -170,10 +170,12 @@ class CreateConstraintTriggerUseCaseTest {
 
     @Test(expected = IllegalStateException::class)
     fun `rejects a missing mission id`() = runTest {
-        // requireNotNull(), not require() — throws IllegalStateException, matching every other
-        // "should be structurally impossible" guard in this codebase (e.g.
-        // RecordViolationUseCase.execute's identical requireNotNull calls for a missing parent
-        // row).
+        // checkNotNull(), not requireNotNull() — throws IllegalStateException, matching every
+        // other "should be structurally impossible" guard in this codebase's *intent* (see
+        // CreateConstraintTriggerUseCase's own kdoc: requireNotNull actually throws
+        // IllegalArgumentException in Kotlin, which is what broke this exact test in CI —
+        // fixed by switching the use-case to checkNotNull rather than loosening this
+        // assertion).
         useCase.execute(
             missionId = UUID.randomUUID(),
             packageId = "com.example.gambling",
