@@ -7,9 +7,11 @@ import android.view.ViewGroup
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
 import com.disciplineos.app.ui.mission.BehaviorReadClassification
 import com.disciplineos.app.ui.mission.MissionDetailScreen
@@ -18,9 +20,11 @@ import com.disciplineos.app.ui.mission.RelationshipQuadrant
 import com.disciplineos.app.ui.mission.RelationshipView
 import com.disciplineos.app.ui.theme.themedComposeView
 import com.disciplineos.data.entity.GoalMission
+import com.disciplineos.data.entity.LifecycleStage
 import com.disciplineos.data.entity.MissionArchetype
 import com.disciplineos.data.entity.MissionLogEntry
 import com.disciplineos.data.entity.TargetDirection
+import com.disciplineos.data.metrics.hypothesizingStageSatisfied
 import com.disciplineos.domain.usecase.ApplyAdherenceDecayUseCase
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -71,6 +75,19 @@ import java.util.UUID
  *
  * Screen renders the four-quadrant read as plain-language text, not a chart (base doc §4.1's own
  * v1 requirement) — [MissionDetailScreen] is presentation-only; this Fragment does all reading.
+ *
+ * **Batch G5 addition — lifecycle-stage transition + "attach a Trigger?" prompt.** On load, this
+ * Fragment checks [hypothesizingStageSatisfied] and, if satisfied, writes the mission's
+ * [LifecycleStage] forward from `OBSERVING` to `HYPOTHESIZING` (base doc §5) before computing
+ * display state — the transition and the display read happen in the same load pass rather than
+ * needing a separate background job, matching this project's existing bias toward doing derived
+ * work at read-time over introducing new scheduled/background machinery for a v1 feature. Once
+ * `HYPOTHESIZING`, [MissionDetailUiState.Loaded.showTriggerPrompt] is computed from three inputs
+ * — current lifecycle stage, whether any [com.disciplineos.data.entity.Trigger] already exists
+ * for this mission, and whether the prompt was already dismissed
+ * ([GoalMission.triggerPromptDismissedAt]) — see [computeMissionDetailState]'s own doc for the
+ * exact rule. Placement (Mission Detail, not Home) and "shown once" semantics are Integration
+ * Plan §6 / base doc §4.3's own resolved position, recorded in `ROADMAP.md`.
  */
 class MissionDetailFragment : Fragment() {
 
@@ -96,6 +113,19 @@ class MissionDetailFragment : Fragment() {
             MissionDetailScreen(
                 uiState = uiState,
                 onBack = { findNavController().popBackStack() },
+                onAttachTrigger = {
+                    if (missionId != null) {
+                        findNavController().navigate(
+                            R.id.action_missionDetail_to_triggerCreation,
+                            bundleOf(TriggerCreationFragment.ARG_MISSION_ID to missionId.toString()),
+                        )
+                    }
+                },
+                onDismissTriggerPrompt = {
+                    if (missionId != null) {
+                        dismissTriggerPrompt(missionId) { state -> uiState = state }
+                    }
+                },
             )
         }
     }
@@ -104,10 +134,30 @@ class MissionDetailFragment : Fragment() {
         lifecycleScope.launch {
             val context = requireContext().applicationContext
             val database = AppContainer.database(context)
-            val goalMission = database.goalMissionDao().get(missionId)
-            if (goalMission == null) {
+            val loadedMission = database.goalMissionDao().get(missionId)
+            if (loadedMission == null) {
                 onLoaded(MissionDetailUiState.NotFound)
                 return@launch
+            }
+
+            // Batch G5 — resolve hasAnyBehaviorAttached/outcomeLogCount, the two DB-backed
+            // inputs hypothesizingStageSatisfied needs but deliberately doesn't read itself
+            // (see that function's own kdoc for the DB-free-pure-function boundary).
+            val hasAnyBehaviorAttached = database.missionPeriodDao().forMission(missionId).isNotEmpty()
+            val outcomeLogCount = database.missionLogEntryDao().forMission(missionId).size
+
+            val transitioned = hypothesizingStageSatisfied(
+                currentStage = loadedMission.lifecycleStage,
+                hasAnyBehaviorAttached = hasAnyBehaviorAttached,
+                outcomeLogCount = outcomeLogCount,
+                threshold = HYPOTHESIZING_LOG_THRESHOLD,
+            )
+            val goalMission = if (transitioned) {
+                val updated = loadedMission.copy(lifecycleStage = LifecycleStage.HYPOTHESIZING)
+                database.goalMissionDao().update(updated)
+                updated
+            } else {
+                loadedMission
             }
 
             val useCase = AppContainer.applyAdherenceDecayUseCase(context)
@@ -115,6 +165,7 @@ class MissionDetailFragment : Fragment() {
 
             val logEntries = database.missionLogEntryDao().forMission(missionId)
             val hitRateThreshold = AppContainer.adherenceDecayPolicy().hitRateThreshold()
+            val hasExistingTrigger = database.triggerDao().forMission(missionId).isNotEmpty()
 
             onLoaded(
                 computeMissionDetailState(
@@ -122,6 +173,39 @@ class MissionDetailFragment : Fragment() {
                     adherenceResult = adherenceResult,
                     logEntries = logEntries,
                     hitRateThreshold = hitRateThreshold,
+                    hasExistingTrigger = hasExistingTrigger,
+                ),
+            )
+        }
+    }
+
+    /**
+     * Batch G5 — "don't show again" path for [MissionDetailUiState.Loaded.showTriggerPrompt].
+     * Writes [GoalMission.triggerPromptDismissedAt], then recomputes state so the card
+     * disappears immediately rather than waiting for the next full load.
+     */
+    private fun dismissTriggerPrompt(missionId: UUID, onLoaded: (MissionDetailUiState) -> Unit) {
+        lifecycleScope.launch {
+            val context = requireContext().applicationContext
+            val database = AppContainer.database(context)
+            val goalMission = database.goalMissionDao().get(missionId) ?: return@launch
+
+            val updated = goalMission.copy(triggerPromptDismissedAt = Instant.now())
+            database.goalMissionDao().update(updated)
+
+            val useCase = AppContainer.applyAdherenceDecayUseCase(context)
+            val adherenceResult = useCase.execute(missionId, Instant.now())
+            val logEntries = database.missionLogEntryDao().forMission(missionId)
+            val hitRateThreshold = AppContainer.adherenceDecayPolicy().hitRateThreshold()
+            val hasExistingTrigger = database.triggerDao().forMission(missionId).isNotEmpty()
+
+            onLoaded(
+                computeMissionDetailState(
+                    goalMission = updated,
+                    adherenceResult = adherenceResult,
+                    logEntries = logEntries,
+                    hitRateThreshold = hitRateThreshold,
+                    hasExistingTrigger = hasExistingTrigger,
                 ),
             )
         }
@@ -133,6 +217,11 @@ class MissionDetailFragment : Fragment() {
     }
 }
 
+// [HYPOTHESIS] — base doc §5 step 2 names "a small number, e.g. 2-3" with the exact value left
+// unfixed. Picking 3, same "round number, no derivation" posture every other placeholder
+// threshold in this codebase states about itself (NEAR_MISS_MARGIN, MIN_ENTRIES_FOR_TREND).
+private const val HYPOTHESIZING_LOG_THRESHOLD = 3
+
 /**
  * Pure function — see this file's class kdoc for the full behavior-axis/outcome-axis reasoning.
  * Pulled out of the Fragment specifically so it's unit-testable without Robolectric, matching
@@ -143,12 +232,19 @@ class MissionDetailFragment : Fragment() {
  *   Adherence's own `adherenceWindow`, since the two axes answer different questions (behavior
  *   compliance rate vs. outcome direction) and nothing in base doc §4.1 ties their windows
  *   together.
+ * @param hasExistingTrigger Batch G5 — true if any [com.disciplineos.data.entity.Trigger] row
+ *   already exists for [goalMission]. Defaults to `false` so every pre-G5 call site (including
+ *   all of [com.disciplineos.app.mission.MissionDetailFragmentTest]'s existing tests, none of
+ *   which pass this parameter) keeps compiling and passing unmodified — the default is chosen
+ *   to make their omission of it *correct* (no trigger data existed to omit) rather than
+ *   accidentally always-true/false.
  */
 fun computeMissionDetailState(
     goalMission: GoalMission,
     adherenceResult: ApplyAdherenceDecayUseCase.Result,
     logEntries: List<MissionLogEntry>,
     hitRateThreshold: Double,
+    hasExistingTrigger: Boolean = false,
 ): MissionDetailUiState.Loaded {
     val behaviorRead = behaviorReadFor(result = adherenceResult, hitRateThreshold = hitRateThreshold)
 
@@ -167,6 +263,14 @@ fun computeMissionDetailState(
         null
     }
 
+    // Batch G5, base doc §4.3 / Integration Plan §6: shown only while HYPOTHESIZING, only if no
+    // Trigger exists yet, and only if not already dismissed — all three independently gate the
+    // prompt (see MissionDetailFragment's class kdoc for the "hide once dismissed OR once a
+    // Trigger exists" resolution — either condition alone is sufficient to hide it).
+    val showTriggerPrompt = goalMission.lifecycleStage == LifecycleStage.HYPOTHESIZING &&
+        !hasExistingTrigger &&
+        goalMission.triggerPromptDismissedAt == null
+
     return MissionDetailUiState.Loaded(
         missionId = goalMission.id,
         title = goalMission.title,
@@ -176,6 +280,7 @@ fun computeMissionDetailState(
         isSecondary = adherenceResult.isSecondary == true,
         behaviorRead = behaviorRead?.classification,
         relationshipView = relationshipView,
+        showTriggerPrompt = showTriggerPrompt,
     )
 }
 

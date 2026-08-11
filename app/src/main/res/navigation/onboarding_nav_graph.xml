@@ -262,11 +262,31 @@
          (Integration Plan §7.6's own stated resolution). missionId is a String argument (a
          serialized UUID, matching this graph's existing "primitive argType, parsed at the
          Fragment boundary" pattern — tierConfirmationFragment's own `tier` argument does the
-         same for its enum instead of inventing a custom NavType for a one-destination need). -->
+         same for its enum instead of inventing a custom NavType for a one-destination need).
+
+         **New outgoing action, Batch G5:** action_missionDetail_to_triggerCreation, added this
+         pass — the "attach a Trigger?" prompt (base doc §4.3/Integration Plan §6) and any
+         direct "add another trigger" action both navigate here. -->
     <fragment
         android:id="@+id/missionDetailFragment"
         android:name="com.disciplineos.app.mission.MissionDetailFragment"
         android:label="Mission Detail">
+        <argument
+            android:name="missionId"
+            app:argType="string" />
+        <action
+            android:id="@+id/action_missionDetail_to_triggerCreation"
+            app:destination="@id/triggerCreationFragment" />
+    </fragment>
+
+    <!-- Trigger Creation — Batch G5 (Integration Plan §6, base doc §3.4/§4.3). Reached only
+         from missionDetailFragment. missionId is a String argument, same convention as
+         missionDetailFragment's own argument above — parsed at the Fragment boundary, not a
+         custom NavType. -->
+    <fragment
+        android:id="@+id/triggerCreationFragment"
+        android:name="com.disciplineos.app.mission.TriggerCreationFragment"
+        android:label="Add a Trigger">
         <argument
             android:name="missionId"
             app:argType="string" />

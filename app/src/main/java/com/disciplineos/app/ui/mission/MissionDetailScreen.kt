@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -14,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -41,6 +43,10 @@ sealed interface MissionDetailUiState {
      * @param relationshipView the four-quadrant read (base doc §4.1), null for any non-
      *   [MissionArchetype.OUTCOME_DRIVEN] mission or when there isn't yet enough log data to call
      *   an outcome trend — see [com.disciplineos.app.mission.computeMissionDetailState]'s own doc.
+     * @param showTriggerPrompt Batch G5 — true while the mission is in
+     *   [com.disciplineos.data.entity.LifecycleStage.HYPOTHESIZING] and no Trigger has been
+     *   attached or dismissed yet. See [com.disciplineos.app.mission.MissionDetailFragment]'s
+     *   class kdoc, "Batch G5 addition" section, for the full placement/dismissal reasoning.
      */
     data class Loaded(
         val missionId: UUID,
@@ -51,6 +57,7 @@ sealed interface MissionDetailUiState {
         val isSecondary: Boolean,
         val behaviorRead: BehaviorReadClassification?,
         val relationshipView: RelationshipView?,
+        val showTriggerPrompt: Boolean = false,
     ) : MissionDetailUiState
 }
 
@@ -97,6 +104,8 @@ fun MissionDetailScreen(
     uiState: MissionDetailUiState,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onAttachTrigger: () -> Unit = {},
+    onDismissTriggerPrompt: () -> Unit = {},
 ) {
     Scaffold(modifier = modifier.fillMaxSize()) { contentPadding ->
         Column(
@@ -122,7 +131,11 @@ fun MissionDetailScreen(
                 }
 
                 is MissionDetailUiState.Loaded -> {
-                    MissionDetailContent(uiState)
+                    MissionDetailContent(
+                        state = uiState,
+                        onAttachTrigger = onAttachTrigger,
+                        onDismissTriggerPrompt = onDismissTriggerPrompt,
+                    )
                 }
             }
 
@@ -139,7 +152,11 @@ fun MissionDetailScreen(
 }
 
 @Composable
-private fun MissionDetailContent(state: MissionDetailUiState.Loaded) {
+private fun MissionDetailContent(
+    state: MissionDetailUiState.Loaded,
+    onAttachTrigger: () -> Unit,
+    onDismissTriggerPrompt: () -> Unit,
+) {
     Text(
         text = state.title,
         style = MaterialTheme.typography.headlineSmall,
@@ -222,6 +239,50 @@ private fun MissionDetailContent(state: MissionDetailUiState.Loaded) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+    }
+
+    // Batch G5, Integration Plan §6, base doc §4.3 — "shown once per Mission during
+    // Hypothesizing... offered more assertively than a bare mention but never mandatory."
+    // Placed after the Adherence/relationship cards (a person's own progress data is the
+    // primary content this screen exists to surface), same "judgment call, no spec section
+    // orders these relative to each other" posture com.disciplineos.app.ui.home.HomeScreen's
+    // own card-ordering comments already use for its own optional cards.
+    if (state.showTriggerPrompt) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = stringResource(R.string.mission_detail_trigger_prompt_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                Text(
+                    text = stringResource(R.string.mission_detail_trigger_prompt_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 16.dp),
+                )
+                Button(
+                    onClick = onAttachTrigger,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                ) {
+                    Text(stringResource(R.string.mission_detail_trigger_prompt_attach_button))
+                }
+                TextButton(
+                    onClick = onDismissTriggerPrompt,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.mission_detail_trigger_prompt_dismiss_button))
+                }
             }
         }
     }

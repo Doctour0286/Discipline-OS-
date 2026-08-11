@@ -51,6 +51,19 @@ import java.util.UUID
  * hit-rate fell below the decay threshold; reset to 0 the first window that clears it, same
  * counter-reset semantics `ApplyReputationDecayUseCase` already uses for the Reputation
  * equivalent.
+ *
+ * [triggerPromptDismissedAt] — added Batch G5, another small motivated field addition in the
+ * same category as [consecutiveWindowsBelowThreshold] above. Base doc §4.3 / Integration Plan
+ * §6: the "attach a Trigger?" prompt on Mission Detail is shown "once per Mission during
+ * HYPOTHESIZING." That's per-Mission current-state, not an event log — no other row in this
+ * schema needs to exist just to remember "did the person already dismiss this," so a nullable
+ * timestamp field directly on [GoalMission] is simpler than a whole new dismissal table (the
+ * alternative considered: mirroring
+ * [com.disciplineos.data.entity.PredictiveFailureAlertDismissal]'s shape — rejected because
+ * that table's `ruleId`-keyed shape answers a different question, "which of several rule types
+ * fired," where this is a single boolean-shaped fact about one Mission). Null means never
+ * dismissed; non-null is the dismissal timestamp, kept (not just a `Boolean`) in case a future
+ * pass wants to know *when* without a second migration.
  */
 enum class MissionArchetype { OUTCOME_DRIVEN, BEHAVIOR_DRIVEN, CONSTRAINT }
 enum class TargetDirection { INCREASE, DECREASE, MAINTAIN }
@@ -77,6 +90,7 @@ data class GoalMission(
     val consecutiveWindowsBelowThreshold: Int = 0,
     val createdAt: Instant,
     val archivedAt: Instant?,
+    val triggerPromptDismissedAt: Instant? = null,
 )
 
 /**
