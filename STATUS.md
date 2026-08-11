@@ -44,13 +44,17 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-10 (through §5.31 — post-onboarding Home shell built,
-plus a real Iron Calibration flow that finally gives `TierTransitionUseCase.activateIron` a
-call site. **Corrected same day:** §5.31 is now merged to `main` via PR #21 — the
-"not yet merged" note below and in the Phase 3 row was accurate when first written but went
-stale within the same session. Verified directly via `git log main --oneline -1`,
-`git merge-base --is-ancestor <§5.31 commit> main`, and `git branch -r` rather than trusted
-from a prior note, per this file's own standing advice.)
+**Last synced to ROADMAP.md:** 2026-08-11 (through §5.32 — Goal-Oriented Mission Model
+accepted and folded into the spec docs, **docs-only, no code**. Four uploaded documents
+(a base design doc, an engineering-ready integration plan, two now-superseded earlier drafts)
+resolved into: `Documents/01_DATA_MODEL_AND_SCHEMA.md` §2.2a (new §2.2a section, plus a new §8
+row), `Documents/06_GOAL_ORIENTED_MISSION_MODEL.md` (reduced to a historical pointer, per its
+own §0 instruction), `Documents/06_GOAL_ORIENTED_MISSION_MODEL_INTEGRATION_PLAN.md` (checked in
+unmodified), and `BUILD_PLAN.md` (new Batches G1–G6, dependency-graphed against A–F with an
+explicit merge-collision warning since G1 renames the `Mission` table). See §5.32 for the full
+account, including one call-site gap found in the uploaded plan and corrected before it reached
+`BUILD_PLAN.md`. **Prior sync (2026-08-10, §5.31 — post-onboarding Home shell, Iron Calibration
+flow, merged via PR #21) unchanged below**, carried forward as-is.)
 
 ---
 
@@ -144,6 +148,7 @@ on-device pass, not a logic change needing separate re-verification.
 | Behavioral Fingerprint + Predictive Failure Alerts | ⬜ | Phase 4, not started |
 | Unsupervised Reliability (opt-in tracking) | ✅ | Schema isolated (Phase 0); opt-in flow (`UnsupervisedReliabilityOptInFragment`, §2.7) merged and confirmed CI + on-device (PR #16) — writes `User.unsupervisedReliabilityOptIn`/`optInAt`. No capture pipeline (actual passive signal collection into `UnsupervisedSignalDao`) built yet — this pass is the consent/opt-in screen only, not the measurement pipeline itself. |
 | Daily / Weekly Reports | ⬜ | Not started |
+| Goal-Oriented Mission Model (`GoalMission`/`EnforcementSession` split) | ⬜ | **Accepted, docs-only (§5.32, 2026-08-11) — no code written yet.** Not part of PRD §41's MVP bar (post-v3.6 addition). Tracked as `BUILD_PLAN.md` Batches G1–G6, separate from the A–F sequence above. See `Documents/01_DATA_MODEL_AND_SCHEMA.md` §2.2a for the accepted shape. |
 
 ---
 
@@ -188,7 +193,7 @@ position (Operator's floor = INCONSISTENT, Warden's = RELIABLE, Iron's = DISCIPL
 
 - `OnboardingPlaceholderFragmentTest` doesn't exist despite `fragment-testing` dependency implying it does (either write it or drop the now-unjustified dependency).
 - `androidx.security:security-crypto:1.1.0-alpha06` is an alpha version, pinned to match existing code rather than independently vetted.
-- The `Documents/` directory (PRD, data model, architecture, onboarding spec, crisis-boundary spec) referenced throughout `ROADMAP.md` §1 is **not checked into this repo** — only `docs/PHASE2_DEVICE_VERIFICATION.md` exists under version control. Worth deciding deliberately whether specs should be tracked here too, or intentionally kept elsewhere.
+- ~~The `Documents/` directory (PRD, data model, architecture, onboarding spec, crisis-boundary spec) referenced throughout `ROADMAP.md` §1 is **not checked into this repo**~~ — **corrected 2026-08-11 (§5.32): this was false as of this pass.** All six spec docs (PRD, data model, architecture, onboarding spec, behavioral fingerprint spec, crisis-boundary spec) are tracked under `Documents/`, confirmed directly via `ls Documents/` rather than trusted from this note. Unclear how long this note had already been stale before being caught — flagging that as a reminder to spot-check "known standing gaps" entries occasionally rather than assume they age correctly on their own.
 - No compiler in the authoring sandbox this file may be edited from — every new file ships as "manually cross-checked, not compiled" until CI confirms it.
 - `MainActivity`/`activity_main.xml` still carries the pre-Compose
   `@android:style/Theme.NoTitleBar.Fullscreen` Activity theme rather than a Compose-first
