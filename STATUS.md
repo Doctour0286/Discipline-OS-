@@ -44,19 +44,26 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-11 (through §5.42 — Batch G5 (Trigger UI + lifecycle
-prompts) pushed to `g5-trigger-ui-lifecycle-prompts`, PR open (#38), **not yet merged.** Two CI
-rounds so far, both fixed: run #151 failed on two test-authoring bugs in
+**Last synced to ROADMAP.md:** 2026-08-11 (through §5.43 — audit and fix of the
+`requireNotNull`/`checkNotNull` pattern flagged in §5.42. Twelve call sites across
+`RecordViolationUseCase`, `ApplyReputationDecayUseCase`, `ResolveDisputeUseCase`,
+`TierTransitionUseCase`, and `MissionInterceptionActivity` fixed to `checkNotNull`;
+`TriggerCreationFragment`'s one flagged site confirmed to be a genuinely different,
+correctly-`requireNotNull` case and left unchanged. No compiler reachable to verify by
+building — see "known standing gaps" below. See §5.43 for the full per-file account.
+
+**Prior sync (through §5.42):** Batch G5 (Trigger UI + lifecycle prompts) pushed to
+`g5-trigger-ui-lifecycle-prompts`, PR open (#38), not yet merged as of that sync. Two CI
+rounds, both fixed: run #151 failed on two test-authoring bugs in
 `CreateConstraintTriggerUseCaseTest` (an `Instant`-precision DB-round-trip mismatch and a
 nested-`runTest`-inside-`assertThrows` exception-propagation bug), fixed in commit `1907e49`.
 Run #154 failed on a real production bug — `CreateConstraintTriggerUseCase` used `requireNotNull`
 where its own kdoc claimed an `IllegalStateException` posture, but `requireNotNull` always
 throws `IllegalArgumentException` in Kotlin; `checkNotNull` is correct for that posture — fixed
-in commit `208f0bc`. The same latent `requireNotNull`-for-a-"should-be-impossible"-guard pattern
-was found, not fixed, in five other files (see "known standing gaps" below). CI re-run pending
-as of this sync. See §5.42 for the full account, including the `MissionProfile`-sourcing
-judgment call and the PRD §8.1 mischaracterization caught and corrected before the UI was built
-against it.
+in commit `208f0bc`. The same latent pattern was found, not fixed, in five other files at that
+time (resolved by §5.43 above). See §5.42 for the full account, including the
+`MissionProfile`-sourcing judgment call and the PRD §8.1 mischaracterization caught and
+corrected before the UI was built against it.
 
 **Sync prior to this (2026-08-11, §5.35)** — a DAO-level linkage test was added
 for Batch G2's open verification-checklist item (`FirstMissionSchedulingFragmentTest`, `:app`):
@@ -243,20 +250,32 @@ position (Operator's floor = INCONSISTENT, Warden's = RELIABLE, Iron's = DISCIPL
   theme itself, since `MainActivity` has no Activity-level Compose tree to move it into without a
   Compose Navigation rewrite (see §5.29's own investigation). Low priority — no observed visual
   or functional issue from the mismatch, just a naming/consistency loose end.
-- **`requireNotNull` used where `checkNotNull` was intended, in five files beyond the one G5
-  fixed (§5.42).** `CreateConstraintTriggerUseCase` originally used `requireNotNull` for a
-  "missing parent row, should be structurally impossible" guard, with a kdoc claiming this
-  throws `IllegalStateException` — Kotlin's `requireNotNull` always throws
-  `IllegalArgumentException`; `checkNotNull` is the correct stdlib call for that posture. Fixed
-  there once a real CI failure exposed it (no test elsewhere in this codebase currently asserts
-  on the exception *type* closely enough to catch this). The same `requireNotNull`-for-a-
-  "should-be-impossible"-guard pattern also appears, unverified and unfixed, in
-  `RecordViolationUseCase`, `ApplyReputationDecayUseCase`, `ResolveDisputeUseCase`,
-  `TierTransitionUseCase`, `MissionInterceptionActivity`, and `TriggerCreationFragment` — each
-  should be checked against its own stated intent (does the surrounding comment/kdoc actually
-  want `IllegalArgumentException`, or does it want the "structurally impossible"
-  `IllegalStateException` posture `checkNotNull` provides) rather than assumed correct because
-  it compiles and no test has caught it yet.
+- ~~`requireNotNull` used where `checkNotNull` was intended, in five files beyond the one G5
+  fixed (§5.42).`~~ — **resolved 2026-08-11 (§5.43).** Audited all five flagged files
+  (`RecordViolationUseCase`, `ApplyReputationDecayUseCase`, `ResolveDisputeUseCase`,
+  `TierTransitionUseCase`, `MissionInterceptionActivity`) plus `TriggerCreationFragment`. Twelve
+  call sites across the first five confirmed as genuine "missing row, structurally impossible"
+  guards and fixed to `checkNotNull` (including `TierTransitionUseCase`'s shared private
+  `requireUser` helper, renamed `checkUser` to match); each file's test suite checked first for
+  any exception-*type* assertion that might depend on the old behavior, none found affected.
+  `TriggerCreationFragment`'s one site is a genuinely different case — a UI-enforced,
+  defense-in-depth guard on a plain nullable parameter, not a missing-DB-row guard, matching its
+  sibling `require` call and the class kdoc's own cited precedent — confirmed correct as
+  `requireNotNull` and deliberately left unchanged. No compiler reachable in this sandbox to
+  verify by building; verification was manual (full kdoc/comment read per site, every test
+  assertion traced to the specific call it exercises, brace-balance check on all touched files).
+  General "no compiler reachable" sandbox limitation remains a standing gap on its own — see the
+  entry below.
+- **No Kotlin/Gradle compiler reachable from this authoring sandbox.** `./gradlew` cannot
+  complete a build here (outward network calls for the Gradle distribution fail in this
+  environment), so every change in this repo's history — including every fix on this list — is
+  verified by manual reading, targeted `grep`/`find` cross-checks, and tracing existing test
+  assertions to their exact call sites, never by an actual compile or test run. This has already
+  produced at least one real, live consequence (§5.42/§5.43's `requireNotNull`/`checkNotNull`
+  chain: a stdlib-semantics claim stated confidently in a kdoc, never verified, that shipped and
+  stayed wrong until a real CI run happened to catch it). Worth remembering as the reason "no
+  test currently asserts on this" is treated in this project's history as "unverified," not as
+  "confirmed fine."
 
 ---
 

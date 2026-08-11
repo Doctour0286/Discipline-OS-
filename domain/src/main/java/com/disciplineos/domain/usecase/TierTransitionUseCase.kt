@@ -120,8 +120,8 @@ class TierTransitionUseCase(
      */
     suspend fun explicitDowngrade(userId: UUID, toTier: Tier, now: Instant = Instant.now()): TierEvent {
         return database.withTransaction {
-            val user = requireUser(userId)
-            val currentTier = requireNotNull(user.currentTier) {
+            val user = checkUser(userId)
+            val currentTier = checkNotNull(user.currentTier) {
                 "explicitDowngrade called for user $userId with no tier set — " +
                     "selectInitialTier must complete before any tier-transition method runs " +
                     "(User.kt kdoc, Batch B)"
@@ -169,8 +169,8 @@ class TierTransitionUseCase(
      */
     suspend fun crisisDowngrade(userId: UUID, triggerReason: String, now: Instant = Instant.now()): TierEvent {
         return database.withTransaction {
-            val user = requireUser(userId)
-            val currentTier = requireNotNull(user.currentTier) {
+            val user = checkUser(userId)
+            val currentTier = checkNotNull(user.currentTier) {
                 "crisisDowngrade called for user $userId with no currentTier — " +
                     "selectInitialTier must complete before any tier-transition method runs " +
                     "(User.kt kdoc, Batch B)"
@@ -211,13 +211,13 @@ class TierTransitionUseCase(
      */
     suspend fun ironCrisisExit(userId: UUID, missionId: UUID, now: Instant = Instant.now()): TierEvent {
         return database.withTransaction {
-            val user = requireUser(userId)
+            val user = checkUser(userId)
             val currentTier = user.currentTier
             require(currentTier == Tier.IRON) {
                 "ironCrisisExit called for user $userId at tier $currentTier — " +
                     "this control only exists on the Iron-tier interception screen (PRD §12.4.4)"
             }
-            val mission = requireNotNull(missionDao.get(missionId)) {
+            val mission = checkNotNull(missionDao.get(missionId)) {
                 "ironCrisisExit references missing Mission $missionId"
             }
             require(mission.userId == userId) {
@@ -356,13 +356,13 @@ class TierTransitionUseCase(
      */
     suspend fun activateIron(userId: UUID, now: Instant = Instant.now()): TierEvent {
         return database.withTransaction {
-            val user = requireUser(userId)
-            val currentTier = requireNotNull(user.currentTier) {
+            val user = checkUser(userId)
+            val currentTier = checkNotNull(user.currentTier) {
                 "activateIron called for user $userId with no currentTier — " +
                     "selectInitialTier must complete before any tier-transition method runs " +
                     "(User.kt kdoc, Batch B)"
             }
-            val tierSelectedAt = requireNotNull(user.tierSelectedAt) {
+            val tierSelectedAt = checkNotNull(user.tierSelectedAt) {
                 "activateIron called for user $userId with no tierSelectedAt — same " +
                     "precondition as currentTier above, set together by selectInitialTier"
             }
@@ -394,8 +394,8 @@ class TierTransitionUseCase(
         now: Instant,
     ): TierEvent {
         return database.withTransaction {
-            val user = requireUser(userId)
-            val currentTier = requireNotNull(user.currentTier) {
+            val user = checkUser(userId)
+            val currentTier = checkNotNull(user.currentTier) {
                 "transition called for user $userId with no currentTier — " +
                     "selectInitialTier must complete before any tier-transition method runs " +
                     "(User.kt kdoc, Batch B)"
@@ -433,7 +433,7 @@ class TierTransitionUseCase(
      * that method deliberately doesn't call this helper — see its own body). Does NOT assert
      * [User.currentTier] non-null here, even though every caller needs that to be true: Kotlin
      * smart-casts from a null-check don't survive across a function boundary — asserting inside
-     * this function would not change what type `requireUser(...)`'s *return value* is seen as
+     * this function would not change what type `checkUser(...)`'s *return value* is seen as
      * by callers, so it would be a no-op fix that looks like it works but doesn't (caught before
      * merge; see BUILD_PLAN.md Batch B note — this is a second concrete example, after
      * TierTransitionUseCase.explicitDowngrade's inverted-boolean bug, of exactly why nothing in
@@ -445,6 +445,6 @@ class TierTransitionUseCase(
      * so it was never at risk of this mistake) — the other methods needed the same treatment
      * added deliberately.
      */
-    private suspend fun requireUser(userId: UUID): User =
-        requireNotNull(userDao.get(userId)) { "No User found for id $userId" }
+    private suspend fun checkUser(userId: UUID): User =
+        checkNotNull(userDao.get(userId)) { "No User found for id $userId" }
 }

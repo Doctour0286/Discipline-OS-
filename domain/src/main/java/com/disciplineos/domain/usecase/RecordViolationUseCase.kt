@@ -56,7 +56,7 @@ class RecordViolationUseCase(
      *   Report refresh, or a test) don't have to re-derive it from ledger state.
      */
     suspend fun execute(violation: Violation): Result = database.withTransaction {
-        val mission = requireNotNull(missionDao.get(violation.missionId)) {
+        val mission = checkNotNull(missionDao.get(violation.missionId)) {
             "Violation ${violation.id} references missing Mission ${violation.missionId}"
         }
         require(mission.status != MissionStatus.ABORTED_CRISIS_EXIT) {
@@ -67,7 +67,7 @@ class RecordViolationUseCase(
             "Mission ${mission.id} is ABORTED_CRISIS_EXIT — must not go through " +
                 "RecordViolationUseCase; crisis exit writes no Debt/Reputation (Data Model §5)"
         }
-        val user = requireNotNull(userDao.get(mission.userId)) {
+        val user = checkNotNull(userDao.get(mission.userId)) {
             "Mission ${mission.id} references missing User ${mission.userId}"
         }
         // A Mission requires a MissionProfile (Mission.missionProfileId), which requires a
@@ -76,7 +76,7 @@ class RecordViolationUseCase(
         // user.currentTier being null here means that invariant was violated upstream; a
         // loud crash surfaces that immediately rather than silently misbehaving (Batch B,
         // BUILD_PLAN.md — see User.kt kdoc for why this field became nullable at all).
-        val currentTier = requireNotNull(user.currentTier) {
+        val currentTier = checkNotNull(user.currentTier) {
             "RecordViolationUseCase reached for user ${user.id} with no currentTier — " +
                 "should be structurally impossible once a Mission/MissionProfile exist " +
                 "(User.kt kdoc, Batch B)"

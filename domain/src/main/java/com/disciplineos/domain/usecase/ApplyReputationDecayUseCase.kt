@@ -115,14 +115,14 @@ class ApplyReputationDecayUseCase(
         // §5.9 demotion firing (below) calls TierTransitionUseCase.standardDowngrade, which
         // opens its own database.withTransaction — Room composes nested transactions onto
         // the same connection/thread fine, but standardDowngrade re-fetches the User row
-        // itself (see requireUser() in that class) rather than accepting one, so any
+        // itself (see checkUser() in that class) rather than accepting one, so any
         // consecutiveDaysBelowFloor bookkeeping this method needs persisted *before* that
         // call must actually be written first, not just held in a local `var user`. That's
         // why the counter-reset branches below call userDao.update immediately rather than
         // batching every User mutation into one write at the end the way the original
         // (pre-review) version of this method did.
         val entriesAndDemotion = database.withTransaction {
-            var user = requireNotNull(userDao.get(userId)) { "No User found for id $userId" }
+            var user = checkNotNull(userDao.get(userId)) { "No User found for id $userId" }
 
             val entries = mutableListOf<LedgerEntry>()
 
@@ -155,7 +155,7 @@ class ApplyReputationDecayUseCase(
             // post-onboarding, on an already-tiered user — see User.kt kdoc's "every
             // non-test call site reading these four fields was checked" note, which
             // predates this file and should be extended to cover it too.
-            val currentTier = requireNotNull(user.currentTier) {
+            val currentTier = checkNotNull(user.currentTier) {
                 "ApplyReputationDecayUseCase ran for user $userId with no tier set — " +
                     "decay/demotion should never run before onboarding completes"
             }
