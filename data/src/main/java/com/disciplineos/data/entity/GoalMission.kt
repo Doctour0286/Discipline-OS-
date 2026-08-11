@@ -264,12 +264,28 @@ data class Trigger(
  * by). [achievedAt] null means not yet reached — a [Milestone] row always exists once defined,
  * whether or not it's been hit, so "not achieved" is representable without deleting/recreating
  * rows.
+ *
+ * [targetValue]: [Double]?, matching Addendum §B.2's field list exactly ("targetValue: Double?
+ * — null = ordinal-only checkpoint"). This shipped as `String?` in the original G1 schema pass
+ * with a comment deferring interpretation to the parent [GoalMission]'s target shape — an
+ * unflagged divergence from the spec, not a deliberate choice; a numeric-comparison field has no
+ * legitimate reason to be a `String`. Fixed here rather than worked around, same treatment this
+ * project has already given two prior instances of this exact category of finding
+ * ([MissionLogEntry.numericValue], the [Trigger] entity shape fix). Confirmed zero call sites
+ * constructed a [Milestone] anywhere in the codebase at the time of this fix, so there was no
+ * pre-fix shape to migrate.
+ *
+ * [targetDate]: [Instant]?, also per Addendum §B.2 ("targetDate: Instant | null — null =
+ * milestone is ordinal only ('halfway'), not date-bound"). Missing entirely pre-fix; added here
+ * alongside [targetValue]'s type correction since both are the same spec's field list and both
+ * were absent/wrong for the same reason (never revisited since the original G1 pass).
  */
 @Entity(tableName = "milestones")
 data class Milestone(
     @PrimaryKey val id: UUID,
     val missionId: UUID,
     val label: String,
-    val targetValue: String?, // interpretation depends on the parent GoalMission's target shape
+    val targetValue: Double?,
+    val targetDate: Instant?,
     val achievedAt: Instant?,
 )
