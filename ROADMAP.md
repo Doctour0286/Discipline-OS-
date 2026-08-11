@@ -531,7 +531,9 @@ content requirements as this phase's checklist rather than duplicating it here.
 
 ---
 
-### Phase 4 — Behavioral Fingerprint / Predictive Failure Rules  ⬜ **NOT STARTED**
+### Phase 4 — Behavioral Fingerprint / Predictive Failure Rules  ✅ **DONE** (merged to `main`,
+commit `45d82f8`, 2026-08-10 — confirmed 2026-08-11, see §5.45; never had its own §5 entry when
+it landed, this is that missing entry)
 
 **Delivers:** F1–F5 rule implementations, the shared Predictive Failure Alert UI pattern
 (Onboarding doc §3.5), per-rule accuracy tracking.
@@ -3549,3 +3551,73 @@ starting point matched what this entry describes, not a stale assumption), brace
 after editing, and every cross-file reference (`MilestoneDao` accessor name, `TargetDirection`
 enum, `MissionLogEntry` field names) grepped and confirmed against the real files on disk rather
 than assumed from memory of the spec docs alone.
+
+### 5.45 Doc audit: base doc §6.6 resolves the two §5.24 `[HYPOTHESIS]` items; Phase 4 found merged but never logged; `01_DATA_MODEL_AND_SCHEMA.md` §2.2a found stale on five independent points
+
+**Trigger for this pass:** asked to study the Goal-Oriented Mission Model documents as the
+source of truth and find every gap/deviation between them and what's shipped or planned, then
+correct the plan to match. Full base document (`06_GOAL_ORIENTED_MISSION_MODEL.md`, restored
+content, not the pointer) read start to finish for this pass, cross-checked against every
+shipped entity file directly (`GoalMission.kt`, `EnforcementSession.kt` and siblings) rather than
+against the Integration Plan or `01_DATA_MODEL_AND_SCHEMA.md` §2.2a alone, since either of those
+could themselves have drifted — confirmed one of them had (below).
+
+**Finding 1 — the two §5.24 `[HYPOTHESIS]` items in `FirstMissionSchedulingFragment` are not
+open.** Base doc §6.6 ("First Mission Scheduling's onboarding gap") names both explicitly —
+`plannedDurationMin`'s 25-minute default and reusing `MissionStatus.active` for a
+scheduled-but-not-started session — and states a resolved position: both are the deliberate,
+minimum-viable shape for this one call site, "flagged, not silently assumed," with a duration
+picker or dedicated status named as real future options once a proper scheduling UI exists to
+source them from, not defects in the current screen. This was already the base document's stated
+position at the time §6.6 was written; §5.24 (and every later reference to these two items as
+"open") predates that resolution and was never updated once §6.6 landed as part of accepting the
+whole model (§5.32). Closed in `STATUS.md`'s "what's actually next" section and
+`BUILD_PLAN.md`'s Batch G2 scope note, both updated this same pass — not a new decision, just
+catching up the record to one already made.
+
+**Finding 2 — Phase 4 (Behavioral Fingerprint / Predictive Failure) is fully merged to `main`
+and was never logged.** Commit `45d82f8` (2026-08-10, predates G6) ships F1–F5 in full:
+`BehavioralFingerprintPolicy`/`HypothesisBehavioralFingerprintPolicy`,
+`ComputeBehavioralFingerprintUseCase` (421 lines, 15 test cases), wired through `AppContainer`
+DI into `HomeFragment`/`HomeScreen`, rendering via `PredictiveFailureAlertCard`, with dismissal
+tracking (`PredictiveFailureAlertDismissal`). Checked against `BUILD_PLAN.md`'s Batch E spec
+line-by-line: all five rules present and matching (F1 clustering, F2 cancellation, F3 debt
+slope, F4 correctly internal-only with no `PredictiveFailureAlert` ever constructed for it — the
+`FollowUpAction` `when` needs no F4 branch by construction, not by omission — F5's threshold
+correctly a conservative, explicitly-flagged placeholder rather than a guessed number). No §5
+entry exists for this commit; §2's phase table still marked it "⬜ NOT STARTED / 0%" until this
+entry's header fix, above. Root cause not investigated further (which session/branch this landed
+on outside the batch sequence this log otherwise tracks is not reconstructed here) — flagged as
+a gap in this log's own completeness, not just in the phase table.
+
+**Finding 3 — `01_DATA_MODEL_AND_SCHEMA.md` §2.2a, the file meant to carry the base document's
+content forward once it's reduced to a pointer, had drifted stale on five independent points,**
+none previously flagged:
+1. Status line claimed "partially implemented... nothing below is built yet" — true only through
+   G1, false since G6 merged.
+2. `MissionLogEntry`'s field list was missing `numericValue`/`didOccur` — the exact fields
+   §5.36 already added to fix a real gap; §2.2a was never updated to match its own project's own
+   fix.
+3. `PeriodType`'s middle enum value was written `deadline` (lowercase) in this section — matching
+   neither the base doc's `FLOATING_DEADLINE` nor the shipped code's `DEADLINE` exactly, a third,
+   independent spelling.
+4. `Trigger`/`Milestone` had no field list at all, just a comment pointing at the base document —
+   which, now that the base doc is a pointer with no field lists of its own, pointed nowhere.
+5. `MissionPeriod.enforcementProfileId`'s nullability mismatch (base doc: nullable; shipped:
+   non-null) was already flagged in the entity's own kdoc but not carried into this summary or
+   this log — now flagged in both places.
+
+All five corrected in this pass — §2.2a rewritten in full against the real shipped entity
+signatures directly, both remaining base-doc-vs-shipped-code divergences (§2.2a's own naming and
+nullability notes, above) called out explicitly rather than resolved silently either direction.
+
+**Explicitly not done in this pass, flagged rather than attempted:** `STATUS.md`'s "what's
+actually next" items 2–3 and `ROADMAP.md` §2's phase-progress bar chart are both stale beyond
+just the Phase 4 line (e.g. the bar chart still shows Phase 3 — Onboarding at 0% despite
+STATUS.md confirming it fully done and on-device verified) — a real, larger resync this entry
+deliberately doesn't attempt, to keep this pass scoped to what was actually asked. Flagged in
+`STATUS.md` directly as its own open item.
+
+**Not run: an actual compile or build** — this was a documentation-only pass, no `.kt` files
+touched, so the standing "no toolchain reachable" gap doesn't apply to this entry's own changes,
+though it remains true for everything else in this log.
