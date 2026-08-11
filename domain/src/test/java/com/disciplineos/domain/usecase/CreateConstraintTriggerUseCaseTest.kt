@@ -15,7 +15,6 @@ import com.disciplineos.data.entity.TriggerCueType
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -86,10 +85,19 @@ class CreateConstraintTriggerUseCaseTest {
     fun `creates a MissionProfile, an ALWAYS_ON MissionPeriod, and an APP_OPEN Trigger in one call`() = runTest {
         val mission = seedGoalMission(MissionArchetype.CONSTRAINT)
 
+        // Room's Instant converter round-trips through epoch-millis (Converters.kt), which
+        // truncates any sub-millisecond precision Instant.now() may carry. Passing an
+        // already-millis-truncated `now` here means `result.*` (in-memory) and the DB
+        // round-trip below compare equal on `createdAt` — using a bare `Instant.now()` would
+        // make this assertion flaky/failing depending on JVM clock precision, which is exactly
+        // what broke this test in CI.
+        val now = Instant.ofEpochMilli(Instant.now().toEpochMilli())
+
         val result = useCase.execute(
             missionId = mission.id,
             packageId = "com.example.gambling",
             cueDescription = "whenever I feel bored at night",
+            now = now,
         )
 
         // The MissionProfile is scoped to exactly the one blocked package — see class kdoc's
@@ -119,20 +127,40 @@ class CreateConstraintTriggerUseCaseTest {
         assertEquals(listOf(result.trigger), db.triggerDao().forMission(mission.id))
     }
 
-    @Test
+    // Both exception tests below use `@Test(expected = ...)` directly on a `suspend fun =
+    // runTest { ... }`, matching RecordViolationUseCaseTest's identical
+    // `a crisis-exit mission must not go through this use-case` test — NOT `assertThrows`
+    // wrapping a second, nested `runTest { }`. The nested-runTest form is what actually broke
+    // CI here: Room's `withTransaction` dispatches its lambda through its own dispatcher, and
+    // an exception thrown inside a nested TestScope doesn't propagate out of `assertThrows`
+    // as the original exception type — it surfaces as a generic AssertionError instead. The
+    // single-runTest form used elsewhere in this codebase (RecordViolationUseCaseTest) does
+    // not have this problem, since JUnit's `expected=` catches the exception at the top level
+    // of the same coroutine `runTest` already runs the test body in.
+
+    @Test(expected = IllegalArgumentException::class)
     fun `rejects a non-CONSTRAINT mission rather than silently coercing it`() = runTest {
         val mission = seedGoalMission(MissionArchetype.BEHAVIOR_DRIVEN)
 
         // require(), not requireNotNull() — throws IllegalArgumentException, matching Kotlin's
         // own require/requireNotNull split and this project's identical usage of it elsewhere.
-        assertThrows(IllegalArgumentException::class.java) {
-            runTest {
-                useCase.execute(
-                    missionId = mission.id,
-                    packageId = "com.example.gambling",
-                    cueDescription = "whenever I feel bored at night",
-                )
-            }
+        useCase.execute(
+            missionId = mission.id,
+            packageId = "com.example.gambling",
+            cueDescription = "whenever I feel bored at night",
+        )
+    }
+
+    @Test
+    fun `a rejected non-CONSTRAINT mission writes nothing`() = runTest {
+        val mission = seedGoalMission(MissionArchetype.BEHAVIOR_DRIVEN)
+
+        runCatching {
+            useCase.execute(
+                missionId = mission.id,
+                packageId = "com.example.gambling",
+                cueDescription = "whenever I feel bored at night",
+            )
         }
 
         // Nothing should have been written — the transaction never got past the guard.
@@ -140,20 +168,16 @@ class CreateConstraintTriggerUseCaseTest {
         assertTrue(db.triggerDao().forMission(mission.id).isEmpty())
     }
 
-    @Test
+    @Test(expected = IllegalStateException::class)
     fun `rejects a missing mission id`() = runTest {
         // requireNotNull(), not require() — throws IllegalStateException, matching every other
         // "should be structurally impossible" guard in this codebase (e.g.
         // RecordViolationUseCase.execute's identical requireNotNull calls for a missing parent
         // row).
-        assertThrows(IllegalStateException::class.java) {
-            runTest {
-                useCase.execute(
-                    missionId = UUID.randomUUID(),
-                    packageId = "com.example.gambling",
-                    cueDescription = "whenever I feel bored at night",
-                )
-            }
-        }
+        useCase.execute(
+            missionId = UUID.randomUUID(),
+            packageId = "com.example.gambling",
+            cueDescription = "whenever I feel bored at night",
+        )
     }
 }
