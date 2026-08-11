@@ -89,11 +89,12 @@ class FirstMissionSchedulingFragmentTest {
         val (userId, profile) = insertExistingUserAndProfile()
 
         // Mirrors createMissionAndFinish(scheduledStart = null).
-        db.missionDao().insert(
+        db.enforcementSessionDao().insert(
             EnforcementSession(
                 id = UUID.randomUUID(),
                 userId = userId,
-                goalMissionId = null,
+                missionId = UUID.randomUUID(),
+                missionPeriodId = null,
                 scheduledStart = null,
                 actualStart = Instant.now(),
                 actualEnd = null,
@@ -105,7 +106,7 @@ class FirstMissionSchedulingFragmentTest {
             )
         )
 
-        val active = db.missionDao().activeMissionFor(userId)
+        val active = db.enforcementSessionDao().activeMissionFor(userId)
         assertNotNull(active)
         assertNull(active!!.scheduledStart)
         assertEquals(MissionStatus.ACTIVE, active.status)
@@ -124,11 +125,12 @@ class FirstMissionSchedulingFragmentTest {
 
         // Mirrors createMissionAndFinish(scheduledStart = futureInstant) after a successful
         // parseScheduledTime call.
-        db.missionDao().insert(
+        db.enforcementSessionDao().insert(
             EnforcementSession(
                 id = UUID.randomUUID(),
                 userId = userId,
-                goalMissionId = null,
+                missionId = UUID.randomUUID(),
+                missionPeriodId = null,
                 scheduledStart = futureInstant,
                 actualStart = Instant.now(),
                 actualEnd = null,
@@ -140,7 +142,7 @@ class FirstMissionSchedulingFragmentTest {
             )
         )
 
-        val active = db.missionDao().activeMissionFor(userId)
+        val active = db.enforcementSessionDao().activeMissionFor(userId)
         assertNotNull(active)
         assertEquals(futureInstant, active!!.scheduledStart)
         assertTrue(active.scheduledStart!!.isAfter(Instant.now()))
@@ -165,7 +167,7 @@ class FirstMissionSchedulingFragmentTest {
         val profile = db.missionProfileDao().mostRecentFor(userId)
         assertNull(profile)
 
-        val active = db.missionDao().activeMissionFor(userId)
+        val active = db.enforcementSessionDao().activeMissionFor(userId)
         assertNull(active)
     }
 
@@ -174,11 +176,12 @@ class FirstMissionSchedulingFragmentTest {
         val (userId, profile) = insertExistingUserAndProfile()
 
         repeat(2) {
-            db.missionDao().insert(
+            db.enforcementSessionDao().insert(
                 EnforcementSession(
                     id = UUID.randomUUID(),
                     userId = userId,
-                    goalMissionId = null,
+                    missionId = UUID.randomUUID(),
+                    missionPeriodId = null,
                     scheduledStart = null,
                     actualStart = Instant.now(),
                     actualEnd = null,
@@ -191,7 +194,7 @@ class FirstMissionSchedulingFragmentTest {
             )
         }
 
-        val completed = db.missionDao().completedMissionsSince(userId, Instant.EPOCH)
+        val completed = db.enforcementSessionDao().completedMissionsSince(userId, Instant.EPOCH)
         assertEquals(2, completed)
     }
 }

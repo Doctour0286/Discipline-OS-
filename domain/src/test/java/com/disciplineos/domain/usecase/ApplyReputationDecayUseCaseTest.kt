@@ -52,13 +52,13 @@ class ApplyReputationDecayUseCaseTest {
         useCase = ApplyReputationDecayUseCase(
             database = db,
             userDao = db.userDao(),
-            missionDao = db.missionDao(),
+            missionDao = db.enforcementSessionDao(),
             ledgerDao = db.ledgerDao(),
             tierTransitionUseCase = TierTransitionUseCase(
                 database = db,
                 userDao = db.userDao(),
                 tierDao = db.tierDao(),
-                missionDao = db.missionDao(),
+                missionDao = db.enforcementSessionDao(),
             ),
             policy = HypothesisReputationDecayPolicy(),
         )
@@ -103,11 +103,12 @@ class ApplyReputationDecayUseCaseTest {
     }
 
     private suspend fun seedMission(actualStart: Instant, status: MissionStatus) {
-        db.missionDao().insert(
+        db.enforcementSessionDao().insert(
             EnforcementSession(
                 id = UUID.randomUUID(),
                 userId = userId,
-                goalMissionId = null,
+                missionId = UUID.randomUUID(),
+                missionPeriodId = null,
                 scheduledStart = null,
                 actualStart = actualStart,
                 actualEnd = actualStart.plusSeconds(1800),

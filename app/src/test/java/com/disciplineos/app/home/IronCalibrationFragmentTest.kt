@@ -46,7 +46,7 @@ class IronCalibrationFragmentTest {
             database = db,
             userDao = db.userDao(),
             tierDao = db.tierDao(),
-            missionDao = db.missionDao(),
+            missionDao = db.enforcementSessionDao(),
         )
     }
 

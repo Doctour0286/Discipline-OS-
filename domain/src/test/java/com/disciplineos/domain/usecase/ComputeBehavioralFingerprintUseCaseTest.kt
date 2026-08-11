@@ -67,7 +67,7 @@ class ComputeBehavioralFingerprintUseCaseTest {
             .build()
 
         useCase = ComputeBehavioralFingerprintUseCase(
-            missionDao = db.missionDao(),
+            missionDao = db.enforcementSessionDao(),
             violationDao = db.violationDao(),
             ledgerDao = db.ledgerDao(),
             userDao = db.userDao(),
@@ -101,11 +101,12 @@ class ComputeBehavioralFingerprintUseCaseTest {
         status: MissionStatus = MissionStatus.VIOLATED,
     ): UUID {
         val missionId = UUID.randomUUID()
-        db.missionDao().insert(
+        db.enforcementSessionDao().insert(
             EnforcementSession(
                 id = missionId,
                 userId = userId,
-                goalMissionId = null,
+                missionId = UUID.randomUUID(),
+                missionPeriodId = null,
                 scheduledStart = null,
                 actualStart = actualStart,
                 actualEnd = actualStart.plusSeconds(60),
@@ -393,11 +394,12 @@ class ComputeBehavioralFingerprintUseCaseTest {
 
     private suspend fun seedResolvedMission(actualStart: Instant, durationMinutes: Long, status: MissionStatus): UUID {
         val missionId = UUID.randomUUID()
-        db.missionDao().insert(
+        db.enforcementSessionDao().insert(
             EnforcementSession(
                 id = missionId,
                 userId = userId,
-                goalMissionId = null,
+                missionId = UUID.randomUUID(),
+                missionPeriodId = null,
                 scheduledStart = null,
                 actualStart = actualStart,
                 actualEnd = actualStart.plusSeconds(durationMinutes * 60),

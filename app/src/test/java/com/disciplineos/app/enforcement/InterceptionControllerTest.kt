@@ -126,7 +126,8 @@ class InterceptionControllerTest {
         val mission = EnforcementSession(
             id = missionId,
             userId = userId,
-            goalMissionId = null,
+            missionId = UUID.randomUUID(),
+            missionPeriodId = null,
             scheduledStart = null,
             actualStart = Instant.now(),
             actualEnd = null,
@@ -136,7 +137,7 @@ class InterceptionControllerTest {
             blocklist = listOf("com.example.blocked"),
             missionProfileId = UUID.randomUUID(),
         )
-        db.missionDao().insert(mission)
+        db.enforcementSessionDao().insert(mission)
         return mission
     }
 
@@ -271,7 +272,7 @@ class InterceptionControllerTest {
         controller.ironCrisisExit(userId = userId)
 
         val updatedUser = db.userDao().get(userId)
-        val updatedMission = db.missionDao().get(missionId)
+        val updatedMission = db.enforcementSessionDao().get(missionId)
         assertEquals(Tier.RECRUIT, updatedUser?.currentTier)
         assertEquals(MissionStatus.ABORTED_CRISIS_EXIT, updatedMission?.status)
         // Confirms the closed loop RecordViolationUseCase's §5.6 decision-log entry flagged:
