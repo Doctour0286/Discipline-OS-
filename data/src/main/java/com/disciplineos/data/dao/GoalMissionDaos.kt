@@ -93,7 +93,10 @@ interface MissionLogEntryDao {
 
 /**
  * Backs [Trigger]. Method set matches Integration Plan §2.2: `insert`, `forMission(missionId)`.
- * Real condition-evaluation queries are Batch G5 scope.
+ * `forMission` filters on `active = 1` — see [Trigger]'s own kdoc for why `active` exists at all
+ * (a small, flagged addition beyond base doc §3.4's field list). Real per-`cueType` evaluation
+ * (surfacing a `TIME_OF_DAY`/`PRECEDING_EVENT` reminder, etc.) is Batch G5 scope; this DAO only
+ * stores/retrieves the row.
  */
 @Dao
 interface TriggerDao {

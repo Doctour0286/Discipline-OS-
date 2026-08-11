@@ -176,32 +176,69 @@ data class MissionLogEntry(
 )
 
 /**
- * Data Model & Schema doc §2.2a. A condition that can auto-generate or flag a new
- * [EnforcementSession] under a [GoalMission] — e.g. "if no session has run in 3 days, prompt."
- * [Trigger] and [Milestone] are two distinct entities with distinct roles (a `Trigger` acts on
- * *sessions*, a `Milestone` reports on *progress within the goal itself* — see [Milestone]'s own
- * kdoc for the second half of that distinction) and are deliberately not merged into one table
- * despite both being "small, goal-scoped, and not directly enforcement-facing" — collapsing them
- * would blur a genuine semantic difference (an actionable condition vs. a descriptive
- * checkpoint) the same way merging `GoalMission` and `EnforcementSession` themselves would have.
+ * Data Model & Schema doc §2.2a; base design doc §3.4/§4.3 (`06_GOAL_ORIENTED_MISSION_MODEL.md`,
+ * restored content one commit before the pointer reduction — see that file's own kdoc).
  *
- * [conditionType]/[conditionValue] follow a jsonb-equivalent pattern for the same reason: the
- * set of possible trigger conditions is expected to grow, and a free-form value column avoids a
- * schema migration per new condition type. Real condition types, evaluation timing, and exactly
- * which UI surfaces a fired `Trigger` are Batch G5 scope
- * (`06_GOAL_ORIENTED_MISSION_MODEL_INTEGRATION_PLAN.md` §6) — this entity only stores the
- * template, same division of responsibility as [MissionPeriod].
+ * **Rebuilt this pass (ROADMAP.md §5.41) — the shape that shipped with Batch G1 was a different
+ * entity entirely, not a variant of this one.** What actually shipped
+ * (`TriggerConditionType { INACTIVITY, SCHEDULE_MISS, MANUAL }`, `conditionValue: String?`,
+ * `active: Boolean`, `lastFiredAt: Instant?`) modeled a session-inactivity watchdog — "if no
+ * session has run in N days, prompt." That is not what base doc §3.4/§4.3 specify for `Trigger`
+ * at all: the base doc's `Trigger` is an **implementation-intention cue** (Gollwitzer's
+ * "if-then" plans, d = 0.65 across a 94-study meta-analysis per §4.3) — a cue-response pair like
+ * "when I finish dinner (cue), open the reading app (response)," entirely independent of whether
+ * any `EnforcementSession` has or hasn't run. The two entities share almost no real fields and
+ * answer different questions; this was not a narrower version of the spec, it was the wrong
+ * entity, following the exact same "diverged from the document it was meant to summarize, only
+ * caught while implementing the batch that actually needed the real shape" pattern §5.36/§5.37
+ * already found twice before in this project (`MissionLogEntry.numericValue`/`didOccur`, and
+ * `ApplyAdherenceDecayUseCase.Result`'s scope gate). See §5.41 for the full account of how this
+ * was found and why fixing it in place (rather than adding a second, correctly-shaped entity)
+ * was the right call: nothing in `:domain`/`:app` reads or writes the pre-fix shape as of this
+ * pass — `TriggerDao.insert`/`forMission` exist but are called nowhere — so there is no call
+ * site to migrate and no data to lose under this project's still-in-effect
+ * `fallbackToDestructiveMigration()` policy.
+ *
+ * [cueType] — all values except [TriggerCueType.APP_OPEN] are **not independently
+ * phone-enforceable**: structure for the person's own plan and material for a reminder/nudge
+ * surface, not a new interception mechanism (§4.3). This keeps the addition inside PRD §13.4's
+ * existing boundary (measurement/prompting only, outside a real `EnforcementSession` window).
+ *
+ * [cueType] = [TriggerCueType.APP_OPEN] **on a [MissionArchetype.CONSTRAINT] mission is sugar
+ * over an [MissionPeriod.periodType] = `ALWAYS_ON` period with [cueTriggerPackageId] on its
+ * blocklist** — base doc §6.2's resolved position, restated here since it's the one place this
+ * entity's shape has real correctness risk if callers get it wrong: **this `Trigger` row must
+ * never be treated as its own, second enforcement mechanism.** The actual blocking behavior is
+ * always delegated to a real `MissionPeriod`/`enforcementProfileId`; this row only ever carries
+ * the person's own descriptive cue/response text. See
+ * [com.disciplineos.domain.usecase.CreateConstraintTriggerUseCase] (Batch G5) for the one
+ * sanctioned call site that creates both rows together, in one transaction, so no second,
+ * independently-written path can accidentally reimplement "block this app always" a second way.
+ *
+ * [active] — a small, motivated addition beyond base doc §3.4's field list, same category and
+ * same justification this project already gives every other small flagged addition
+ * (`GoalMission.consecutiveWindowsBelowThreshold`, `MilestoneDao`'s `@Update` exception): lets a
+ * person deactivate a Trigger they're no longer using without deleting the row (and losing their
+ * own cue/response text), the same "descriptive, not itself scored" posture this table already
+ * has. `[HYPOTHESIS]`-style flag, not silently assumed: base doc §3.4 states no field like this;
+ * if it should be removed rather than kept, that's a real product decision, not an oversight.
  */
-enum class TriggerConditionType { INACTIVITY, SCHEDULE_MISS, MANUAL }
+enum class TriggerCueType { TIME_OF_DAY, PRECEDING_EVENT, LOCATION, APP_OPEN, MANUAL }
 
 @Entity(tableName = "triggers")
 data class Trigger(
     @PrimaryKey val id: UUID,
     val missionId: UUID,
-    val conditionType: TriggerConditionType,
-    val conditionValue: String?,
-    val active: Boolean,
-    val lastFiredAt: Instant?,
+    val cueType: TriggerCueType,
+    val cueDescription: String,
+    val responseDescription: String,
+    val createdAt: Instant,
+    val missionPeriodId: UUID? = null,
+    val cueTimeOfDay: LocalTime? = null,
+    val cuePrecedingMissionId: UUID? = null,
+    val cueLocationLabel: String? = null,
+    val cueTriggerPackageId: String? = null,
+    val active: Boolean = true,
 )
 
 /**
