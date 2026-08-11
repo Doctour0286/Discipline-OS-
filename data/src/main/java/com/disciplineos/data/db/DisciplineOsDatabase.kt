@@ -5,9 +5,9 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.disciplineos.data.dao.EnforcementSessionDao
 import com.disciplineos.data.dao.GoalMissionDao
 import com.disciplineos.data.dao.MilestoneDao
-import com.disciplineos.data.dao.MissionDao
 import com.disciplineos.data.dao.MissionLogEntryDao
 import com.disciplineos.data.dao.MissionPeriodDao
 import com.disciplineos.data.dao.MissionProfileDao
@@ -106,27 +106,40 @@ import net.sqlcipher.database.SupportFactory
     // needs a durable FingerprintSignal row, only the accuracy log does. Same
     // fallbackToDestructiveMigration reasoning applies unchanged; still no real installed
     // base.
-    // v9 (Goal-Oriented Mission Model, ROADMAP.md §5.32/§G1): `Mission` renamed to
+    // v9 (Goal-Oriented Mission Model, ROADMAP.md §5.32/§G1, first pass): `Mission` renamed to
     // `EnforcementSession` (same `missions` table, same columns, plus one new nullable
-    // `goalMissionId` column — see EnforcementSession.kt kdoc). Four new tables added:
-    // `goal_missions`, `mission_periods`, `mission_log_entries`, `triggers`, `milestones` —
-    // see GoalMission.kt kdoc for all five entities' full rationale. No real Migration
-    // written, same fallbackToDestructiveMigration reasoning as every bump above — still
-    // pre-launch, still no real installed base. This is the first bump where that
-    // reasoning is being deliberately re-confirmed rather than just inherited: this rename
-    // touches a table with real seeded/test data flowing through it in every existing
-    // Phase 2+ on-device verification pass, but "real seeded/test data" is exactly what
-    // destructive fallback is already understood to discard on every reinstall in this
-    // project's existing dev workflow — DebugSeeder already assumes a fresh install re-seeds
-    // from scratch. Revisit this reasoning at the same trigger point already named above:
-    // before the first real pilot install (Phase 5).
-    version = 9,
+    // `goalMissionId` column). Five new tables added: `goal_missions`, `mission_periods`,
+    // `mission_log_entries`, `triggers`, `milestones`. Superseded by v10 below — this first pass
+    // shipped a GoalMission shape and DAO naming that diverged from
+    // `06_GOAL_ORIENTED_MISSION_MODEL_INTEGRATION_PLAN.md` §2.1/§2.2's actual spec (see v10
+    // comment for what changed and why). Kept here, not rewritten, so the migration-comment
+    // history stays an accurate record of what each version actually shipped.
+    // v10 (Goal-Oriented Mission Model, Integration Plan §2.1/§2.2, conformance pass): brings the
+    // schema in line with the Integration Plan's literal field/DAO spec, which v9 diverged from.
+    // `EnforcementSession.goalMissionId: UUID?` -> `missionId: UUID` (non-null) +
+    // `missionPeriodId: UUID?` (see EnforcementSession.kt kdoc — Batch G2's
+    // FirstMissionSchedulingFragment fix, landing in this same pass, guarantees a parent
+    // GoalMission always exists, so missionId no longer needs to be nullable). `GoalMission`
+    // rebuilt to the Plan's exact field list (archetype/targetDirection/cadenceType/resetMode/
+    // measurementSource/lifecycleStage/adherenceScore/adherenceWindow, no missionProfileId — see
+    // GoalMission.kt kdoc). `MissionPeriod` rebuilt to periodType/windowStart/windowEnd/
+    // targetDurationMin/deadlineTime/enforcementProfileId. `goalMissionId` FK columns on
+    // MissionPeriod/MissionLogEntry/Trigger/Milestone renamed to `missionId`, matching the Plan's
+    // naming. `missionDao()`/`MissionDao` renamed to `enforcementSessionDao()`/
+    // `EnforcementSessionDao` per Plan §2.3, reversing v9's low-churn "keep the DAO name" choice.
+    // Still no real Migration object — Integration Plan §9 explicitly rules one out
+    // ("this stays a destructive version bump, matching v2 through v8"), re-confirming the same
+    // fallbackToDestructiveMigration reasoning as every bump above: still pre-launch, still no
+    // real installed base (no release tag, no store listing — re-checked this pass). Same
+    // "DebugSeeder already assumes a fresh reinstall re-seeds from scratch" reasoning v9 gave
+    // still applies. Revisit before the first real pilot install (Phase 5).
+    version = 10,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
 abstract class DisciplineOsDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
-    abstract fun missionDao(): MissionDao
+    abstract fun enforcementSessionDao(): EnforcementSessionDao
     abstract fun violationDao(): ViolationDao
     abstract fun ledgerDao(): LedgerDao
     abstract fun tierDao(): TierDao

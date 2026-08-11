@@ -12,8 +12,17 @@ import com.disciplineos.app.R
 import com.disciplineos.app.di.AppContainer
 import com.disciplineos.app.ui.onboarding.FirstMissionSchedulingScreen
 import com.disciplineos.app.ui.theme.themedComposeView
+import androidx.room.withTransaction
+import com.disciplineos.data.entity.CadenceType
 import com.disciplineos.data.entity.EnforcementSession
+import com.disciplineos.data.entity.GoalMission
+import com.disciplineos.data.entity.LifecycleStage
+import com.disciplineos.data.entity.MeasurementSource
+import com.disciplineos.data.entity.MissionArchetype
+import com.disciplineos.data.entity.MissionPeriod
 import com.disciplineos.data.entity.MissionStatus
+import com.disciplineos.data.entity.PeriodType
+import com.disciplineos.data.entity.ResetMode
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.util.UUID
@@ -34,11 +43,13 @@ import java.util.UUID
  * already wrote —
  * either immediately ("Start now": `scheduledStart = null`, `actualStart = now()`, status
  * `ACTIVE`) or for a user-entered future time ("Schedule Mission": `scheduledStart` = that
- * time). No `:domain` use-case wraps this, same reasoning
- * [MissionProfileSetupFragment][com.disciplineos.app.onboarding.MissionProfileSetupFragment]'s
- * own kdoc already gives for its own single unconditional insert: one row, one insert, no other
- * table needs to change in the same transaction, so introducing a use-case here would be the
- * same kind of premature structure the Data Model doc's §3.1 reasoning argues against.
+ * time). As of the Batch G2 fix
+ * (`06_GOAL_ORIENTED_MISSION_MODEL_INTEGRATION_PLAN.md` §3.1), this also auto-creates a minimal
+ * parent [GoalMission] and [MissionPeriod] in the same [androidx.room.withTransaction] block —
+ * [EnforcementSession] can no longer exist standalone (`missionId` is non-null as of schema
+ * v10), and no separate Mission-creation use-case existed to reuse, so this Fragment does the
+ * three-row insert directly, matching `RecordViolationUseCase`'s existing
+ * `database.withTransaction { }` idiom rather than introducing a new one.
  *
  * **`scheduledStart` is exactly the field [EnforcementSession]'s own kdoc already calls out**
  * ("null means ad hoc — feeds Self-Initiation Trend, §3.6") — this screen is the first and, as
@@ -88,7 +99,10 @@ import java.util.UUID
  * Profile" guard, a second Mission for the same user is not a bug — it's exactly what using the
  * app for a second time looks like. Pressing Start Now or Schedule more than once from this
  * screen (e.g. Back then resubmit) creates a second real Mission row each time, which is
- * correct, not defended against.
+ * correct, not defended against. As of the Batch G2 fix, this now also means a second visit
+ * creates a second, identically-generic-titled [GoalMission] rather than one shared goal — a
+ * real, new open question (Integration Plan §7.3), not resolved by this pass, not silently
+ * assumed away.
  *
  * **Duration:** [EnforcementSession.plannedDurationMin] has no spec-mandated value anywhere in §2.9, the
  * Data Model doc, or the PRD — this pass uses a fixed default
@@ -112,8 +126,9 @@ import java.util.UUID
  * Compose migration CI + on-device. A later pass (see "Time input" above) did change this
  * Fragment's business logic — removing `parseScheduledTime` entirely once
  * [FirstMissionSchedulingScreen] started producing a real [Instant] itself — so that
- * "unchanged from the XML version" claim no longer holds in full; `createMissionAndFinish`
- * is still the same, only its caller's contract changed.
+ * "unchanged from the XML version" claim no longer held even before this pass. The Batch G2 fix
+ * (above) changes `createMissionAndFinish` again, materially this time — it now does a
+ * three-row transactional insert instead of one.
  */
 class FirstMissionSchedulingFragment : Fragment() {
 
@@ -148,33 +163,76 @@ class FirstMissionSchedulingFragment : Fragment() {
                 return@launch
             }
 
-            database.missionDao().insert(
-                EnforcementSession(
+            // Real fix per Integration Plan §3.1 (base doc §6.6's resolution): auto-create a
+            // minimal parent GoalMission + MissionPeriod so EnforcementSession.missionId always
+            // has something real to point at — EnforcementSession can no longer be created
+            // standalone as of the v10 schema (missionId is non-null).
+            //
+            // No re-entry guard, deliberately — same "no re-entry guard" behavior this screen
+            // already had for EnforcementSession alone (class kdoc, above): a second visit to
+            // this screen creates a second GoalMission + MissionPeriod + EnforcementSession
+            // triple. Flagged as a real, new open question by Integration Plan §7.3 — not
+            // resolved by this pass, left exactly as flagged there.
+            database.withTransaction {
+                val goalMission = GoalMission(
                     id = UUID.randomUUID(),
                     userId = userId,
-                    goalMissionId = null,
-                    scheduledStart = scheduledStart,
-                    actualStart = Instant.now(),
-                    actualEnd = null,
-                    plannedDurationMin = DEFAULT_PLANNED_DURATION_MIN,
-                    status = MissionStatus.ACTIVE,
-                    allowlist = profile.allowlist,
-                    blocklist = profile.blocklist,
-                    missionProfileId = profile.id,
+                    title = profile.name,
+                    archetype = MissionArchetype.BEHAVIOR_DRIVEN,
+                    targetDirection = null,
+                    targetValue = null,
+                    unit = null,
+                    cadenceType = CadenceType.NONE,
+                    // ROLLING_WINDOW: Integration Plan §3.3's own judgment call for an
+                    // auto-generated placeholder goal — [HYPOTHESIS], not derived from base doc
+                    // §6.1/§6.6, logged there as an open item rather than assumed correct.
+                    resetMode = ResetMode.ROLLING_WINDOW,
+                    measurementSource = MeasurementSource.AUTOMATIC,
+                    lifecycleStage = LifecycleStage.ENFORCING,
+                    adherenceScore = null,
+                    adherenceWindow = null,
+                    createdAt = Instant.now(),
+                    archivedAt = null,
                 )
-            )
+                database.goalMissionDao().insert(goalMission)
 
-            // Onboarding ends here and hands off to the new post-onboarding Home screen —
-            // added this pass. Previously this comment said "nothing further to navigate to";
-            // that was true until action_firstMissionScheduling_to_home was added to the nav
-            // graph this same pass (see that action's own comment for why: onboarding
-            // previously had no real "complete" hand-off, which STATUS.md's "what's actually
-            // next" item 2 named as a real gap, not a documentation nicety).
-            //
-            // goalMissionId is left null here, deliberately — Batch G1 (this rename) is
-            // additive-schema-only, zero behavior change (BUILD_PLAN.md). Wiring this screen
-            // to create a real GoalMission first is Batch G2's explicit scope
-            // (06_GOAL_ORIENTED_MISSION_MODEL_INTEGRATION_PLAN.md §3), not this batch's.
+                // FIXED_WINDOW with null windowStart/windowEnd is a known, documented type/data
+                // mismatch for this auto-generated case — Integration Plan §3.3/§7.4, genuinely
+                // open, not resolved by this pass (the alternative, a dedicated AD_HOC
+                // periodType, is left for that open question's own resolution).
+                val missionPeriod = MissionPeriod(
+                    id = UUID.randomUUID(),
+                    missionId = goalMission.id,
+                    periodType = PeriodType.FIXED_WINDOW,
+                    daysOfWeek = emptyList(),
+                    windowStart = null,
+                    windowEnd = null,
+                    targetDurationMin = null,
+                    deadlineTime = null,
+                    enforcementProfileId = profile.id,
+                )
+                database.missionPeriodDao().insert(missionPeriod)
+
+                database.enforcementSessionDao().insert(
+                    EnforcementSession(
+                        id = UUID.randomUUID(),
+                        userId = userId,
+                        missionId = goalMission.id,
+                        missionPeriodId = missionPeriod.id,
+                        scheduledStart = scheduledStart,
+                        actualStart = Instant.now(),
+                        actualEnd = null,
+                        plannedDurationMin = DEFAULT_PLANNED_DURATION_MIN,
+                        status = MissionStatus.ACTIVE,
+                        allowlist = profile.allowlist,
+                        blocklist = profile.blocklist,
+                        missionProfileId = profile.id,
+                    )
+                )
+            }
+
+            // Onboarding ends here and hands off to the post-onboarding Home screen
+            // (action_firstMissionScheduling_to_home — see that action's own comment).
             findNavController().navigate(R.id.action_firstMissionScheduling_to_home)
         }
     }

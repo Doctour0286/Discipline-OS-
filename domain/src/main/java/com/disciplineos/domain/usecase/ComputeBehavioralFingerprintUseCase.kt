@@ -1,6 +1,6 @@
 package com.disciplineos.domain.usecase
 
-import com.disciplineos.data.dao.MissionDao
+import com.disciplineos.data.dao.EnforcementSessionDao
 import com.disciplineos.data.dao.PredictiveFailureAlertDismissalDao
 import com.disciplineos.data.dao.UserDao
 import com.disciplineos.data.dao.ViolationDao
@@ -63,7 +63,7 @@ import java.util.UUID
  * [PredictiveFailureAlertDismissalDao.mostRecentSince]'s kdoc describes.
  */
 class ComputeBehavioralFingerprintUseCase(
-    private val missionDao: MissionDao,
+    private val missionDao: EnforcementSessionDao,
     private val violationDao: ViolationDao,
     private val ledgerDao: LedgerDao,
     private val userDao: UserDao,
@@ -139,7 +139,7 @@ class ComputeBehavioralFingerprintUseCase(
      * within the same [BehavioralFingerprintPolicy.f1ClusterWindowHours]-hour window across
      * the last [BehavioralFingerprintPolicy.f1MissionWindow] Missions with any violation, flag
      * that window." Scoped by Mission count (not violation count) per
-     * [MissionDao.missionIdsWithAnyViolation]'s kdoc — the literal spec reading, since a
+     * [EnforcementSessionDao.missionIdsWithAnyViolation]'s kdoc — the literal spec reading, since a
      * single Mission can carry more than one Violation.
      *
      * Clustering is binned by hour-of-day (UTC — this codebase has no user-timezone concept
@@ -222,7 +222,7 @@ class ComputeBehavioralFingerprintUseCase(
      * Spec §3, F2: proportion of Missions in the last [BehavioralFingerprintPolicy.f2WindowDays]
      * days that ended within [BehavioralFingerprintPolicy.f2EarlyCancelMinutes] minutes of
      * `actualStart`, trigger at >= [BehavioralFingerprintPolicy.f2TriggerProportion].
-     * `sampleSize` here is the denominator ([MissionDao.resolvedMissionCountSince]) — Spec §4's
+     * `sampleSize` here is the denominator ([EnforcementSessionDao.resolvedMissionCountSince]) — Spec §4's
      * F2 gate ("minimum Mission sample size") reads naturally as "enough resolved Missions to
      * trust the proportion," not "enough early cancellations," so the total is what's compared
      * against [BehavioralFingerprintPolicy.f2MinSampleSize].

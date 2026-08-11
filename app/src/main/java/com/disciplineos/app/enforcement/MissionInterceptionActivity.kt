@@ -121,7 +121,7 @@ class MissionInterceptionActivity : ComponentActivity() {
 
         lifecycleScope.launch {
             val database = AppContainer.database(applicationContext)
-            val mission = database.missionDao().get(missionId)
+            val mission = database.enforcementSessionDao().get(missionId)
             val user = database.userDao().get(userId)
             if (mission == null || user == null) {
                 finish()

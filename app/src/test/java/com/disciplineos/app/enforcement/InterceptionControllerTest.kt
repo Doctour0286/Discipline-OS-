@@ -4,8 +4,14 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.disciplineos.data.db.DisciplineOsDatabase
+import com.disciplineos.data.entity.CadenceType
 import com.disciplineos.data.entity.EnforcementSession
+import com.disciplineos.data.entity.GoalMission
+import com.disciplineos.data.entity.LifecycleStage
+import com.disciplineos.data.entity.MeasurementSource
+import com.disciplineos.data.entity.MissionArchetype
 import com.disciplineos.data.entity.MissionStatus
+import com.disciplineos.data.entity.ResetMode
 import com.disciplineos.data.entity.Tier
 import com.disciplineos.data.entity.User
 import com.disciplineos.data.entity.Violation
@@ -88,7 +94,7 @@ class InterceptionControllerTest {
         recordViolationUseCase = RecordViolationUseCase(
             database = db,
             violationDao = db.violationDao(),
-            missionDao = db.missionDao(),
+            missionDao = db.enforcementSessionDao(),
             userDao = db.userDao(),
             ledgerDao = db.ledgerDao(),
             consequencePolicy = HypothesisConsequencePolicy(),
@@ -97,7 +103,7 @@ class InterceptionControllerTest {
             database = db,
             userDao = db.userDao(),
             tierDao = db.tierDao(),
-            missionDao = db.missionDao(),
+            missionDao = db.enforcementSessionDao(),
         )
     }
 

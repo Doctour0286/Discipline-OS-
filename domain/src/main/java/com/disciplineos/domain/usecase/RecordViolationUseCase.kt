@@ -1,7 +1,7 @@
 package com.disciplineos.domain.usecase
 
 import androidx.room.withTransaction
-import com.disciplineos.data.dao.MissionDao
+import com.disciplineos.data.dao.EnforcementSessionDao
 import com.disciplineos.data.dao.UserDao
 import com.disciplineos.data.dao.ViolationDao
 import com.disciplineos.data.db.DisciplineOsDatabase
@@ -42,7 +42,7 @@ import java.util.UUID
 class RecordViolationUseCase(
     private val database: DisciplineOsDatabase,
     private val violationDao: ViolationDao,
-    private val missionDao: MissionDao,
+    private val missionDao: EnforcementSessionDao,
     private val userDao: UserDao,
     private val ledgerDao: LedgerDao,
     private val consequencePolicy: ConsequencePolicy,

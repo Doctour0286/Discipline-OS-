@@ -104,17 +104,16 @@ interface OnboardingEventDao {
 
 /**
  * Backs [EnforcementSession] (renamed from `Mission`, ROADMAP.md §5.32 — see that entity's own
- * kdoc for the full rationale). The interface name `MissionDao`, every method name, the
- * `missions` table name, and the `MissionStatus` enum are all deliberately kept unchanged in
- * that rename — only the entity type each method returns/accepts changed, from `Mission` to
- * [EnforcementSession]. Renaming the DAO interface and its methods too would be pure churn
- * across every call site in `:app`/`:domain` with no semantic gain (same reasoning
- * `OutputArtifact.missionId` and the `missions` table name are kept unchanged for, see
- * [EnforcementSession]'s kdoc) — the type that flows through these methods is what changed,
- * not what they're called or how they're queried.
+ * kdoc for the full rationale). Interface renamed `MissionDao` → `EnforcementSessionDao` per
+ * Integration Plan §2.3 ("rename `abstract fun missionDao(): MissionDao` → `abstract fun
+ * enforcementSessionDao(): EnforcementSessionDao`"), the plan's deliberate reversal of an earlier
+ * low-churn "keep the DAO name" choice — every call site in `:app`/`:domain` updated in this same
+ * pass. The `missions` table name and the `MissionStatus` enum are still kept unchanged (no
+ * plan clause asks for either to move) — only the DAO interface name and its accessor method
+ * changed, matching the entity rename it backs.
  */
 @Dao
-interface MissionDao {
+interface EnforcementSessionDao {
     @Insert
     suspend fun insert(mission: EnforcementSession)
 
@@ -259,7 +258,7 @@ interface MissionDao {
  * pre-existing gap, `EnforcementSession.missionProfileId` had nothing to point at before this).
  * Kept as
  * its own `@Dao` matching [TierDao]'s own stated reasoning: a distinct table with its own
- * query shape, not folded into [MissionDao] just because the two entities are related.
+ * query shape, not folded into [EnforcementSessionDao] just because the two entities are related.
  *
  * No `@Update` yet — Mission Profile Setup (Onboarding §2.8, this pass) only ever creates the
  * first Profile a user has. Editing an existing Profile is real future work (a profile-picker
@@ -350,7 +349,7 @@ interface ViolationDao {
     /**
      * Backs Rule F1 (Time-of-Day Violation Clustering, Behavioral Fingerprint & Predictive
      * Failure Rules Spec §3) — [detectedAt] timestamps for every Violation attached to any
-     * Mission in [missionIds] (see [MissionDao.missionIdsWithAnyViolation] for how that list is
+     * Mission in [missionIds] (see [EnforcementSessionDao.missionIdsWithAnyViolation] for how that list is
      * bounded to "the last 10 Missions with any violation" per that spec). Same `IN (:list)`
      * pattern [forRootCauseCluster]'s neighbor [LedgerDao.activeEntriesForViolations] already
      * uses elsewhere in this codebase. Deliberately does NOT exclude OVERTURNED disputes the

@@ -1,7 +1,7 @@
 package com.disciplineos.domain.usecase
 
 import androidx.room.withTransaction
-import com.disciplineos.data.dao.MissionDao
+import com.disciplineos.data.dao.EnforcementSessionDao
 import com.disciplineos.data.dao.TierDao
 import com.disciplineos.data.dao.UserDao
 import com.disciplineos.data.db.DisciplineOsDatabase
@@ -46,7 +46,7 @@ class TierTransitionUseCase(
     private val database: DisciplineOsDatabase,
     private val userDao: UserDao,
     private val tierDao: TierDao,
-    private val missionDao: MissionDao,
+    private val missionDao: EnforcementSessionDao,
 ) {
 
     /**
