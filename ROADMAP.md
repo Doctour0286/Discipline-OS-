@@ -3621,3 +3621,55 @@ deliberately doesn't attempt, to keep this pass scoped to what was actually aske
 **Not run: an actual compile or build** — this was a documentation-only pass, no `.kt` files
 touched, so the standing "no toolchain reachable" gap doesn't apply to this entry's own changes,
 though it remains true for everything else in this log.
+
+### 5.46 Functional/spec-completeness audit (`AUDIT_2026-08-11.md`) reviewed; Batch G7 (Add
+Mission) planned in response; stale G5/G6/Batch C status lines in `BUILD_PLAN.md` corrected
+
+**Trigger for this pass:** person-provided on-device screenshots plus a written audit
+(`AUDIT_2026-08-11.md`) requesting a full reachability/spec-completeness check — go further than
+"is each batch's own narrow acceptance criteria met" and ask "can a real user actually operate the
+resulting app end-to-end."
+
+**Finding 1 — the audit's central claim holds up, checked directly against the real nav graph
+(`onboarding_nav_graph.xml`) and entity code, not just trusted from the audit's own prose.** The
+entire app is reachable from 13 destinations; there is no way to create, delete, or manage a
+Mission beyond the one `FirstMissionSchedulingFragment` auto-generates during onboarding. Every
+`GoalMission`/`MissionPeriod` field the base doc specifies already exists correctly in the shipped
+entity (confirmed by direct read of `GoalMission.kt`) — the gap is entirely UI, not schema. This
+matches the audit's own Part 3 finding exactly.
+
+**Finding 2 — the audit's claim that G4/G5/G6 had "zero on-device confirmation, ever, until the
+screenshots" is consistent with this log's own prior entries** (§5.39/§5.42/§5.44 all state
+verification was "manual reading, no compiler reachable" with on-device confirmation left as an
+open checklist item) — not a new gap, but the first time it's been confirmed closed, via the
+screenshots themselves.
+
+**Finding 3 — `BUILD_PLAN.md`'s G5/G6/Batch C status lines were stale, independently of anything
+the audit found.** G5 said "IN REVIEW... PR open (#38) — not yet merged" and G6 said "WRITTEN,
+PUSHED, NOT YET MERGED" — both false as of this pass (confirmed directly against GitHub: zero
+open PRs, both already merged per this log's own §5.40/§5.44 history, which the status lines
+never caught up to). Batch C said "NOT STARTED," false for two of its five items (3.1 Mission
+Interception and 3.5 the Predictive Failure Alert card are both done, per Phase 2/Phase 4). Same
+category of drift this log has now found and fixed multiple times (§5.36 `MissionLogEntry`, §5.41
+`Trigger`, §5.45 Phase 4/§2's phase table) — worth restating, again, that a status line's own
+"DONE"/"NOT STARTED" wording needs to be re-verified against real repo/GitHub state periodically,
+not assumed to age correctly on its own. All three corrected in this pass, in `BUILD_PLAN.md`
+directly.
+
+**Decision: plan, not build, this pass.** Rather than writing `AddMissionFragment.kt` directly in
+the same pass that reviewed the audit, this pass produced a checked-in plan document
+(`Documents/07_ADD_MISSION_BATCH_PLAN.md`, "Batch G7 — Add Mission") — matching this project's own
+established convention of a written plan preceding implementation for anything beyond a small,
+self-contained fix (see the Integration Plan itself, and G5/G6's own scoping discussion before
+either was built). Reasoning for splitting into two slices (a title/core-fields-only Slice 1 now,
+`MissionPeriod`/Trigger-attach as a separate Slice 2) rather than attempting the audit's full
+9-item field list in one PR: this project's own history (§5.33's G1 divergences, §5.41's `Trigger`
+entity mismatch) shows what happens when a batch tries to cover too much spec surface before any
+real device/CI feedback exists on the smaller pieces. Full reasoning, exact field list, nav-graph
+change, and three explicitly-flagged open questions (lifecycle-stage picker scope, Trigger-prompt
+interaction timing, `CUSTOM_DAYS` handling) are in the plan doc itself, not duplicated here.
+
+**Explicitly not done in this pass:** no `.kt`/`.xml` file was written or changed — this was a
+review-and-plan pass only, per the person's own explicit request this session ("plan the fixes'
+execution and appropriately document in the repo," not "build it"). Slice 1 implementation is the
+next real piece of work, once the plan doc's §6 open questions are resolved.

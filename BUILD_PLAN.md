@@ -64,10 +64,13 @@ Batch G3 (Adherence engine: ApplyAdherenceDecayUseCase)
 Batch G4 (Mission detail screen)  ◄── DONE, PR #35 — entry point: Home Mission list
         │
         ▼
-Batch G5 (Trigger UI + lifecycle prompts)  ◄── next up
+Batch G5 (Trigger UI + lifecycle prompts)  ◄── DONE, PR #38/#39, corrected 2026-08-12
         │
         ▼
-Batch G6 (Milestone UI)  ◄── sequenced last, per the base design doc's own §F
+Batch G6 (Milestone UI)  ◄── DONE, PR #41/#42, corrected 2026-08-12
+        │
+        ▼
+Batch G7 (Add Mission)  ◄── PLANNED, not started — see Documents/07_ADD_MISSION_BATCH_PLAN.md
 ```
 
 **Where Batches G1–G6 fit relative to A–F:** the Goal-Oriented Mission Model is a structural
@@ -346,8 +349,10 @@ destination) — Integration Plan §7.6's own stated resolution, recorded in `RO
 
 ## Batch G5 — Trigger UI + lifecycle prompts
 
-**Status: IN REVIEW. Pushed to `g5-trigger-ui-lifecycle-prompts`, PR open (#38 on GitHub) — not
-yet merged.** Two CI rounds so far, both fixed:
+**Status: DONE.** Corrected 2026-08-12 — this line previously said "IN REVIEW... PR open (#38)
+— not yet merged," which is stale: `g5-trigger-ui-lifecycle-prompts` (PR #38) and its doc-sync
+follow-up (PR #39) are both merged to `main`, confirmed directly against GitHub (no open PRs as
+of this correction). Two CI rounds during review, both fixed:
 - Run #151 failed on two test-authoring bugs in `CreateConstraintTriggerUseCaseTest` (an
   `Instant` DB-round-trip precision mismatch, and a nested-`runTest`-inside-`assertThrows`
   exception-propagation bug) — fixed in commit `1907e49`.
@@ -355,10 +360,10 @@ yet merged.** Two CI rounds so far, both fixed:
   `requireNotNull` for a guard whose kdoc claimed it throws `IllegalStateException` —
   `requireNotNull` actually always throws `IllegalArgumentException` in Kotlin; `checkNotNull`
   is the correct stdlib call for that posture. Fixed in commit `208f0bc`. The same latent pattern
-  was found (not fixed) in five other files — see `ROADMAP.md` §5.42 and `STATUS.md`'s known
-  standing gaps.
+  was found (not fixed) in five other files — see `ROADMAP.md` §5.42 and §5.43 (audited and
+  fixed) and `STATUS.md`'s known standing gaps.
 
-CI re-run pending as of this update. Full account: `ROADMAP.md` §5.42.
+Full account: `ROADMAP.md` §5.42/§5.43.
 
 **Full detail:** Integration Plan §6.
 
@@ -370,9 +375,10 @@ instance of the stale-summary-line pattern this project keeps finding and fixing
 see Integration Plan §6 for the exact prompt copy/timing requirements it specifies.
 
 **Verification checklist:**
-- [ ] CI green — pending re-run after §5.42's fixes (two test-authoring bugs, one real
-      `requireNotNull`/`checkNotNull` production bug)
-- [ ] On-device confirmed
+- [x] CI green — confirmed on `main`
+- [ ] On-device confirmed — per `AUDIT_2026-08-11.md` Part 1.2, G5's Trigger creation screen had
+      **zero on-device confirmation until the audit's own screenshots**; treat as newly, not
+      historically, confirmed
 - [x] Trigger-fired prompts confirmed not to collide with the Predictive Failure Alert card
       pattern's own home-screen surface (Batch C §3.5) — trivially satisfied: the trigger prompt
       lives on Mission Detail, not Home, confirmed directly rather than assumed (`ROADMAP.md`
@@ -382,10 +388,10 @@ see Integration Plan §6 for the exact prompt copy/timing requirements it specif
 
 ## Batch G6 — Milestone UI
 
-**Status: WRITTEN, PUSHED, NOT YET MERGED.** PR open, code-only branch
-`g6-milestone-ui` (§5.44) — doc sync (this entry) follows as a separate PR, per this
-project's established two-branch convention (see G5's `g5-trigger-ui-lifecycle-prompts` +
-`g5-docsync-pending-merge` split for precedent).
+**Status: DONE.** Corrected 2026-08-12 — this line previously said "WRITTEN, PUSHED, NOT YET
+MERGED," which is stale: PR #41 (code) and PR #42 (doc sync) are both merged to `main` (merge
+commit `c3f3311`), CI confirmed green on that commit (`ROADMAP.md` §5.45 / STATUS.md's prior
+sync). No open PRs as of this correction, confirmed directly against GitHub.
 
 **Full detail:** Integration Plan §7 ("Milestone (G6) — sequenced last, per base document §F").
 
@@ -402,13 +408,46 @@ calls for `Double?` — see §5.44 for the full account, including why this was 
 sites constructed a `Milestone` anywhere pre-fix).
 
 **Verification checklist:**
-- [ ] CI green
-- [ ] On-device confirmed
+- [x] CI green — confirmed on `main`
+- [ ] On-device confirmed — per `AUDIT_2026-08-11.md` Part 1.2, same as G5/G4: **zero on-device
+      confirmation until the audit's own screenshots** confirmed Milestone creation actually
+      renders and works
 - [ ] Confirm directly (not assumed from the entity's own "descriptive only" label) that no
       code path lets a `Milestone` write to `LedgerEntry` or any scored metric — same style of
       structural check `ArchitectureBoundaryTest` already does for `UnsupervisedSignal`; worth
       asking whether this boundary should get the same automated enforcement rather than
       resting on code-review discipline alone
+
+---
+
+## Batch G7 — Add Mission
+
+**Status: PLANNED, not started.** Full plan: `Documents/07_ADD_MISSION_BATCH_PLAN.md`. Written
+in direct response to `AUDIT_2026-08-11.md`, which found the single highest-impact functional
+gap in the app: no way to create, view, or manage a Mission after the one auto-generated row
+onboarding produces (`FirstMissionSchedulingFragment.createMissionAndFinish`, a self-flagged
+placeholder per Integration Plan §3.1/§3.3, never intended as real Mission creation). Sequenced
+after G6 (not blocking or blocked by it) rather than folded into it, since G1–G6 are all merged
+and this is new scope, not a continuation.
+
+**Scope, split into two slices (full reasoning in the plan doc, §1):**
+- **Slice 1 (this batch):** a real, persistent "Add Mission" entry point on Home, covering every
+  core `GoalMission` field (archetype, title, target fields, cadence, reset mode — explicit
+  choice, no silent default per base doc §6.1 — measurement source, starting lifecycle stage).
+  No `MissionPeriod`, no inline Trigger attach.
+- **Slice 2 (separate, not yet planned in detail):** `MissionPeriod` creation (reusing the
+  Mission Profile allow/blocklist picker) plus inline Trigger attach, per Audit Part 4 items 8–9.
+
+**Verification checklist (Slice 1):**
+- [ ] CI green
+- [ ] On-device confirmed: reachable from Home via a persistent button (not one-shot, not
+      conditional on an empty mission list), all fields render/validate correctly, Create writes
+      a real row visible on Home and openable via Mission Detail
+- [ ] Archetype-conditional field visibility (target fields shown only for `OUTCOME_DRIVEN`)
+      confirmed on-device, including the mid-form archetype-switch case
+- [ ] Plan doc §6's three open questions (lifecycle-stage picker scope, Trigger-prompt
+      interaction, `CUSTOM_DAYS` handling) confirmed signed off on before merge, not silently
+      shipped with the plan's own stated defaults
 
 ---
 
@@ -463,7 +502,17 @@ sequencing to unblock 2.8's stated gap early):
 
 ## Batch C — In-product screens
 
-**Status: NOT STARTED.**
+**Status: PARTIALLY DONE.** Corrected 2026-08-12 (`AUDIT_2026-08-11.md`) — this line previously
+said "NOT STARTED," which was already false for two of the five items below:
+- **3.1 (Mission Interception/Countdown) — DONE**, shipped as part of Phase 2, on-device
+  confirmed (see Phase 2 status).
+- **3.5 (Predictive Failure Alert UI pattern) — DONE**, shipped as part of Phase 4
+  (`PredictiveFailureAlertCard`, `ROADMAP.md` §5.45) — confirmed on `main`, still needing
+  its own on-device confirmation per Phase 4's status note above.
+- **3.2 (Tribunal), 3.3 (Dispute Flag), 3.4 (Monthly Intelligence Report) — genuinely NOT
+  STARTED**, confirmed directly (`grep` across `:app` for `Tribunal`/`DisputeFlag`/
+  `MonthlyReport`/`MonthlyIntelligence` — zero matches). These three remain the real open scope
+  of this batch.
 
 **Scope** (Onboarding/Consent spec §3):
 

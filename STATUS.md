@@ -44,12 +44,24 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-11 (through §5.45 — doc audit against the Goal-Oriented
-Mission Model base document: resolved the two §5.24 `[HYPOTHESIS]` items per base doc §6.6 as
-deliberate-not-open, found Phase 4 merged to `main` since 2026-08-10 but never logged in this
-file or `ROADMAP.md` §2's phase table, and corrected five independent stale points in
-`01_DATA_MODEL_AND_SCHEMA.md` §2.2a. See §5.45 for the full account. This pass also confirmed
-G6's CI (below) went green after this file's prior sync recorded it as still in progress.)
+**Last synced to ROADMAP.md:** 2026-08-12 (through §5.46 — reviewed `AUDIT_2026-08-11.md`, a
+functional/spec-completeness audit triggered by on-device screenshots. Confirmed its central
+finding directly: there is no way to create, delete, or manage a Mission anywhere in the app
+beyond the one auto-generated row onboarding produces, even though the `GoalMission`/
+`MissionPeriod` schema already has every field a real creation UI needs. Wrote a checked-in plan,
+not code, for the fix — `Documents/07_ADD_MISSION_BATCH_PLAN.md` ("Batch G7 — Add Mission"),
+split into a Slice 1 (core fields, no `MissionPeriod`/Trigger yet) and an unplanned Slice 2. Also
+corrected three independently-stale `BUILD_PLAN.md` status lines found in the same pass (G5 and
+G6 both said "not yet merged," already false; Batch C said "NOT STARTED," false for two of its
+five items). See §5.46 for the full account. No `.kt`/`.xml` file touched this pass — plan only,
+per explicit request.)
+
+**Prior sync, through §5.45** — doc audit against the Goal-Oriented Mission Model base document:
+resolved the two §5.24 `[HYPOTHESIS]` items per base doc §6.6 as deliberate-not-open, found Phase
+4 merged to `main` since 2026-08-10 but never logged in this file or `ROADMAP.md` §2's phase
+table, and corrected five independent stale points in `01_DATA_MODEL_AND_SCHEMA.md` §2.2a. See
+§5.45 for the full account. This pass also confirmed G6's CI (below) went green after this file's
+prior sync recorded it as still in progress.
 
 **Prior sync, through §5.44 — Batch G6, Milestone UI. Data layer
 (`Milestone` entity/DAO/DB wiring) was already shipped since G1 but unsurfaced in `:domain`/
@@ -332,17 +344,31 @@ items, in rough priority order:
    `TierTransitionUseCase.activateIron` directly — the first real UI call site that use-case has
    ever had. Not the onboarding-time `ironCalibrationGateFragment` placeholder, which stays
    unreachable by design (row 4b) — see §5.31 for why these are deliberately two separate things.
-3. **This numbered list (items 1–3) is stale relative to `main` as of 2026-08-11 and needs a
-   fuller resync, not done in this pass.** Confirmed directly against the repo while resolving
-   item 1 above: Phase 4 (Behavioral Fingerprint / Predictive Failure) is also already merged to
-   `main` (commit `45d82f8`, 2026-08-10) — wired end-to-end (`ComputeBehavioralFingerprintUseCase`,
+3. **Phase 4 and G1–G6 confirmed merged, resync still owed for `ROADMAP.md` §2/§3/§4 (not done
+   as of this entry).** Phase 4 (Behavioral Fingerprint / Predictive Failure) is merged to `main`
+   (commit `45d82f8`, 2026-08-10) — wired end-to-end (`ComputeBehavioralFingerprintUseCase`,
    `BehavioralFingerprintPolicy`, `AppContainer` DI, `HomeFragment`/`HomeScreen`,
    `PredictiveFailureAlertCard`, dismissal tracking), F1–F5 all present and spec-matching
-   (`BUILD_PLAN.md` Batch E), 15 test cases in `ComputeBehavioralFingerprintUseCaseTest`. Never
-   flagged with a `ROADMAP.md` §5 entry when it landed, and `ROADMAP.md` §2's phase table still
-   marks it "⬜ NOT STARTED / 0%" — a real, live documentation gap, same category as every
-   "shipped but unflagged" finding elsewhere in this project's history, just at phase scale. Also
-   G1–G6 (the Goal-Oriented Mission Model itself) are fully merged, not just item 2 above — see
-   `01_DATA_MODEL_AND_SCHEMA.md` §2.2a. This whole section needs a real resync pass against
-   current `main`, not further item-by-item patching — flagged here rather than attempted
-   piecemeal in the same edit that resolved item 1.
+   (`BUILD_PLAN.md` Batch E), 15 test cases in `ComputeBehavioralFingerprintUseCaseTest`. G1–G6
+   (the Goal-Oriented Mission Model) are also fully merged — see `01_DATA_MODEL_AND_SCHEMA.md`
+   §2.2a. `ROADMAP.md` §2's phase table and §3/§4's snapshot/next-action sections still don't
+   reflect this — a real resync pass against current `main`, not yet attempted, still needed.
+4. **The real next item, per `AUDIT_2026-08-11.md` (functional/spec-completeness audit,
+   2026-08-11) and `ROADMAP.md` §5.46: Batch G7, "Add Mission."** The audit found the single
+   highest-impact functional gap in the app — no way to create, delete, or manage a Mission
+   anywhere beyond the one auto-generated row `FirstMissionSchedulingFragment` produces during
+   onboarding, even though the `GoalMission`/`MissionPeriod` schema already has every field a
+   real creation UI needs (confirmed directly against the shipped entity, not just the audit's
+   own claim). A full plan — not yet implemented — is checked in at
+   `Documents/07_ADD_MISSION_BATCH_PLAN.md`, split into a Slice 1 (a persistent Add Mission entry
+   point on Home covering every core `GoalMission` field, no `MissionPeriod`/Trigger yet) and an
+   unplanned Slice 2 (`MissionPeriod` + inline Trigger attach). Three open questions are flagged
+   in the plan doc's §6, needing sign-off before Slice 1 implementation starts. **This is the
+   actual next piece of work**, ahead of the §2/§3/§4 resync above — closing a real functional
+   gap for the app's one existing user takes priority over a documentation-only pass with no
+   behavior-affecting effect.
+5. **Same audit also found `BUILD_PLAN.md`'s G5/G6/Batch C status lines independently stale**
+   (G5 and G6 both still said "not yet merged" despite both already being merged per this file's
+   own §5.40/§5.44 history; Batch C said "NOT STARTED" despite two of its five items — Mission
+   Interception and the Predictive Failure Alert card — already being done). All three corrected
+   directly in `BUILD_PLAN.md` this same pass (§5.46).
