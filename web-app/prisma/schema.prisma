@@ -1,0 +1,451 @@
+// DisciplineOS Console — Authoritative Database Schema
+// Matches Kotlin entities from data/src/main/java/com/disciplineos/data/entity/
+// Design doc §1: Console owns the authoritative DB; Enforcer keeps minimal local cache.
+//
+// Enum values match Kotlin source exactly (design doc requirement §3: no silent renaming).
+// Field nullability matches Kotlin source exactly — nullability encodes real product decisions.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+// All enum values match Kotlin source exactly per design doc §3 requirement.
+
+enum Tier {
+  RECRUIT
+  OPERATOR
+  WARDEN
+  IRON
+}
+
+enum TierEventKind {
+  INITIAL_SELECTION
+  UPGRADE_RECOMMENDED
+  UPGRADE_ACCEPTED
+  STANDARD_DOWNGRADE
+  EXPLICIT_DOWNGRADE
+  CRISIS_DOWNGRADE
+  IRON_CRISIS_EXIT
+}
+
+enum MissionArchetype {
+  OUTCOME_DRIVEN
+  BEHAVIOR_DRIVEN
+  CONSTRAINT
+}
+
+enum TargetDirection {
+  INCREASE
+  DECREASE
+  MAINTAIN
+}
+
+enum CadenceType {
+  DAILY
+  WEEKLY
+  CUSTOM_DAYS
+  NONE
+}
+
+enum ResetMode {
+  FIXED_CALENDAR
+  ROLLING_WINDOW
+}
+
+enum MeasurementSource {
+  AUTOMATIC
+  MANUAL_LOG
+  BOTH
+}
+
+enum LifecycleStage {
+  OBSERVING
+  HYPOTHESIZING
+  ENFORCING
+  REVIEWING
+}
+
+enum MissionStatus {
+  ACTIVE
+  COMPLETED
+  VIOLATED
+  DISPUTED
+  ABORTED_CRISIS_EXIT
+}
+
+enum ViolationType {
+  BLOCKLIST_ACCESS
+  EARLY_EXIT
+  NON_START
+}
+
+enum DisputeStatus {
+  NONE
+  FLAGGED
+  UNDER_REVIEW
+  UPHELD
+  OVERTURNED
+}
+
+enum LedgerMetric {
+  DEBT
+  REPUTATION
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+// data/entity/User.kt — table: users
+// Nullable fields: currentTier, tierSelectedAt, tierActivationAt, onboardingConsentVersion
+// are nullable because User row is created at GoalDefinition (onboarding screen 2),
+// before tier is selected (screen 4a). Null = "not yet chosen."
+
+model User {
+  id                             String    @id @default(uuid()) @db.Uuid
+  createdAt                      DateTime  @default(now())
+  currentTier                    Tier?
+  tierSelectedAt                 DateTime?
+  tierActivationAt               DateTime?
+  calibrationWindowDays          Int       @default(10)
+  onboardingConsentVersion       String?
+  unsupervisedReliabilityOptIn   Boolean   @default(false)
+  unsupervisedReliabilityOptInAt DateTime?
+  debtAccrualPausedUntil         DateTime? // null = accrual active; non-null = don't write Debt ledger entries until that instant
+  tribunalDeferredUntil          DateTime? // display/gating only
+  flaggedCategories              String[]  @default([]) // stored as string array
+  consecutiveDaysBelowFloor      Int       @default(0)
+  lastExplicitDowngradeAt        DateTime?
+
+  // Relations
+  sessions       EnforcementSession[]
+  violations     Violation[]
+  ledgerEntries  LedgerEntry[]
+  tierEvents     TierEvent[]
+  goals          GoalMission[]
+  profiles       MissionProfile[]
+  devices        DeviceCredentials[]
+}
+
+// ─── Ledger Entries ───────────────────────────────────────────────────────────
+// data/ledger/LedgerEntry.kt — table: ledger_entries
+// Event-sourced, append-only. Current value = sum(delta) where reversedAt IS NULL AND pausedAt IS NULL.
+// Three distinct lifecycle states: active (both null), paused, reversed.
+
+model LedgerEntry {
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @db.Uuid
+  violationId    String?      @db.Uuid // nullable: not every entry originates from a Violation (e.g. decay)
+  metric         LedgerMetric
+  delta          Float
+  appliedAt      DateTime     @default(now())
+  pausedAt       DateTime?    // temporary pause pending dispute review; cleared on UPHELD
+  reversedAt     DateTime?    // permanent strike; set on OVERTURNED
+  reversedReason String?      // why reversed (OVERTURNED path)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, metric])
+  @@index([violationId])
+}
+
+// ─── Violations ───────────────────────────────────────────────────────────────
+// data/entity/Violation.kt — table: violations
+
+model Violation {
+  id                String        @id @default(uuid()) @db.Uuid
+  missionId         String        @db.Uuid
+  detectedAt        DateTime      @default(now())
+  type              ViolationType
+  disputeStatus     DisputeStatus @default(NONE)
+  disputeFlaggedAt  DateTime?
+  consequencePaused Boolean       @default(false)
+  rootCauseClusterId String?      @db.Uuid // shared-cause guard (§27.2)
+
+  user          User          @relation(fields: [missionId], references: [id]) // via mission
+  ledgerEntries LedgerEntry[]
+  pending       PendingViolation[]
+
+  @@index([missionId])
+  @@index([rootCauseClusterId])
+}
+
+// ─── Pending Violations (Enforcer → Console sync) ─────────────────────────────
+// data/entity/PendingViolation.kt — table: pending_violations
+// Offline queue for violations. Console receives and reconciles these.
+
+model PendingViolation {
+  id                       String          @id @default(uuid()) @db.Uuid
+  missionId                String          @db.Uuid
+  detectedAt               DateTime        @default(now())
+  type                     ViolationType
+  disputeStatus            DisputeStatus   @default(NONE)
+  disputeFlaggedAt         DateTime?
+  consequencePaused        Boolean         @default(false)
+  rootCauseClusterId       String?         @db.Uuid
+  syncState                String          @default("PENDING") // PENDING | SYNCING | SYNCED | FAILED
+  provisionalDebtDelta     Float?
+  provisionalReputationDelta Float?
+  createdAt                DateTime        @default(now())
+
+  violation Violation? @relation(fields: [missionId], references: [id])
+
+  @@index([syncState])
+}
+
+// ─── Enforcement Sessions (Missions) ──────────────────────────────────────────
+// data/entity/EnforcementSession.kt — table: missions
+// missionId is non-null (v10 fix) — every session must have a parent GoalMission.
+// missionPeriodId nullable (recurring-schedule template, not required).
+// ABORTED_CRISIS_EXIT must NOT write to Debt or Reputation.
+
+model EnforcementSession {
+  id                String        @id @default(uuid()) @db.Uuid
+  userId            String        @db.Uuid
+  goalMissionId     String        @db.Uuid // renamed from missionId for clarity in Prisma
+  missionPeriodId   String?       @db.Uuid
+  scheduledStart    DateTime?     // null = ad hoc (feeds Self-Initiation Trend §3.6)
+  actualStart       DateTime      @default(now())
+  actualEnd         DateTime?
+  plannedDurationMin Int
+  status            MissionStatus
+  allowlist         String[]      @default([])
+  blocklist         String[]      @default([])
+  missionProfileId  String        @db.Uuid
+
+  user         User         @relation(fields: [userId], references: [id])
+  goalMission  GoalMission  @relation(fields: [goalMissionId], references: [id])
+  period       MissionPeriod? @relation(fields: [missionPeriodId], references: [id])
+  profile      MissionProfile @relation(fields: [missionProfileId], references: [id])
+  violations   Violation[]
+  logs         MissionLogEntry[]
+  artifacts    OutputArtifact[]
+
+  @@index([userId, status])
+  @@index([goalMissionId])
+}
+
+// ─── Goal Missions ────────────────────────────────────────────────────────────
+// data/entity/GoalMission.kt — table: goal_missions
+
+model GoalMission {
+  id                              String          @id @default(uuid()) @db.Uuid
+  userId                          String          @db.Uuid
+  title                           String
+  archetype                       MissionArchetype
+  targetDirection                 TargetDirection?
+  targetValue                     Float?
+  unit                            String?
+  cadenceType                     CadenceType     @default(NONE)
+  resetMode                       ResetMode       @default(ROLLING_WINDOW)
+  measurementSource               MeasurementSource @default(MANUAL_LOG)
+  lifecycleStage                  LifecycleStage  @default(OBSERVING)
+  adherenceScore                  Float?
+  adherenceWindow                 Int?
+  consecutiveWindowsBelowThreshold Int             @default(0)
+  createdAt                       DateTime        @default(now())
+  archivedAt                      DateTime?
+  triggerPromptDismissedAt        DateTime?
+
+  user          User                @relation(fields: [userId], references: [id])
+  sessions      EnforcementSession[]
+  periods       MissionPeriod[]
+  logs          MissionLogEntry[]
+  milestones    Milestone[]
+  triggers      Trigger[]
+  adherenceEntries AdherenceLedgerEntry[]
+
+  @@index([userId])
+}
+
+// ─── Mission Profiles ─────────────────────────────────────────────────────────
+// data/entity/MissionProfile.kt — table: mission_profiles
+
+model MissionProfile {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  name      String
+  allowlist String[] @default([])
+  blocklist String[] @default([])
+  createdAt DateTime @default(now())
+
+  user     User                @relation(fields: [userId], references: [id])
+  sessions EnforcementSession[]
+
+  @@index([userId])
+}
+
+// ─── Tier Events ──────────────────────────────────────────────────────────────
+// data/entity/TierEvent.kt — table: tier_events
+// Append-only record of why a tier transition happened.
+
+model TierEvent {
+  id         String        @id @default(uuid()) @db.Uuid
+  userId     String        @db.Uuid
+  kind       TierEventKind
+  fromTier   Tier          // always non-null; for INITIAL_SELECTION set equal to toTier
+  toTier     Tier
+  occurredAt DateTime      @default(now())
+  reasonNote String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, occurredAt])
+}
+
+// ─── Mission Periods (Schedule Templates) ─────────────────────────────────────
+// Console-only. Schedule template resolved into concrete EnforcementSession before push.
+
+model MissionPeriod {
+  id                   String   @id @default(uuid()) @db.Uuid
+  goalMissionId        String   @db.Uuid
+  periodType           String   // FIXED_CALENDAR | FLOATING_DEADLINE | ROLLING_WINDOW
+  windowStart          DateTime?
+  windowEnd            DateTime?
+  enforcementProfileId String?  @db.Uuid
+  createdAt            DateTime @default(now())
+
+  goalMission GoalMission        @relation(fields: [goalMissionId], references: [id])
+  sessions    EnforcementSession[]
+
+  @@index([goalMissionId])
+}
+
+// ─── Mission Log Entries ──────────────────────────────────────────────────────
+// Console-only. Adherence hit-rate input — descriptive only, never scored for Debt/Reputation.
+
+model MissionLogEntry {
+  id          String   @id @default(uuid()) @db.Uuid
+  goalMissionId String @db.Uuid
+  createdAt   DateTime @default(now())
+  note        String?
+  numericValue Float?
+  didOccur    Boolean?
+
+  goalMission GoalMission @relation(fields: [goalMissionId], references: [id])
+
+  @@index([goalMissionId])
+}
+
+// ─── Triggers ─────────────────────────────────────────────────────────────────
+// Console-only. Implementation-intention cues.
+
+model Trigger {
+  id          String   @id @default(uuid()) @db.Uuid
+  goalMissionId String @db.Uuid
+  triggerType String   // APP_OPEN | SCHEDULE | etc.
+  configJson  String   // trigger-type-specific configuration
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  goalMission GoalMission @relation(fields: [goalMissionId], references: [id])
+
+  @@index([goalMissionId])
+}
+
+// ─── Milestones ───────────────────────────────────────────────────────────────
+// Console-only. Progress checkpoints — descriptive only.
+
+model Milestone {
+  id           String    @id @default(uuid()) @db.Uuid
+  goalMissionId String  @db.Uuid
+  label        String
+  targetValue  Float?    // null = ordinal-only checkpoint
+  targetDate   DateTime?
+  achievedAt   DateTime? // null = not yet achieved
+  createdAt    DateTime  @default(now())
+
+  goalMission GoalMission @relation(fields: [goalMissionId], references: [id])
+
+  @@index([goalMissionId])
+}
+
+// ─── Output Artifacts ─────────────────────────────────────────────────────────
+// Console-only. Mission Output Intelligence (PRD §13.7). Descriptive only.
+
+model OutputArtifact {
+  id         String   @id @default(uuid()) @db.Uuid
+  missionId  String   @db.Uuid
+  kind       String   // "words", "commits", "exports" — free-form per PRD §13.7
+  value      String   // stored as string; interpretation is kind-dependent
+  recordedAt DateTime @default(now())
+
+  session EnforcementSession @relation(fields: [missionId], references: [id])
+
+  @@id([missionId, id])
+}
+
+// ─── Adherence Ledger Entries ─────────────────────────────────────────────────
+// Console-only. Second consequence track separate from Reputation.
+
+model AdherenceLedgerEntry {
+  id           String   @id @default(uuid()) @db.Uuid
+  goalMissionId String @db.Uuid
+  windowStart  DateTime
+  windowEnd    DateTime
+  score        Float
+  createdAt    DateTime @default(now())
+
+  goalMission GoalMission @relation(fields: [goalMissionId], references: [id])
+
+  @@index([goalMissionId])
+}
+
+// ─── Unsupervised Signals ─────────────────────────────────────────────────────
+// Hard-isolated. "Measurement never enforces" (Data Model §7).
+// These never feed Tier, Debt, or Reputation.
+
+model UnsupervisedSignal {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  signalType String  // pickup_count | screen_time | etc.
+  value     Float
+  capturedAt DateTime @default(now())
+  source    String   // automatic | manual
+
+  @@index([userId, capturedAt])
+}
+
+// ─── Onboarding Screen Events ─────────────────────────────────────────────────
+// Console-only. Onboarding instrumentation.
+
+model OnboardingScreenEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  screenName String
+  action     String   // shown | completed | dismissed
+  occurredAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─── Predictive Failure Alert Dismissals ──────────────────────────────────────
+// Console-only. Alert accuracy tracking.
+
+model PredictiveFailureAlertDismissal {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  alertType   String
+  dismissedAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─── Device Credentials (Pairing) ─────────────────────────────────────────────
+// Design doc §3: device pairing model. One token per device; re-pairing revokes old.
+
+model DeviceCredentials {
+  id            String   @id @default(uuid()) @db.Uuid
+  deviceToken   String   @unique // long-lived JWT or opaque token
+  accountUserId String   @db.Uuid
+  pairedAt      DateTime @default(now())
+  lastSeenAt    DateTime?
+  revoked       Boolean  @default(false)
+
+  user User @relation(fields: [accountUserId], references: [id])
+
+  @@index([accountUserId])
+}

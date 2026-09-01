@@ -3689,3 +3689,59 @@ This corrects the initial design doc draft. The event-sourced ledger's immutabil
 local Debt/Reputation estimates until the Console confirms or rejects them via sync. Once
 confirmed, entries are written to the authoritative `ledger_entries` table and the provisional
 row is deleted.
+
+### 5.47 Enforcer/Console Split — Prompt 3 of 5: scaffold web app (Console)
+
+**Trigger for this pass:** Same split as §5.46. This entry documents Prompt 3: creating the
+web Console application scaffold with database schema, auth/pairing, API stubs, and frontend
+routing.
+
+**What was done:**
+1. Created `web-app/` directory with Next.js 14 (App Router) + TypeScript + Tailwind CSS
+2. Prisma schema (`prisma/schema.prisma`) — **authoritative database schema** matching Kotlin
+   entities field-for-field:
+   - 14 enums matching Kotlin source exactly (Tier, MissionStatus, ViolationType, etc.)
+   - 17 models covering all Console-authoritative tables (User, LedgerEntry, Violation,
+     EnforcementSession, GoalMission, MissionProfile, TierEvent, MissionPeriod, MissionLogEntry,
+     Trigger, Milestone, OutputArtifact, AdherenceLedgerEntry, UnsupervisedSignal,
+     OnboardingScreenEvent, PredictiveFailureAlertDismissal, DeviceCredentials, PendingViolation)
+   - Field nullability, defaults, and comments preserving product semantics from Kotlin kdocs
+3. Auth/pairing flow (design doc §3.1):
+   - `POST /api/auth/pair` — generates 6-digit pairing code (5-min expiry)
+   - `POST /api/auth/login` — exchanges code for 90-day JWT device token
+   - `src/lib/auth.ts` — token generation, verification, pairing code store
+4. Sync protocol API stubs (design doc §2):
+   - `POST /api/sync/violations` — Enforcer pushes pending violations
+   - `GET /api/sync/pending` — Enforcer pulls pending Console actions
+   - `POST /api/sync/state` — full state refresh for Enforcer
+5. CRUD API stubs: users, missions, goals, profiles, ledger, tier-events, reports
+6. Frontend routing scaffold:
+   - `(dashboard)/` layout with sidebar navigation
+   - Pages: Home, Missions (§9), Goals (§8), Tier Status (§12), Tribunal (§30),
+     Reports (§32-34), Settings (device management, data export)
+   - `(auth)/` pages: Login, Register
+7. README with setup instructions, project structure, API reference
+
+**Design decisions:**
+- **Stack:** Next.js + Prisma + PostgreSQL — single deployable unit, one language (TypeScript)
+  end to end, matching design doc §5.2's "simple REST/JSON API" assumption
+- **Schema fidelity:** All field names, types, nullability, and enum values match Kotlin source
+  exactly per design doc §3 requirement — no silent renaming at sync boundary
+- **Enforcer-local tables excluded:** `cached_user`, `cached_goal_missions`,
+  `cached_mission_profiles`, `sync_metadata`, `provisional_ledger_entries` are not in the
+  Prisma schema — these exist only on the Enforcer per design doc §1.3
+- **Business logic deferred:** All use-case logic (Debt/Reputation calculation, tier transitions,
+  dispute resolution, report generation) marked `TODO(prompt4)` — to be ported from
+  `web-app-reference/` in the next prompt
+
+**What was NOT done (deferred to Prompt 4):**
+- Business logic port from `web-app-reference/` (use cases, policies, decay calculations)
+- Real auth (NextAuth integration, password hashing, session management)
+- WebSocket/SSE push to Enforcer (design doc §2.1)
+- Report generation algorithms (PRD §32-34)
+- Tribunal AI (Behavioral Correction Plan generation, PRD §30)
+- Frontend data fetching and state management
+
+**Not run: compilation or build** — no Node.js/npm available in this sandbox. The scaffold
+is syntactically valid TypeScript/Prisma but has not been verified with `npm run build` or
+`npx prisma generate`. Standing gap: run full build before merging.
