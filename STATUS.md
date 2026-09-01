@@ -44,9 +44,9 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-31 (through §5.46 — Enforcer/Console Split Prompt 2:
-native app stripped to enforcement core, non-enforcement code relocated to `web-app-reference/`,
-new Enforcer-specific entities/DAOs added, sync stubs created)
+**Last synced to ROADMAP.md:** 2026-09-01 (through §5.47 — Enforcer/Console Split Prompt 3:
+web app scaffold created with Next.js + Prisma + PostgreSQL, database schema matching Kotlin
+entities, auth/pairing flow, sync protocol API stubs, frontend routing)
 
 **Prior sync, through §5.44 — Batch G6, Milestone UI. Data layer
 (`Milestone` entity/DAO/DB wiring) was already shipped since G1 but unsurfaced in `:domain`/
@@ -344,12 +344,10 @@ items, in rough priority order:
    current `main`, not further item-by-item patching — flagged here rather than attempted
    piecemeal in the same edit that resolved item 1.
 
-4. **Enforcer/Console Split (§5.46) — Prompt 2 complete, Prompts 3-5 pending.** The native app
-   has been stripped to the enforcement core (Accessibility Service, interception, local cache).
-   Non-enforcement code (onboarding, home, mission detail, goal management, adherence, behavioral
-   fingerprint, predictive failure) relocated to `web-app-reference/` as reference for Prompt 4
-   (web backend porting). New Enforcer-specific entities (`CachedUser`, `CachedGoalMission`,
-   `CachedMissionProfile`, `PendingViolation`, `ProvisionalLedgerEntry`, `SyncMetadata`,
-   `DeviceCredentials`) and DAOs added. Sync client stubs created (`MissionSyncClient`,
-   `ConsoleSyncApi`). Database bumped to v20 with destructive migration. Standing gap: no
-   Android SDK in sandbox, compilation not verified — run full build before merging.
+4. **Enforcer/Console Split (§5.46-§5.47) — Prompts 2-3 complete, Prompts 4-5 pending.**
+   Prompt 2: native app stripped to enforcement core; non-enforcement code relocated to
+   `web-app-reference/`. Prompt 3: web Console scaffolded with Next.js + Prisma + PostgreSQL;
+   database schema matching Kotlin entities; auth/pairing flow; sync protocol API stubs;
+   frontend routing. Prompt 4: port business logic from `web-app-reference/` to web backend.
+   Prompt 5: final integration + testing. Standing gap: no Node.js in sandbox, web-app
+   compilation not verified — run `npm run build` before merging.
