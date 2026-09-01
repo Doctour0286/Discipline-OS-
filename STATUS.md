@@ -44,12 +44,9 @@ touched at all" — it can't verify the *content* below still matches, that's st
 judgment call each sync. See the script's own header for exactly what it does and doesn't
 check.
 
-**Last synced to ROADMAP.md:** 2026-08-11 (through §5.45 — doc audit against the Goal-Oriented
-Mission Model base document: resolved the two §5.24 `[HYPOTHESIS]` items per base doc §6.6 as
-deliberate-not-open, found Phase 4 merged to `main` since 2026-08-10 but never logged in this
-file or `ROADMAP.md` §2's phase table, and corrected five independent stale points in
-`01_DATA_MODEL_AND_SCHEMA.md` §2.2a. See §5.45 for the full account. This pass also confirmed
-G6's CI (below) went green after this file's prior sync recorded it as still in progress.)
+**Last synced to ROADMAP.md:** 2026-08-31 (through §5.46 — Enforcer/Console Split Prompt 2:
+native app stripped to enforcement core, non-enforcement code relocated to `web-app-reference/`,
+new Enforcer-specific entities/DAOs added, sync stubs created)
 
 **Prior sync, through §5.44 — Batch G6, Milestone UI. Data layer
 (`Milestone` entity/DAO/DB wiring) was already shipped since G1 but unsurfaced in `:domain`/
@@ -346,3 +343,13 @@ items, in rough priority order:
    `01_DATA_MODEL_AND_SCHEMA.md` §2.2a. This whole section needs a real resync pass against
    current `main`, not further item-by-item patching — flagged here rather than attempted
    piecemeal in the same edit that resolved item 1.
+
+4. **Enforcer/Console Split (§5.46) — Prompt 2 complete, Prompts 3-5 pending.** The native app
+   has been stripped to the enforcement core (Accessibility Service, interception, local cache).
+   Non-enforcement code (onboarding, home, mission detail, goal management, adherence, behavioral
+   fingerprint, predictive failure) relocated to `web-app-reference/` as reference for Prompt 4
+   (web backend porting). New Enforcer-specific entities (`CachedUser`, `CachedGoalMission`,
+   `CachedMissionProfile`, `PendingViolation`, `ProvisionalLedgerEntry`, `SyncMetadata`,
+   `DeviceCredentials`) and DAOs added. Sync client stubs created (`MissionSyncClient`,
+   `ConsoleSyncApi`). Database bumped to v20 with destructive migration. Standing gap: no
+   Android SDK in sandbox, compilation not verified — run full build before merging.

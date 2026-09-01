@@ -1,19 +1,18 @@
 package com.disciplineos.data.metrics
 
-import com.disciplineos.data.entity.LifecycleStage
-import com.disciplineos.data.entity.Milestone
-import com.disciplineos.data.entity.MissionLogEntry
-import com.disciplineos.data.entity.TargetDirection
 import com.disciplineos.data.entity.Tier
 import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Pure formula layer — Data Model & Schema doc §3. Deliberately has no DB/DAO dependency
- * so these can be unit tested against fixed inputs without a Room instance, and so the
- * "measurement never enforces" boundary (§7) has a single obvious place to check: none of
- * these functions accept an UnsupervisedSignal-derived value as an input that flows into a
- * Tier or LedgerEntry decision.
+ * Pure formula layer — Data Model & Schema doc §3. Enforcer-stripped version.
+ * Functions referencing non-enforcement entities (Milestone, MissionLogEntry, LifecycleStage)
+ * moved to web-app-reference/ with the non-enforcement code.
+ *
+ * Retains only the functions used by the enforcement path:
+ * - [ironCalibrationSatisfied]: used by TierTransitionUseCase
+ * - [reliabilityIndex], [debtCeiling], [clampToDebtCeiling], [debtQuartileMarkers]:
+ *   pure formulas with no entity dependencies, retained for completeness.
  */
 
 /** Data Model §3.2. Thresholds (85%/10 days) are Hypothesis per PRD §42 — not encoded here. */
@@ -62,98 +61,4 @@ fun ironCalibrationSatisfied(
     if (tier != Tier.IRON) return true // gate only applies to Iron
     val windowMillis = calibrationWindowDays * 24L * 60 * 60 * 1000
     return nowEpochMilli >= tierSelectedAtEpochMilli + windowMillis
-}
-
-/**
- * Batch G5 (BUILD_PLAN.md), Integration Plan §6 / base design doc §5 ("Mission lifecycle:
- * observe -> hypothesize -> enforce -> review"). Answers "should this GoalMission move from
- * OBSERVING to HYPOTHESIZING as of now" — a pure read, same "does not mutate anything, caller
- * decides what to do with the result" contract [ironCalibrationSatisfied] already establishes
- * for this file, and the same reuse Integration Plan §6 explicitly asks for ("computed the same
- * way ironCalibrationSatisfied is today — a pure function, reused rather than re-derived at each
- * call site").
- *
- * Base doc §5, step 2: "after a minimum number of outcome logs with no behavior attached (a
- * small number, e.g. 2-3 -- exact threshold is `[HYPOTHESIS]`, not fixed here), the app may
- * surface a single, dismissible, non-scored prompt to attach a behavior." Two conditions from
- * that sentence, both required:
- * - the mission is still in [LifecycleStage.OBSERVING] (step 1's own state) — a mission already
- *   past Observing has nothing to transition *into* Hypothesizing from; re-firing this check on
- *   an already-Hypothesizing or already-Enforcing mission must be a no-op, not a downgrade.
- * - [outcomeLogCount] (count of [com.disciplineos.data.entity.MissionLogEntry] rows for this
- *   mission) has reached [threshold], with no behavior attached yet.
- *
- * "No behavior attached yet" is represented here as [hasAnyBehaviorAttached] rather than this
- * function inspecting [com.disciplineos.data.entity.MissionPeriod] rows itself — same
- * DB-free-pure-function boundary this file's own kdoc states; the caller (a use-case or Fragment
- * with real DAO access) resolves that existence check (`MissionPeriodDao.forMission(missionId)
- * .isNotEmpty()`) and passes in the boolean.
- *
- * [threshold] has no default here (unlike [ironCalibrationSatisfied]'s implicit reliance on a
- * caller-supplied [Int] with no built-in fallback either) — the placeholder value itself lives
- * at the call site as a flagged `[HYPOTHESIS]` constant, matching every other unstated-in-spec
- * number in this codebase (`NEAR_MISS_MARGIN`, `MIN_ENTRIES_FOR_TREND`, etc.) rather than being
- * silently baked into this shared function where a future real value would require an API
- * change to plug in.
- */
-fun hypothesizingStageSatisfied(
-    currentStage: LifecycleStage,
-    hasAnyBehaviorAttached: Boolean,
-    outcomeLogCount: Int,
-    threshold: Int,
-): Boolean {
-    if (currentStage != LifecycleStage.OBSERVING) return false
-    if (hasAnyBehaviorAttached) return false
-    return outcomeLogCount >= threshold
-}
-
-/**
- * Batch G6 (BUILD_PLAN.md), Integration Plan §7 / Addendum §B.2. Answers "has [milestone] been
- * reached as of [logEntries]" — a pure read, same "does not mutate anything, caller decides
- * what to do with the result" contract [ironCalibrationSatisfied]/[hypothesizingStageSatisfied]
- * already establish for this file. The caller (a Fragment with real DAO access) is responsible
- * for persisting a non-null result via `MilestoneDao.update` — this function only computes
- * whether the crossing happened, matching Integration Plan §7's own framing ("`achievedAt`
- * computed when a new `MissionLogEntry` crosses the threshold").
- *
- * Addendum §B.2: "Milestones are derived checkpoints on the same trend `MissionLogEntry`
- * already builds, not a new logging surface — the person doesn't log against a Milestone
- * directly, `achievedAt` is computed from existing log entries crossing the threshold." Reuses
- * [GoalMission.targetDirection] for which direction counts as "crossing" — a [Milestone] with
- * no numeric target ([Milestone.targetValue] null, an ordinal-only checkpoint per Addendum
- * §B.2's "targetDate = null means ordinal only" framing extended to targetValue) can never be
- * computed this way and always returns `false` (no read possible).
- *
- * Already-achieved milestones ([milestone].achievedAt != null) are not re-evaluated — once hit,
- * always hit; nothing in the Addendum's "checkpoint" framing suggests a milestone can be
- * un-reached if a later log entry regresses (e.g. weight creeping back up after crossing a
- * loss checkpoint), and no spec language supports building an un-achieve path with no data or
- * sign-off behind it. Returns `false` in this case, since the caller uses a `false` result to
- * mean "no write needed," which already-achieved rows correctly are.
- *
- * @param milestone the checkpoint being evaluated.
- * @param targetDirection the parent [GoalMission]'s [TargetDirection] — [TargetDirection.MAINTAIN]
- *   has no well-defined "crossing" for an intermediate checkpoint (a maintain-type goal has no
- *   directional progress to be ahead of/behind on) and always returns `false`.
- * @param logEntries all [MissionLogEntry] rows for the parent [GoalMission] — not windowed; a
- *   milestone is a point on the goal's overall trajectory, not a per-window fact.
- * @return `true` if this call should mark [milestone] achieved now, `false` otherwise (already
- *   achieved, no numeric target, `MAINTAIN` direction, or no log entry has crossed it yet).
- */
-fun milestoneAchievementSatisfied(
-    milestone: Milestone,
-    targetDirection: TargetDirection?,
-    logEntries: List<MissionLogEntry>,
-): Boolean {
-    if (milestone.achievedAt != null) return false
-    val target = milestone.targetValue ?: return false
-    val direction = targetDirection ?: return false
-    val numericValues = logEntries.mapNotNull { it.numericValue }
-    if (numericValues.isEmpty()) return false
-
-    return when (direction) {
-        TargetDirection.INCREASE -> numericValues.any { it >= target }
-        TargetDirection.DECREASE -> numericValues.any { it <= target }
-        TargetDirection.MAINTAIN -> false
-    }
 }

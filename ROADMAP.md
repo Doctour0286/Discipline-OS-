@@ -3621,3 +3621,71 @@ deliberately doesn't attempt, to keep this pass scoped to what was actually aske
 **Not run: an actual compile or build** — this was a documentation-only pass, no `.kt` files
 touched, so the standing "no toolchain reachable" gap doesn't apply to this entry's own changes,
 though it remains true for everything else in this log.
+
+### 5.46 Enforcer/Console Split — Prompt 2 of 5: strip native app to Enforcer core
+
+**Trigger for this pass:** Splitting DisciplineOS into two applications per
+`Documents/07_WEB_SPLIT_SYNC_DESIGN.md` (v2). The native Android app becomes a thin Enforcer
+(Accessibility Service, interception, local cache only). Everything else (onboarding, goals,
+reports, Tribunal, tier selection UI) moves to a web Console. This entry documents Prompt 2:
+restructuring the native app to contain only the Enforcer core.
+
+**What was done:**
+1. Non-enforcement code relocated to `web-app-reference/` as reference for Prompt 4 (web backend
+   porting):
+   - **App moved:** `onboarding/` (10 fragments), `home/` (2 fragments), `mission/` (3 fragments),
+     `ui/onboarding/`, `ui/home/`, `ui/mission/`, `applist/`
+   - **Domain moved:** `ApplyAdherenceDecayUseCase`, `ApplyReputationDecayUseCase`,
+     `ComputeBehavioralFingerprintUseCase`+`BehavioralFingerprintModel`, `ResolveDisputeUseCase`,
+     `CreateConstraintTriggerUseCase`, `AdherenceDecayPolicy`, `ReputationDecayPolicy`,
+     `BehavioralFingerprintPolicy`, `HypothesisAdherenceDecayPolicy`,
+     `HypothesisBehavioralFingerprintPolicy`, `HypothesisConsequencePolicy`
+   - **Data moved:** `UnsupervisedSignal`, `OnboardingScreenEvent`,
+     `PredictiveFailureAlertDismissal`, `UnsupervisedSignalDao`, `GoalMissionDaos`
+     (GoalMissionDao/MissionPeriodDao/MissionLogEntryDao/TriggerDao/MilestoneDao),
+     `PredictiveFailureAlertDismissalDao`, entire `adherence/` package, `UnsupervisedDatabase`
+   - **Tests moved:** 7 app tests (onboarding/home/mission), 5 domain tests, 1 data test
+     (`ArchitectureBoundaryTest`)
+   - **OutputArtifact** entity removed entirely (descriptive-only, not used by enforcement path)
+2. New Enforcer-specific entities created (design doc §1.1): `CachedUser`, `CachedGoalMission`,
+   `CachedMissionProfile`, `PendingViolation`, `ProvisionalLedgerEntry`, `SyncMetadata`,
+   `DeviceCredentials`
+3. New Enforcer-specific DAOs created: `CachedUserDao`, `CachedGoalMissionDao`,
+   `CachedMissionProfileDao`, `PendingViolationDao`, `ProvisionalLedgerDao`,
+   `DeviceCredentialsDao`
+4. `DisciplineOsDatabase` updated: v20, destructive migration, new entities/DAOs, removed
+   non-enforcement entities
+5. `AppContainer` stripped to enforcement-path wiring only (RecordViolationUseCase,
+   TierTransitionUseCase, WardenVoiceProvider)
+6. `Metrics.kt` stripped to enforcement-path functions only (removed
+   `hypothesizingStageSatisfied`, `milestoneAchievementSatisfied` which referenced deleted
+   entities)
+7. Navigation graph updated to minimal Enforcer placeholder (deleted fragment references)
+8. Sync client stubs added (`app/sync/MissionSyncClient.kt`, `ConsoleSyncApi.kt`)
+
+**Retained in native app (enforcement core):**
+- `InterceptionController`, `MissionAccessibilityService`, `MissionInterceptionActivity`
+- `RecordViolationUseCase`, `TierTransitionUseCase`
+- `ConsequencePolicy`, `InterceptionPolicy`
+- Voice providers (`FallbackVoiceBank`, `VoiceLineGate`, `WardenVoiceProvider`)
+- Enforcement-path entities: `User`, `EnforcementSession`, `Violation`, `LedgerEntry`, `TierEvent`,
+  `MissionProfile`, `GoalMission`
+
+**What was NOT done (deferred to Prompts 3-5):**
+- ProGuard/R8 keep rules for new entities
+- Full sync protocol implementation (only stubs added)
+- `GoalMission.kt` retains full field set with stub enums for DB compatibility — not trimmed to
+  enforcement-only fields yet
+- `STATUS.md` and `ROADMAP.md` phase table not yet updated (will be updated at final commit)
+
+**Build verification:** No Android SDK available in this sandbox — compilation not verified.
+All references to deleted code confirmed absent via grep sweeps. Standing gap: run full build
+before merging.
+
+**Decision: provisional ledger is a separate table, not a `synced` column on `LedgerEntry`.**
+This corrects the initial design doc draft. The event-sourced ledger's immutability constraint
+(Data Model §6) means adding a `synced` boolean would violate the append-only invariant.
+`ProvisionalLedgerEntry` is a separate entity (`provisional_ledger_entries` table) that holds
+local Debt/Reputation estimates until the Console confirms or rejects them via sync. Once
+confirmed, entries are written to the authoritative `ledger_entries` table and the provisional
+row is deleted.

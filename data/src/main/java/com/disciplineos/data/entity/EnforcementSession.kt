@@ -59,23 +59,4 @@ data class EnforcementSession(
     val missionProfileId: UUID,
 )
 
-/**
- * Data Model §2.2 `output_artifacts` — Mission Output Intelligence, PRD §13.7.
- * Descriptive only. Must never be read by any scoring/consequence calculator —
- * same category of hard boundary as UnsupervisedSignal (§13.3), just narrower in scope
- * (this is barred from consequence paths specifically, not isolated at the schema level
- * the way UnsupervisedSignal is — see OutputArtifactDao notes).
- *
- * [missionId] name kept unchanged through the `Mission` → [EnforcementSession] rename — this
- * column still refers to an [EnforcementSession.id], the rename only touched the Kotlin class
- * name (and, deliberately, nothing else — see [EnforcementSession]'s own kdoc) — renaming this
- * column would be pure churn with no semantic gain.
- */
-@Entity(tableName = "output_artifacts", primaryKeys = ["missionId", "id"])
-data class OutputArtifact(
-    val id: UUID,
-    val missionId: UUID,
-    val kind: String, // e.g. "words", "commits", "exports" — free-form per PRD §13.7, not an enum in the spec
-    val value: String, // stored as string; interpretation is kind-dependent and display-only
-    val recordedAt: Instant,
-)
+
