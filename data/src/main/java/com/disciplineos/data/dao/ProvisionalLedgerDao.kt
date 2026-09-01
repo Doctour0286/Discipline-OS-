@@ -4,7 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
-import com.disciplineos.data.entity.LedgerMetric
+import com.disciplineos.data.ledger.LedgerMetric
 import com.disciplineos.data.entity.ProvisionalLedgerEntry
 import java.util.UUID
 
