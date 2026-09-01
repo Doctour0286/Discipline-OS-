@@ -20,6 +20,6 @@ interface CachedGoalMissionDao {
     @Query("SELECT * FROM cached_goal_missions WHERE id = :id")
     suspend fun get(id: UUID): CachedGoalMission?
 
-    @Query("SELECT * FROM cached_goal_missions WHERE userId = :userId ORDER BY createdAt DESC LIMIT 1")
-    suspend fun mostRecentFor(userId: UUID): CachedGoalMission?
+    @Query("SELECT * FROM cached_goal_missions WHERE userId = :userId LIMIT 1")
+    suspend fun forUser(userId: UUID): CachedGoalMission?
 }
