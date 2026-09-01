@@ -189,6 +189,8 @@
     <string name="welcome_tone_body">Higher tiers (Operator, Warden, Iron) give you direct, evidence-based feedback when you break a commitment — that tone is a choice you make by picking a tier, not something every setup gets by default. Recruit stays lower-pressure throughout.</string>
     <string name="welcome_fit_body">If that sounds like more structure than you want right now, that\'s useful to know before you set anything up — you can always start at a lighter tier and move up later.</string>
     <string name="welcome_continue">Continue</string>
+    <string name="welcome_enable_sa_body">This permission is required to detect when you open apps outside your current Mission, so the app can show the interception screen and enforce your blocklist. Without it, the app cannot restrict access to blocked apps during a Mission.</string>
+    <string name="welcome_enable_sa">Enable Accessibility Service</string>
 
     <!--
         §2.3 Tier Explanation — spec's own label: "highest-stakes copy in onboarding."
